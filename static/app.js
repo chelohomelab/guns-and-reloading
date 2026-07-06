@@ -535,17 +535,15 @@ function filterHandloadBullets() {
             : `<option value="">No bullets in stock for ${escHtml(cal)}</option>`;
     }
 
-    // Casings
+    // Casings — show all (casing caliber is cartridge name e.g. "270 Winchester",
+    // bullet caliber is diameter e.g. ".277" — can't match them automatically)
     if (casSel) {
-        const matching = _hlCasings.filter(c => c.caliber === cal);
         casSel.innerHTML = `<option value="">— Select casing (optional) —</option>` +
-            (matching.length
-                ? matching.map(c => {
-                    const label = `${c.brand} ${c.caliber}`.trim();
-                    const cond = c.times_fired === 0 ? 'New' : `${c.times_fired}x fired`;
-                    return `<option value="${escHtml(c.brand)}" data-id="${c.id}">${escHtml(label)} — ${cond} (${(c.quantity||0).toLocaleString()} ct)</option>`;
-                  }).join('')
-                : `<option value="" disabled>No casings in stock for ${escHtml(cal)}</option>`);
+            _hlCasings.map(c => {
+                const label = `${c.brand} ${c.caliber}`.trim();
+                const cond = c.times_fired === 0 ? 'New' : `${c.times_fired}x fired`;
+                return `<option value="${escHtml(c.brand)}" data-id="${c.id}">${escHtml(label)} — ${cond} (${(c.quantity||0).toLocaleString()} ct)</option>`;
+            }).join('');
     }
 }
 

@@ -458,18 +458,22 @@ function toggleScopeInputState() {
 }
 
 let _hlBullets = [];
+let _hlCasings = [];
 
 async function populateHandloadDropdowns() {
     try {
-        const [powderRes, primerRes, bulletRes] = await Promise.all([
+        const [powderRes, primerRes, bulletRes, casingRes] = await Promise.all([
             fetch('/components/powders/', { cache: 'no-store' }),
             fetch('/components/primers/', { cache: 'no-store' }),
             fetch('/components/bullets/', { cache: 'no-store' }),
+            fetch('/components/casings/', { cache: 'no-store' }),
         ]);
         const powders = powderRes.ok ? await powderRes.json() : [];
         const primers = primerRes.ok ? await primerRes.json() : [];
         const bullets = bulletRes.ok ? await bulletRes.json() : [];
+        const casings = casingRes.ok ? await casingRes.json() : [];
         _hlBullets = bullets;
+        _hlCasings = casings;
 
         const calSel = document.getElementById('hl-caliber');
         if (calSel) {
@@ -506,27 +510,43 @@ async function populateHandloadDropdowns() {
 function filterHandloadBullets() {
     const cal = document.getElementById('hl-caliber')?.value;
     const bulSel = document.getElementById('hl-bullet');
-    if (!bulSel) return;
-    // Reset weight/bc when caliber changes
+    const casSel = document.getElementById('hl-casing');
+
+    // Reset auto-filled fields
     const wt = document.getElementById('hl-bullet-weight');
     const bc = document.getElementById('hl-bullet-bc');
     if (wt) wt.value = '';
     if (bc) bc.value = '';
+
     if (!cal) {
-        bulSel.innerHTML = `<option value="">— Select caliber first —</option>`;
+        if (bulSel) bulSel.innerHTML = `<option value="">— Select caliber first —</option>`;
+        if (casSel) casSel.innerHTML = `<option value="">— Select caliber first —</option>`;
         return;
     }
-    const matching = _hlBullets.filter(b => !b.is_muzzleloader && b.caliber === cal);
-    if (!matching.length) {
-        bulSel.innerHTML = `<option value="">No bullets in stock for ${escHtml(cal)}</option>`;
-        return;
+
+    // Bullets
+    if (bulSel) {
+        const matching = _hlBullets.filter(b => !b.is_muzzleloader && b.caliber === cal);
+        bulSel.innerHTML = matching.length
+            ? `<option value="">— Select bullet —</option>` + matching.map(b => {
+                const label = `${b.brand} ${b.product_line || ''} ${b.weight_gr}gr ${b.bullet_type || ''}`.replace(/\s+/g,' ').trim();
+                return `<option value="${escHtml(label)}" data-id="${b.id}">${escHtml(label)} (${(b.quantity||0).toLocaleString()} ct)</option>`;
+              }).join('')
+            : `<option value="">No bullets in stock for ${escHtml(cal)}</option>`;
     }
-    bulSel.innerHTML = `<option value="">— Select bullet —</option>` +
-        matching.map(b => {
-            const label = `${b.brand} ${b.product_line || ''} ${b.weight_gr}gr ${b.bullet_type || ''}`.replace(/\s+/g,' ').trim();
-            const qty = (b.quantity || 0).toLocaleString();
-            return `<option value="${escHtml(label)}" data-id="${b.id}">${escHtml(label)} (${qty} ct)</option>`;
-        }).join('');
+
+    // Casings
+    if (casSel) {
+        const matching = _hlCasings.filter(c => c.caliber === cal);
+        casSel.innerHTML = `<option value="">— Select casing (optional) —</option>` +
+            (matching.length
+                ? matching.map(c => {
+                    const label = `${c.brand} ${c.caliber}`.trim();
+                    const cond = c.times_fired === 0 ? 'New' : `${c.times_fired}x fired`;
+                    return `<option value="${escHtml(c.brand)}">${escHtml(label)} — ${cond} (${(c.quantity||0).toLocaleString()} ct)</option>`;
+                  }).join('')
+                : `<option value="" disabled>No casings in stock for ${escHtml(cal)}</option>`);
+    }
 }
 
 function autofillBulletData(sel) {

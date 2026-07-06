@@ -461,21 +461,19 @@ let _hlBullets = [];
 
 async function populateHandloadDropdowns() {
     try {
-        const [powderRes, primerRes, bulletRes, caliberRes] = await Promise.all([
+        const [powderRes, primerRes, bulletRes] = await Promise.all([
             fetch('/components/powders/', { cache: 'no-store' }),
             fetch('/components/primers/', { cache: 'no-store' }),
             fetch('/components/bullets/', { cache: 'no-store' }),
-            fetch('/lookups/', { cache: 'no-store' }),
         ]);
         const powders = powderRes.ok ? await powderRes.json() : [];
         const primers = primerRes.ok ? await primerRes.json() : [];
         const bullets = bulletRes.ok ? await bulletRes.json() : [];
-        const lookups = caliberRes.ok ? await caliberRes.json() : {};
         _hlBullets = bullets;
 
         const calSel = document.getElementById('hl-caliber');
         if (calSel) {
-            const calibers = (lookups.caliber || []).sort();
+            const calibers = [...new Set(bullets.filter(b => !b.is_muzzleloader && b.caliber).map(b => b.caliber))].sort();
             calSel.innerHTML = `<option value="">— Select caliber —</option>` +
                 calibers.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
         }

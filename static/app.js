@@ -726,7 +726,7 @@ function switchAmmoCategory(cat) {
 }
 
 function switchAmmoCaliber(cal) {
-    currentAmmoCaliberFilter = currentAmmoCaliberFilter === cal ? null : cal;
+    currentAmmoCaliberFilter = cal;
     loadAmmoInventory(currentAmmoFilter);
 }
 
@@ -1778,9 +1778,7 @@ async function loadAmmoInventory(type) {
         }
         filtered = filtered.filter(matchesSearch);
 
-        document.getElementById('inventory-count').innerText = currentAmmoCaliberFilter
-            ? `${filtered.length} Load${filtered.length !== 1 ? 's' : ''} · ${currentAmmoCaliberFilter}`
-            : `${filtered.length} Load${filtered.length !== 1 ? 's' : ''} Registered`;
+        document.getElementById('inventory-count').innerText = `${filtered.length} Load${filtered.length !== 1 ? 's' : ''} Registered`;
 
         // Group by category → caliber
         const CAT_ORDER = ['centerfire', 'handgun', 'rimfire', 'shotgun', 'shotgun_slug', 'muzzleloader'];
@@ -1810,10 +1808,10 @@ async function loadAmmoInventory(type) {
         function buildCaliberRow(sourceItems) {
             if (!calFilterRow) return;
             const cals = [...new Set(sourceItems.map(a => a.caliber).filter(Boolean))].sort((a,b) => a.localeCompare(b));
-            if (cals.length > 1) {
-                // Validate active filter still exists in this set
-                if (currentAmmoCaliberFilter && !cals.includes(currentAmmoCaliberFilter)) {
-                    currentAmmoCaliberFilter = null;
+            if (cals.length > 0) {
+                // Default to first caliber if none selected or current is invalid
+                if (!currentAmmoCaliberFilter || !cals.includes(currentAmmoCaliberFilter)) {
+                    currentAmmoCaliberFilter = cals[0];
                 }
                 calFilterRow.classList.remove('hidden');
                 calFilterRow.innerHTML = cals.map(cal => {

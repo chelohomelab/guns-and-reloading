@@ -830,7 +830,7 @@ function switchAmmoCategory(cat) {
 }
 
 function switchAmmoCaliber(cal) {
-    currentAmmoCaliberFilter = cal;
+    currentAmmoCaliberFilter = cal || null;
     loadAmmoInventory(currentAmmoFilter);
 }
 
@@ -1912,19 +1912,23 @@ async function loadAmmoInventory(type) {
         function buildCaliberRow(sourceItems) {
             if (!calFilterRow) return;
             const cals = [...new Set(sourceItems.map(a => a.caliber).filter(Boolean))].sort((a,b) => a.localeCompare(b));
-            if (cals.length > 0) {
-                // Default to first caliber if none selected or current is invalid
-                if (!currentAmmoCaliberFilter || !cals.includes(currentAmmoCaliberFilter)) {
-                    currentAmmoCaliberFilter = cals[0];
+            if (cals.length > 1) {
+                // Keep current caliber if valid, otherwise default to null (All)
+                if (currentAmmoCaliberFilter && !cals.includes(currentAmmoCaliberFilter)) {
+                    currentAmmoCaliberFilter = null;
                 }
                 calFilterRow.classList.remove('hidden');
-                calFilterRow.innerHTML = cals.map(cal => {
-                    const isActive = cal === currentAmmoCaliberFilter;
-                    const cls = isActive
-                        ? 'px-2.5 py-1 rounded text-[11px] font-bold bg-amber-700 text-white cursor-pointer transition'
-                        : 'px-2.5 py-1 rounded text-[11px] font-bold bg-gray-800 text-gray-400 hover:text-white border border-gray-700 cursor-pointer transition';
-                    return `<button onclick="switchAmmoCaliber('${cal.replace(/'/g,"\\'")}')" class="${cls}">${escHtml(cal)}</button>`;
-                }).join('');
+                const allCls = !currentAmmoCaliberFilter
+                    ? 'px-2.5 py-1 rounded text-[11px] font-bold bg-gray-600 text-white cursor-pointer transition'
+                    : 'px-2.5 py-1 rounded text-[11px] font-bold bg-gray-800 text-gray-400 hover:text-white border border-gray-700 cursor-pointer transition';
+                calFilterRow.innerHTML = `<button onclick="switchAmmoCaliber(null)" class="${allCls}">All</button>` +
+                    cals.map(cal => {
+                        const isActive = cal === currentAmmoCaliberFilter;
+                        const cls = isActive
+                            ? 'px-2.5 py-1 rounded text-[11px] font-bold bg-amber-700 text-white cursor-pointer transition'
+                            : 'px-2.5 py-1 rounded text-[11px] font-bold bg-gray-800 text-gray-400 hover:text-white border border-gray-700 cursor-pointer transition';
+                        return `<button onclick="switchAmmoCaliber('${cal.replace(/'/g,"\\'")}')" class="${cls}">${escHtml(cal)}</button>`;
+                    }).join('');
             } else {
                 calFilterRow.classList.add('hidden');
                 currentAmmoCaliberFilter = null;

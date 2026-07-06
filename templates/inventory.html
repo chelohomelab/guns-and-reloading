@@ -242,7 +242,8 @@
                     </div>
                     <button onclick="window.location.href='/?tab=add-tab&cat=ammunition'" class="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition cursor-pointer">+ Add</button>
                 </div>
-                <div id="ammo-cat-filter-row" class="hidden flex flex-wrap gap-2 mb-3"></div>
+                <div id="ammo-cat-filter-row" class="hidden flex flex-wrap gap-2 mb-2"></div>
+                <div id="ammo-cal-filter-row" class="hidden flex flex-wrap gap-1.5 mb-3"></div>
                 <div id="ammo-container">
                     <p class="text-gray-400 italic">Loading ammunition...</p>
                 </div>
@@ -324,15 +325,20 @@
     <datalist id="dl-handload-bullet"></datalist>
     <datalist id="dl-handload-brass"></datalist>
 
-    <script src="/static/app.js?v=54"></script>
+    <script src="/static/app.js?v=56"></script>
     <script>
     window.onload = () => {
         fetchInitialLookupData(); applyPreferences(); loadLandingStats(); initCustomAC();
         const p = new URLSearchParams(location.search);
         const inv = p.get('inv') || 'platforms';
+        if (p.has('ammofilter')) currentAmmoFilter = p.get('ammofilter');
         switchInventoryTab(inv);
         if (p.has('platform')) switchPlatformTab(p.get('platform'));
         if (p.has('ammofilter')) switchAmmoFilter(p.get('ammofilter'));
+        if (p.has('cal')) {
+            currentAmmoCaliberFilter = decodeURIComponent(p.get('cal'));
+            loadAmmoInventory(p.get('ammofilter') || currentAmmoFilter);
+        }
         if (p.has('comp')) switchComponentFilter(p.get('comp'));
     };
     // Re-fetch ammo list when navigating back (browser back button restores stale bfcache state)

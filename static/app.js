@@ -61,6 +61,7 @@ function currentFrameType() {
 let currentComponentFilter = "powders"; // "powders", "primers", "bullets", "casings"
 let currentComponentMode = "reloading"; // "reloading" or "muzzleloader"
 let currentAmmoCategoryFilter = null; // active category for factory view
+let currentAmmoCaliberFilter = null;  // active caliber filter (all tabs)
 let currentPlatformSort = "brand";
 let currentOpticSort = "brand";
 let currentSearchQuery = "";
@@ -456,6 +457,110 @@ function toggleScopeInputState() {
     }
 }
 
+let _hlBullets = [];
+let _hlCasings = [];
+
+async function populateHandloadDropdowns() {
+    try {
+        const [powderRes, primerRes, bulletRes, casingRes] = await Promise.all([
+            fetch('/components/powders/', { cache: 'no-store' }),
+            fetch('/components/primers/', { cache: 'no-store' }),
+            fetch('/components/bullets/', { cache: 'no-store' }),
+            fetch('/components/casings/', { cache: 'no-store' }),
+        ]);
+        const powders = powderRes.ok ? await powderRes.json() : [];
+        const primers = primerRes.ok ? await primerRes.json() : [];
+        const bullets = bulletRes.ok ? await bulletRes.json() : [];
+        const casings = casingRes.ok ? await casingRes.json() : [];
+        _hlBullets = bullets;
+        _hlCasings = casings;
+
+        const calSel = document.getElementById('hl-caliber');
+        if (calSel) {
+            // Use casing calibers (cartridge names like "270 Winchester", not bullet diameters like ".277")
+            const calibers = [...new Set(casings.map(c => c.caliber).filter(Boolean))].sort();
+            calSel.innerHTML = `<option value="">— Select caliber —</option>` +
+                calibers.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+        }
+
+        const powSel = document.getElementById('hl-powder');
+        if (powSel) {
+            powSel.innerHTML = `<option value="">— Select powder —</option>` +
+                powders.filter(p => !p.is_muzzleloader).map(p => {
+                    const label = `${p.brand} ${p.name}`.trim();
+                    const qty = `${parseFloat(p.weight_lbs || 0).toFixed(1)} lbs`;
+                    return `<option value="${escHtml(label)}" data-id="${p.id}">${escHtml(label)} (${qty})</option>`;
+                }).join('');
+        }
+
+        const priSel = document.getElementById('hl-primer');
+        if (priSel) {
+            priSel.innerHTML = `<option value="">— Select primer (optional) —</option>` +
+                primers.filter(p => !p.is_muzzleloader).map(p => {
+                    const label = `${p.brand} ${p.model || ''}`.trim();
+                    return `<option value="${escHtml(label)}" data-id="${p.id}">${escHtml(label)} (${(p.quantity || 0).toLocaleString()} ct)</option>`;
+                }).join('');
+        }
+
+        // Bullet dropdown populated by filterHandloadBullets() when caliber is chosen
+        const bulSel = document.getElementById('hl-bullet');
+        if (bulSel) bulSel.innerHTML = `<option value="">— Select caliber first —</option>`;
+    } catch (err) { console.error('populateHandloadDropdowns error:', err); }
+}
+
+function filterHandloadBullets() {
+    const cal = document.getElementById('hl-caliber')?.value;
+    const bulSel = document.getElementById('hl-bullet');
+    const casSel = document.getElementById('hl-casing');
+
+    // Reset auto-filled fields
+    const wt = document.getElementById('hl-bullet-weight');
+    const bc = document.getElementById('hl-bullet-bc');
+    if (wt) wt.value = '';
+    if (bc) bc.value = '';
+
+    if (!cal) {
+        if (bulSel) bulSel.innerHTML = `<option value="">— Select caliber first —</option>`;
+        if (casSel) casSel.innerHTML = `<option value="">— Select caliber first —</option>`;
+        return;
+    }
+
+    // Bullets
+    if (bulSel) {
+        const matching = _hlBullets.filter(b => !b.is_muzzleloader && b.caliber === cal);
+        bulSel.innerHTML = matching.length
+            ? `<option value="">— Select bullet —</option>` + matching.map(b => {
+                const label = `${b.brand} ${b.product_line || ''} ${b.weight_gr}gr ${b.bullet_type || ''}`.replace(/\s+/g,' ').trim();
+                return `<option value="${escHtml(label)}" data-id="${b.id}">${escHtml(label)} (${(b.quantity||0).toLocaleString()} ct)</option>`;
+              }).join('')
+            : `<option value="">No bullets in stock for ${escHtml(cal)}</option>`;
+    }
+
+    // Casings — show all (casing caliber is cartridge name e.g. "270 Winchester",
+    // bullet caliber is diameter e.g. ".277" — can't match them automatically)
+    if (casSel) {
+        casSel.innerHTML = `<option value="">— Select casing (optional) —</option>` +
+            _hlCasings.map(c => {
+                const label = `${c.brand} ${c.caliber}`.trim();
+                const cond = c.times_fired === 0 ? 'New' : `${c.times_fired}x fired`;
+                return `<option value="${escHtml(c.brand)}" data-id="${c.id}">${escHtml(label)} — ${cond} (${(c.quantity||0).toLocaleString()} ct)</option>`;
+            }).join('');
+    }
+}
+
+function autofillBulletData(sel) {
+    const label = sel.value;
+    if (!label) return;
+    const opt = sel.querySelector(`option[value="${CSS.escape(label)}"]`);
+    const id = opt ? parseInt(opt.dataset.id) : null;
+    const b = id ? _hlBullets.find(x => x.id === id) : null;
+    if (!b) return;
+    const wt = document.getElementById('hl-bullet-weight');
+    const bc = document.getElementById('hl-bullet-bc');
+    if (wt && b.weight_gr) wt.value = b.weight_gr;
+    if (bc && b.bc_g1) bc.value = b.bc_g1;
+}
+
 async function fetchInitialLookupData() {
     try {
         const res = await fetch('/lookups/');
@@ -704,6 +809,7 @@ function switchAddForm(formId) {
 
 function switchAmmoFilter(type) {
     currentAmmoFilter = type;
+    currentAmmoCaliberFilter = null;
     const inactive = "px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer";
     const factBtn = document.getElementById('ammo-btn-factory');
     const muzzBtn = document.getElementById('ammo-btn-muzzleloader');
@@ -719,7 +825,13 @@ function switchAmmoFilter(type) {
 
 function switchAmmoCategory(cat) {
     currentAmmoCategoryFilter = cat;
+    currentAmmoCaliberFilter = null;
     loadAmmoInventory('factory');
+}
+
+function switchAmmoCaliber(cal) {
+    currentAmmoCaliberFilter = cal || null;
+    loadAmmoInventory(currentAmmoFilter);
 }
 
 function switchComponentFilter(type) {
@@ -1795,6 +1907,33 @@ async function loadAmmoInventory(type) {
         }
 
         const catFilterRow = document.getElementById('ammo-cat-filter-row');
+        const calFilterRow = document.getElementById('ammo-cal-filter-row');
+
+        function buildCaliberRow(sourceItems) {
+            if (!calFilterRow) return;
+            const cals = [...new Set(sourceItems.map(a => a.caliber).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+            if (cals.length > 1) {
+                // Keep current caliber if valid, otherwise default to null (All)
+                if (currentAmmoCaliberFilter && !cals.includes(currentAmmoCaliberFilter)) {
+                    currentAmmoCaliberFilter = null;
+                }
+                calFilterRow.classList.remove('hidden');
+                const allCls = !currentAmmoCaliberFilter
+                    ? 'px-2.5 py-1 rounded text-[11px] font-bold bg-gray-600 text-white cursor-pointer transition'
+                    : 'px-2.5 py-1 rounded text-[11px] font-bold bg-gray-800 text-gray-400 hover:text-white border border-gray-700 cursor-pointer transition';
+                calFilterRow.innerHTML = `<button onclick="switchAmmoCaliber(null)" class="${allCls}">All</button>` +
+                    cals.map(cal => {
+                        const isActive = cal === currentAmmoCaliberFilter;
+                        const cls = isActive
+                            ? 'px-2.5 py-1 rounded text-[11px] font-bold bg-amber-700 text-white cursor-pointer transition'
+                            : 'px-2.5 py-1 rounded text-[11px] font-bold bg-gray-800 text-gray-400 hover:text-white border border-gray-700 cursor-pointer transition';
+                        return `<button onclick="switchAmmoCaliber('${cal.replace(/'/g,"\\'")}')" class="${cls}">${escHtml(cal)}</button>`;
+                    }).join('');
+            } else {
+                calFilterRow.classList.add('hidden');
+                currentAmmoCaliberFilter = null;
+            }
+        }
 
         if (type === 'factory') {
             // Reset category selection if the current one has no data
@@ -1813,11 +1952,15 @@ async function loadAmmoInventory(type) {
                     return `<button id="ammo-cat-btn-${cat}" onclick="switchAmmoCategory('${cat}')" class="${cls}">${CAT_LABELS[cat]} <span class="opacity-60 font-normal">${count}</span></button>`;
                 }).join('');
             }
-            // Render tiles grouped and sorted by caliber
-            const activeGroups = currentAmmoCategoryFilter && catGroups[currentAmmoCategoryFilter]
-                ? catGroups[currentAmmoCategoryFilter]
-                : {};
-            const calHtml = Object.entries(activeGroups).sort(([a],[b]) => a.localeCompare(b)).map(([cal, loads]) => `
+            // Build caliber row from active category only
+            const activeCatGroups = catGroups[currentAmmoCategoryFilter] || {};
+            const activeCatItems = Object.values(activeCatGroups).flat();
+            buildCaliberRow(activeCatItems);
+            // Render: if caliber selected, show only that caliber; otherwise show all in category
+            const renderGroups = currentAmmoCaliberFilter
+                ? (activeCatGroups[currentAmmoCaliberFilter] ? { [currentAmmoCaliberFilter]: activeCatGroups[currentAmmoCaliberFilter] } : {})
+                : activeCatGroups;
+            const calHtml = Object.entries(renderGroups).sort(([a],[b]) => a.localeCompare(b)).map(([cal, loads]) => `
                 <div class="mb-4">
                     <div class="flex items-center gap-2 mb-2">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-blue-400/80 font-mono">${escHtml(cal)}</span>
@@ -1828,6 +1971,9 @@ async function loadAmmoInventory(type) {
             container.innerHTML = calHtml || `<p class="text-gray-500 italic text-sm">No factory loads in this category.</p>`;
         } else {
             if (catFilterRow) catFilterRow.classList.add('hidden');
+            // Build caliber row from this tab's items, then apply filter
+            buildCaliberRow(filtered);
+            if (currentAmmoCaliberFilter) filtered = filtered.filter(a => a.caliber === currentAmmoCaliberFilter);
             // Handloads: full cards with caliber sub-groups; muzzleloader: tiles
             if (type === 'handload') {
                 const calGroups = {};
@@ -1843,7 +1989,7 @@ async function loadAmmoInventory(type) {
                             <span class="text-xs text-gray-200 font-semibold">${loads.length} load${loads.length !== 1 ? 's' : ''}</span>
                             <div class="flex-1 border-t border-gray-700/60"></div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
                             ${loads.map(renderAmmoCard).join('')}
                         </div>
                     </div>`).join('');
@@ -1941,7 +2087,7 @@ function renderAmmoTile(ammo) {
         ? `<span class="block text-[11px] text-gray-300 font-mono leading-tight">${boxLabel}</span>`
         : '';
     return `
-    <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}'"
+    <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}&filter=${currentAmmoFilter}${currentAmmoCaliberFilter ? '&cal='+encodeURIComponent(currentAmmoCaliberFilter) : ''}'"
          class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden hover:border-amber-500/60 transition cursor-pointer shadow-lg">
         <div class="aspect-square bg-gray-950 flex items-center justify-center overflow-hidden">
             ${imgHtml}
@@ -1961,36 +2107,54 @@ function renderAmmoCard(ammo) {
         : 'bg-blue-950 text-blue-400 border-blue-800';
     const badgeLabel = isHandload ? 'HANDLOAD' : 'FACTORY';
     const line = ammo.line_or_powder || '';
+
+    // Handload: no photo — show recipe data
+    if (isHandload) {
+        const rows = [];
+        if (ammo.bullet_type)   rows.push(['Bullet',  ammo.bullet_type]);
+        if (line)               rows.push(['Powder',  line]);
+        if (ammo.charge_weight) rows.push(['Charge',  `${ammo.charge_weight} gr`]);
+        if (ammo.coal)          rows.push(['COAL',    `${ammo.coal}"`]);
+        const qty = (ammo.qty_sealed || 0) * (ammo.rounds_per_box || 20) + (ammo.qty_open || 0);
+        return `
+        <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}&filter=${currentAmmoFilter}${currentAmmoCaliberFilter ? '&cal='+encodeURIComponent(currentAmmoCaliberFilter) : ''}'"
+             class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden hover:border-emerald-500/60 transition cursor-pointer shadow-lg">
+            <div class="p-3 space-y-2">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-base font-bold text-white leading-tight">${ammo.brand || '—'}</h3>
+                    <button onclick="event.stopPropagation();deleteAmmoEntry(${ammo.id},'${escHtml(ammo.brand||'this load')}')" class="text-gray-600 hover:text-red-400 text-xs cursor-pointer shrink-0 ml-2" title="Delete">✕</button>
+                </div>
+                <div class="space-y-1 border-t border-gray-700/60 pt-2">
+                    ${rows.map(([k,v]) => `<div class="flex justify-between text-xs"><span class="text-gray-500">${k}</span><span class="text-gray-200 font-mono font-semibold">${escHtml(String(v))}</span></div>`).join('')}
+                </div>
+                ${qty > 0 ? `<div class="text-center pt-1 border-t border-gray-700/60"><span class="text-base font-bold font-mono text-emerald-400">${qty}</span><span class="text-xs text-gray-500 ml-1">rds</span></div>` : ''}
+            </div>
+        </div>`;
+    }
+
+    // Factory / other: keep photo
     const gallery = makePhotoGallery(`ammo-${ammo.id}`, '📦', ammo.image_path, ammo.image_path_2);
 
     let detail = '';
-    if (isHandload) {
-        if (line)              detail += `<p class="text-[11px] text-gray-400">Powder: <span class="text-gray-200">${line}</span></p>`;
-        if (ammo.charge_weight) detail += `<p class="text-[11px] text-gray-400">Charge: <span class="text-gray-200 font-mono">${ammo.charge_weight}gr</span></p>`;
-        if (ammo.coal)         detail += `<p class="text-[11px] text-gray-400">COAL: <span class="text-gray-200 font-mono">${ammo.coal}&quot;</span></p>`;
-    } else {
-        if (line) detail += `<p class="text-[11px] text-gray-400">Line: <span class="text-gray-200">${line}</span></p>`;
-        if (isShotgun && ammo.shell_size) detail += `<p class="text-[11px] text-gray-400">Shell: <span class="text-gray-200 font-mono">${ammo.shell_size}"</span></p>`;
-    }
+    if (line) detail += `<p class="text-[11px] text-gray-400">Line: <span class="text-gray-200">${line}</span></p>`;
+    if (isShotgun && ammo.shell_size) detail += `<p class="text-[11px] text-gray-400">Shell: <span class="text-gray-200 font-mono">${ammo.shell_size}"</span></p>`;
 
+    const sealed = ammo.qty_sealed || 0;
+    const open = ammo.qty_open || 0;
+    const rpb = ammo.rounds_per_box || 20;
+    const price = ammo.price_paid || 0;
+    const total = sealed * rpb + open;
     let stockLine = '';
-    if (!isHandload) {
-        const sealed = ammo.qty_sealed || 0;
-        const open = ammo.qty_open || 0;
-        const rpb = ammo.rounds_per_box || 20;
-        const price = ammo.price_paid || 0;
-        const total = sealed * rpb + open;
-        if (total > 0) {
-            const boxLabel = sealed ? `${sealed} box${sealed !== 1 ? 'es' : ''}` : '';
-            stockLine = `<div class="bg-gray-900/60 rounded p-2 text-center mt-1">
-                <p class="text-sm font-bold font-mono text-blue-400">${total} <span class="text-xs text-gray-400">rds</span></p>
-                <p class="text-xs text-gray-200 font-semibold">${boxLabel}${price ? ` · $${price.toFixed(2)}/box` : ''}</p>
-            </div>`;
-        }
+    if (total > 0) {
+        const boxLabel = sealed ? `${sealed} box${sealed !== 1 ? 'es' : ''}` : '';
+        stockLine = `<div class="bg-gray-900/60 rounded p-2 text-center mt-1">
+            <p class="text-sm font-bold font-mono text-blue-400">${total} <span class="text-xs text-gray-400">rds</span></p>
+            <p class="text-xs text-gray-200 font-semibold">${boxLabel}${price ? ` · $${price.toFixed(2)}/box` : ''}</p>
+        </div>`;
     }
 
     return `
-    <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}'"
+    <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}&filter=${currentAmmoFilter}${currentAmmoCaliberFilter ? '&cal='+encodeURIComponent(currentAmmoCaliberFilter) : ''}'"
          class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden hover:border-amber-500/60 transition cursor-pointer shadow-lg">
         ${gallery}
         <div class="p-4 space-y-2">
@@ -2077,6 +2241,7 @@ function toggleAmmoType(type) {
         if (handForm) handForm.classList.remove('hidden');
         if (btnFact) btnFact.className = "px-3 py-1 text-xs font-bold rounded text-gray-200 bg-gray-950 hover:text-white cursor-pointer";
         if (btnHand) btnHand.className = "px-3 py-1 text-xs font-bold rounded bg-emerald-600 text-white cursor-pointer";
+        populateHandloadDropdowns();
     }
 }
 
@@ -3201,6 +3366,12 @@ if (handloadForm) {
         _setBusy(handloadForm, true);
         const formData = new FormData(e.target);
         formData.set('is_handload', 'true');
+        // Auto-wire deduction IDs from the main dropdowns
+        const _getId = id => { const s = document.getElementById(id); const o = s?.options[s.selectedIndex]; return o?.dataset?.id || ''; };
+        formData.set('deduct_powder_id',  _getId('hl-powder'));
+        formData.set('deduct_primer_id',  _getId('hl-primer'));
+        formData.set('deduct_bullet_id',  _getId('hl-bullet'));
+        formData.set('deduct_casing_id',  _getId('hl-casing'));
         const { f1: af1, f2: af2 } = _getPWFiles('pw-ammo-handload');
         if (af1) formData.set('image', af1, af1.name);
         if (af2) formData.set('image_2', af2, af2.name);

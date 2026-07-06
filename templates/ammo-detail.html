@@ -34,27 +34,45 @@
         <!-- Header card -->
         <div class="bg-gray-800 border border-gray-700 rounded-xl p-6 shadow-xl">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Photo column -->
+                <!-- Left column: photo for factory, best-group target for handloads -->
                 <div class="space-y-2">
-                    <div id="main-photo-viewport" onclick="togglePhotoPanel()" title="Click to update photos"
-                        class="w-full h-48 bg-gray-950 border border-gray-700 rounded-lg overflow-hidden flex items-center justify-center relative cursor-pointer">
-                        <span class="text-4xl">📦</span>
+                    <!-- Factory: photo gallery -->
+                    <div id="factory-photo-col">
+                        <div id="main-photo-viewport" onclick="togglePhotoPanel()" title="Click to update photos"
+                            class="w-full h-48 bg-gray-950 border border-gray-700 rounded-lg overflow-hidden flex items-center justify-center relative cursor-pointer">
+                            <span class="text-4xl">📦</span>
+                        </div>
+                        <div id="thumbnail-gallery-strip" class="flex gap-2 overflow-x-auto pb-1 mt-2"></div>
+                        <div id="photo-panel" class="hidden bg-gray-900 border border-gray-700 rounded-lg p-3 space-y-2 mt-2">
+                            <p class="text-xs font-bold text-amber-400 uppercase tracking-wide">📷 Update Photos</p>
+                            <div class="flex gap-1.5">
+                                <button type="button" onclick="document.getElementById('photo-slot-cam').click()" class="flex-1 text-[10px] bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600 py-1 rounded cursor-pointer transition">📷 Camera</button>
+                                <button type="button" onclick="document.getElementById('photo-slot').click()" class="flex-1 text-[10px] bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600 py-1 rounded cursor-pointer transition">🖼 Gallery (multi)</button>
+                            </div>
+                            <div id="detail-photo-preview" class="hidden flex gap-2 flex-wrap"></div>
+                            <button id="detail-upload-btn" onclick="uploadSelectedPhotos()" class="hidden w-full py-1.5 bg-blue-700 hover:bg-blue-600 text-white text-[10px] font-bold rounded cursor-pointer transition">⬆ Upload Selected Photos</button>
+                            <div class="flex gap-2 items-center pt-1 border-t border-gray-800">
+                                <span class="text-[10px] text-gray-500 flex-1">Rotate displayed photo:</span>
+                                <button onclick="rotateCurrentPhoto()" class="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-[10px] font-bold rounded cursor-pointer transition">↻ 90°</button>
+                            </div>
+                            <input type="file" multiple accept="image/*" id="photo-slot" onchange="previewDetailPhotos()" class="hidden">
+                            <input type="file" accept="image/*" capture="environment" id="photo-slot-cam" onchange="addDetailPhotoFromCamera()" class="hidden">
+                        </div>
                     </div>
-                    <div id="thumbnail-gallery-strip" class="flex gap-2 overflow-x-auto pb-1"></div>
-                    <div id="photo-panel" class="hidden bg-gray-900 border border-gray-700 rounded-lg p-3 space-y-2">
-                        <p class="text-xs font-bold text-amber-400 uppercase tracking-wide">📷 Update Photos</p>
+                    <!-- Handload: best-group target selector -->
+                    <div id="handload-target-col" class="hidden space-y-2">
+                        <p class="text-xs font-bold text-emerald-400 uppercase tracking-wide">🎯 Best Group</p>
+                        <div id="best-group-display" class="w-full h-48 bg-gray-950 border border-gray-700 border-dashed rounded-lg overflow-hidden flex flex-col items-center justify-center gap-2 cursor-pointer"
+                             onclick="document.getElementById('best-group-input').click()">
+                            <span class="text-3xl">🎯</span>
+                            <span class="text-[10px] text-gray-500">Tap to attach best group target</span>
+                        </div>
+                        <input type="file" id="best-group-input" accept="image/*" class="hidden" onchange="uploadBestGroup(this)">
+                        <input type="file" id="best-group-cam" accept="image/*" capture="environment" class="hidden" onchange="uploadBestGroup(this)">
                         <div class="flex gap-1.5">
-                            <button type="button" onclick="document.getElementById('photo-slot-cam').click()" class="flex-1 text-[10px] bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600 py-1 rounded cursor-pointer transition">📷 Camera</button>
-                            <button type="button" onclick="document.getElementById('photo-slot').click()" class="flex-1 text-[10px] bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600 py-1 rounded cursor-pointer transition">🖼 Gallery (multi)</button>
+                            <button type="button" onclick="document.getElementById('best-group-cam').click()" class="flex-1 text-[10px] bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600 py-1 rounded cursor-pointer transition">📷 Camera</button>
+                            <button type="button" onclick="document.getElementById('best-group-input').click()" class="flex-1 text-[10px] bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600 py-1 rounded cursor-pointer transition">🖼 Gallery</button>
                         </div>
-                        <div id="detail-photo-preview" class="hidden flex gap-2 flex-wrap"></div>
-                        <button id="detail-upload-btn" onclick="uploadSelectedPhotos()" class="hidden w-full py-1.5 bg-blue-700 hover:bg-blue-600 text-white text-[10px] font-bold rounded cursor-pointer transition">⬆ Upload Selected Photos</button>
-                        <div class="flex gap-2 items-center pt-1 border-t border-gray-800">
-                            <span class="text-[10px] text-gray-500 flex-1">Rotate displayed photo:</span>
-                            <button onclick="rotateCurrentPhoto()" class="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-[10px] font-bold rounded cursor-pointer transition">↻ 90°</button>
-                        </div>
-                        <input type="file" multiple accept="image/*" id="photo-slot" onchange="previewDetailPhotos()" class="hidden">
-                        <input type="file" accept="image/*" capture="environment" id="photo-slot-cam" onchange="addDetailPhotoFromCamera()" class="hidden">
                     </div>
                 </div>
                 <!-- Info column -->
@@ -96,6 +114,9 @@
                     <div>
                         <label class="block text-xs text-gray-200 font-semibold mb-1">Caliber</label>
                         <input type="text" id="ef-caliber" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                        <select id="ef-caliber-select" class="hidden w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                            <option value="">Loading…</option>
+                        </select>
                     </div>
                     <div>
                         <label class="block text-xs text-gray-200 font-semibold mb-1">Product Line / Powder</label>
@@ -523,6 +544,25 @@
             else showToast('Upload failed.', 'error');
         }
 
+        async function uploadBestGroup(input) {
+            const file = input?.files[0];
+            if (!file) return;
+            const fd = new FormData();
+            fd.append('images[]', file);
+            fd.append('slot', '1');
+            fd.append('image', file);
+            try {
+                const res = await fetch(`/ammo/${currentAmmoId}/update-photo/`, { method: 'POST', body: fd });
+                if (res.ok) {
+                    const url = URL.createObjectURL(file);
+                    const disp = document.getElementById('best-group-display');
+                    if (disp) disp.innerHTML = `<img src="${url}" class="w-full h-full object-contain">`;
+                    showToast('Best group photo saved.');
+                } else showToast('Upload failed.', 'error');
+            } catch { showToast('Error uploading.', 'error'); }
+            input.value = '';
+        }
+
         window.onload = function() {
             const params = new URLSearchParams(window.location.search);
             currentAmmoId = params.get('id');
@@ -556,9 +596,12 @@
 
             document.getElementById('breadcrumb-name').innerText = name;
             const isMuzzleloader = a.ammo_category === 'muzzleloader';
-            const _ammoFilter = isHandload ? 'handloads' : isMuzzleloader ? 'muzzleloader' : 'factory';
+            const _ammoFilter = isHandload ? 'handload' : isMuzzleloader ? 'muzzleloader' : 'factory';
             const _ammoLabel = isHandload ? 'Handloads' : isMuzzleloader ? 'Muzzleloader' : 'Factory';
-            const _ammoBackHref = `/inventory?inv=ammo&ammofilter=${_ammoFilter}`;
+            const _urlParams = new URLSearchParams(window.location.search);
+            const _calParam = _urlParams.get('cal') || '';
+            const _filterParam = _urlParams.get('filter') || _ammoFilter;
+            const _ammoBackHref = `/inventory?inv=ammo&ammofilter=${_filterParam}${_calParam ? '&cal=' + encodeURIComponent(_calParam) : ''}`;
             const _btl = document.getElementById('breadcrumb-type-link');
             _btl.innerText = _ammoLabel;
             _btl.href = _ammoBackHref;
@@ -635,12 +678,44 @@
                 }
             }
 
-            // Photo gallery
-            renderImageGallery(a.image_path, a.image_path_2);
+            // Show photo col for factory, best-group target col for handloads
+            const factoryCol = document.getElementById('factory-photo-col');
+            const handloadCol = document.getElementById('handload-target-col');
+            if (isHandload) {
+                factoryCol?.classList.add('hidden');
+                handloadCol?.classList.remove('hidden');
+                if (a.image_path) {
+                    const disp = document.getElementById('best-group-display');
+                    if (disp) disp.innerHTML = `<img src="${a.image_path}" class="w-full h-full object-contain">`;
+                }
+            } else {
+                factoryCol?.classList.remove('hidden');
+                handloadCol?.classList.add('hidden');
+                renderImageGallery(a.image_path, a.image_path_2);
+            }
 
             // Hydrate edit form
             document.getElementById('ef-brand').value = a.brand || '';
-            document.getElementById('ef-caliber').value = a.caliber || '';
+            // For handloads use a casing-caliber dropdown, for factory use text input
+            const efCalInput = document.getElementById('ef-caliber');
+            const efCalSelect = document.getElementById('ef-caliber-select');
+            if (isHandload && efCalInput && efCalSelect) {
+                efCalInput.classList.add('hidden');
+                efCalSelect.classList.remove('hidden');
+                fetch('/components/casings/', { cache: 'no-store' }).then(r => r.json()).then(casings => {
+                    const cals = [...new Set(casings.map(c => c.caliber).filter(Boolean))].sort();
+                    efCalSelect.innerHTML = `<option value="">— Select caliber —</option>` +
+                        cals.map(c => `<option value="${c}" ${c === a.caliber ? 'selected' : ''}>${c}</option>`).join('');
+                    // If stored caliber not in list, add it so it's still selectable
+                    if (a.caliber && !cals.includes(a.caliber)) {
+                        efCalSelect.innerHTML += `<option value="${a.caliber}" selected>${a.caliber} (current)</option>`;
+                    }
+                });
+            } else if (efCalInput && efCalSelect) {
+                efCalInput.classList.remove('hidden');
+                efCalSelect.classList.add('hidden');
+                efCalInput.value = a.caliber || '';
+            }
             document.getElementById('ef-line').value = a.line_or_powder || '';
             document.getElementById('ef-bullet-type').value = a.bullet_type || '';
             document.getElementById('ef-weight').value = a.bullet_weight || '';
@@ -672,7 +747,9 @@
             const isShotgun = cat === 'shotgun' || cat === 'shotgun_slug';
             const payload = {
                 brand: document.getElementById('ef-brand').value.trim(),
-                caliber: document.getElementById('ef-caliber').value.trim(),
+                caliber: (ammoData?.is_handload
+                    ? document.getElementById('ef-caliber-select')?.value
+                    : document.getElementById('ef-caliber')?.value?.trim()) || '',
                 line_or_powder: document.getElementById('ef-line').value.trim(),
                 bullet_type: document.getElementById('ef-bullet-type').value.trim(),
                 bullet_weight: parseFloat(document.getElementById('ef-weight').value) || null,

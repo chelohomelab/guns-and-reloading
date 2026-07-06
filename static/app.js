@@ -488,7 +488,7 @@ async function populateHandloadDropdowns() {
                 powders.filter(p => !p.is_muzzleloader).map(p => {
                     const label = `${p.brand} ${p.name}`.trim();
                     const qty = `${parseFloat(p.weight_lbs || 0).toFixed(1)} lbs`;
-                    return `<option value="${escHtml(label)}">${escHtml(label)} (${qty})</option>`;
+                    return `<option value="${escHtml(label)}" data-id="${p.id}">${escHtml(label)} (${qty})</option>`;
                 }).join('');
         }
 
@@ -497,7 +497,7 @@ async function populateHandloadDropdowns() {
             priSel.innerHTML = `<option value="">— Select primer (optional) —</option>` +
                 primers.filter(p => !p.is_muzzleloader).map(p => {
                     const label = `${p.brand} ${p.model || ''}`.trim();
-                    return `<option value="${escHtml(label)}">${escHtml(label)} (${(p.quantity || 0).toLocaleString()} ct)</option>`;
+                    return `<option value="${escHtml(label)}" data-id="${p.id}">${escHtml(label)} (${(p.quantity || 0).toLocaleString()} ct)</option>`;
                 }).join('');
         }
 
@@ -543,7 +543,7 @@ function filterHandloadBullets() {
                 ? matching.map(c => {
                     const label = `${c.brand} ${c.caliber}`.trim();
                     const cond = c.times_fired === 0 ? 'New' : `${c.times_fired}x fired`;
-                    return `<option value="${escHtml(c.brand)}">${escHtml(label)} — ${cond} (${(c.quantity||0).toLocaleString()} ct)</option>`;
+                    return `<option value="${escHtml(c.brand)}" data-id="${c.id}">${escHtml(label)} — ${cond} (${(c.quantity||0).toLocaleString()} ct)</option>`;
                   }).join('')
                 : `<option value="" disabled>No casings in stock for ${escHtml(cal)}</option>`);
     }
@@ -3350,6 +3350,12 @@ if (handloadForm) {
         _setBusy(handloadForm, true);
         const formData = new FormData(e.target);
         formData.set('is_handload', 'true');
+        // Auto-wire deduction IDs from the main dropdowns
+        const _getId = id => { const s = document.getElementById(id); const o = s?.options[s.selectedIndex]; return o?.dataset?.id || ''; };
+        formData.set('deduct_powder_id',  _getId('hl-powder'));
+        formData.set('deduct_primer_id',  _getId('hl-primer'));
+        formData.set('deduct_bullet_id',  _getId('hl-bullet'));
+        formData.set('deduct_casing_id',  _getId('hl-casing'));
         const { f1: af1, f2: af2 } = _getPWFiles('pw-ammo-handload');
         if (af1) formData.set('image', af1, af1.name);
         if (af2) formData.set('image_2', af2, af2.name);

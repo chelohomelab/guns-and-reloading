@@ -737,44 +737,20 @@
                         </div>
                     </div>
 
-                    <!-- Component Deduction Section -->
+                    <!-- Component Deduction -->
                     <div class="border-t border-gray-700 pt-4">
-                        <button type="button" onclick="toggleDeductSection()" class="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-amber-400 transition cursor-pointer mb-3">
-                            <span id="deduct-toggle-icon">▶</span> Deduct from Component Inventory (optional)
-                        </button>
-                        <div id="deduct-section" class="hidden space-y-3">
-                            <p class="text-xs text-gray-500">Select which inventory items to draw from and enter rounds loaded. Leave blank to skip deduction for that component.</p>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-xs text-gray-200 font-semibold mb-1">Rounds Loaded</label>
-                                    <input type="number" name="rounds_loaded" id="deduct-rounds" min="1" placeholder="e.g., 50" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-gray-200 font-semibold mb-1">Powder Stock to Deduct From</label>
-                                    <select name="deduct_powder_id" id="deduct-powder-select" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
-                                        <option value="">— Skip powder deduction —</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-gray-200 font-semibold mb-1">Primer Stock to Deduct From</label>
-                                    <select name="deduct_primer_id" id="deduct-primer-select" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
-                                        <option value="">— Skip primer deduction —</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-gray-200 font-semibold mb-1">Bullet Stock to Deduct From</label>
-                                    <select name="deduct_bullet_id" id="deduct-bullet-select" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
-                                        <option value="">— Skip bullet deduction —</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-gray-200 font-semibold mb-1">Casing Stock to Deduct From</label>
-                                    <select name="deduct_casing_id" id="deduct-casing-select" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
-                                        <option value="">— Skip casing deduction —</option>
-                                    </select>
-                                </div>
+                        <div class="flex items-center gap-3">
+                            <div class="flex-1">
+                                <label class="block text-xs text-gray-200 font-semibold mb-1">Rounds Loaded <span class="text-emerald-500">*</span></label>
+                                <input type="number" name="rounds_loaded" id="deduct-rounds" min="1" required placeholder="e.g., 50" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
                             </div>
+                            <p class="text-[10px] text-gray-500 pt-4 max-w-xs">Powder, primer, bullet and casing inventory will be automatically deducted based on your selections above.</p>
                         </div>
+                        <!-- Hidden IDs wired from dropdowns at submit -->
+                        <input type="hidden" name="deduct_powder_id" id="deduct-powder-select">
+                        <input type="hidden" name="deduct_primer_id" id="deduct-primer-select">
+                        <input type="hidden" name="deduct_bullet_id" id="deduct-bullet-select">
+                        <input type="hidden" name="deduct_casing_id" id="deduct-casing-select">
                     </div>
 
                     <div class="border-t border-gray-700 pt-3">

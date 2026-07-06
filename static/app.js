@@ -1847,7 +1847,9 @@ async function loadAmmoInventory(type) {
             // Build caliber row from active category only, then apply caliber filter to filtered
             const activeCatItems = Object.values(catGroups[currentAmmoCategoryFilter] || {}).flat();
             buildCaliberRow(activeCatItems);
-            if (currentAmmoCaliberFilter) filtered = filtered.filter(a => a.caliber === currentAmmoCaliberFilter);
+            if (currentAmmoCaliberFilter) filtered = filtered.filter(a =>
+                a.caliber === currentAmmoCaliberFilter && a.ammo_category === currentAmmoCategoryFilter
+            );
             // Render tiles grouped by caliber from the now-filtered list
             const filteredCalGroups = {};
             filtered.forEach(a => {

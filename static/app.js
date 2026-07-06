@@ -2088,7 +2088,7 @@ function renderAmmoTile(ammo) {
         ? `<span class="block text-[11px] text-gray-300 font-mono leading-tight">${boxLabel}</span>`
         : '';
     return `
-    <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}'"
+    <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}&filter=${currentAmmoFilter}${currentAmmoCaliberFilter ? '&cal='+encodeURIComponent(currentAmmoCaliberFilter) : ''}'"
          class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden hover:border-amber-500/60 transition cursor-pointer shadow-lg">
         <div class="aspect-square bg-gray-950 flex items-center justify-center overflow-hidden">
             ${imgHtml}
@@ -2118,7 +2118,7 @@ function renderAmmoCard(ammo) {
         if (ammo.coal)          rows.push(['COAL',    `${ammo.coal}"`]);
         const qty = (ammo.qty_sealed || 0) * (ammo.rounds_per_box || 20) + (ammo.qty_open || 0);
         return `
-        <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}'"
+        <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}&filter=${currentAmmoFilter}${currentAmmoCaliberFilter ? '&cal='+encodeURIComponent(currentAmmoCaliberFilter) : ''}'"
              class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden hover:border-emerald-500/60 transition cursor-pointer shadow-lg">
             <div class="p-3 space-y-2">
                 <div class="flex justify-between items-center">
@@ -2155,7 +2155,7 @@ function renderAmmoCard(ammo) {
     }
 
     return `
-    <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}'"
+    <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}&filter=${currentAmmoFilter}${currentAmmoCaliberFilter ? '&cal='+encodeURIComponent(currentAmmoCaliberFilter) : ''}'"
          class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden hover:border-amber-500/60 transition cursor-pointer shadow-lg">
         ${gallery}
         <div class="p-4 space-y-2">

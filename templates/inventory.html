@@ -332,6 +332,7 @@
         const p = new URLSearchParams(location.search);
         const inv = p.get('inv') || 'platforms';
         if (p.has('ammofilter')) currentAmmoFilter = p.get('ammofilter');
+        if (p.has('cal')) currentAmmoCaliberFilter = decodeURIComponent(p.get('cal'));
         switchInventoryTab(inv);
         if (p.has('platform')) switchPlatformTab(p.get('platform'));
         if (p.has('ammofilter')) switchAmmoFilter(p.get('ammofilter'));

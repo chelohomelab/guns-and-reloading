@@ -598,7 +598,10 @@
             const isMuzzleloader = a.ammo_category === 'muzzleloader';
             const _ammoFilter = isHandload ? 'handload' : isMuzzleloader ? 'muzzleloader' : 'factory';
             const _ammoLabel = isHandload ? 'Handloads' : isMuzzleloader ? 'Muzzleloader' : 'Factory';
-            const _ammoBackHref = `/inventory?inv=ammo&ammofilter=${_ammoFilter}`;
+            const _urlParams = new URLSearchParams(window.location.search);
+            const _calParam = _urlParams.get('cal') || '';
+            const _filterParam = _urlParams.get('filter') || _ammoFilter;
+            const _ammoBackHref = `/inventory?inv=ammo&ammofilter=${_filterParam}${_calParam ? '&cal=' + encodeURIComponent(_calParam) : ''}`;
             const _btl = document.getElementById('breadcrumb-type-link');
             _btl.innerText = _ammoLabel;
             _btl.href = _ammoBackHref;

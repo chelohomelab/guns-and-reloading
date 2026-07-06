@@ -596,7 +596,7 @@
 
             document.getElementById('breadcrumb-name').innerText = name;
             const isMuzzleloader = a.ammo_category === 'muzzleloader';
-            const _ammoFilter = isHandload ? 'handloads' : isMuzzleloader ? 'muzzleloader' : 'factory';
+            const _ammoFilter = isHandload ? 'handload' : isMuzzleloader ? 'muzzleloader' : 'factory';
             const _ammoLabel = isHandload ? 'Handloads' : isMuzzleloader ? 'Muzzleloader' : 'Factory';
             const _ammoBackHref = `/inventory?inv=ammo&ammofilter=${_ammoFilter}`;
             const _btl = document.getElementById('breadcrumb-type-link');

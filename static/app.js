@@ -1952,20 +1952,15 @@ async function loadAmmoInventory(type) {
                     return `<button id="ammo-cat-btn-${cat}" onclick="switchAmmoCategory('${cat}')" class="${cls}">${CAT_LABELS[cat]} <span class="opacity-60 font-normal">${count}</span></button>`;
                 }).join('');
             }
-            // Build caliber row from active category only, then apply caliber filter to filtered
-            const activeCatItems = Object.values(catGroups[currentAmmoCategoryFilter] || {}).flat();
+            // Build caliber row from active category only
+            const activeCatGroups = catGroups[currentAmmoCategoryFilter] || {};
+            const activeCatItems = Object.values(activeCatGroups).flat();
             buildCaliberRow(activeCatItems);
-            if (currentAmmoCaliberFilter) filtered = filtered.filter(a =>
-                a.caliber === currentAmmoCaliberFilter && a.ammo_category === currentAmmoCategoryFilter
-            );
-            // Render tiles grouped by caliber from the now-filtered list
-            const filteredCalGroups = {};
-            filtered.forEach(a => {
-                const cal = a.caliber || 'Unknown Caliber';
-                if (!filteredCalGroups[cal]) filteredCalGroups[cal] = [];
-                filteredCalGroups[cal].push(a);
-            });
-            const calHtml = Object.entries(filteredCalGroups).sort(([a],[b]) => a.localeCompare(b)).map(([cal, loads]) => `
+            // Render: if caliber selected, show only that caliber; otherwise show all in category
+            const renderGroups = currentAmmoCaliberFilter
+                ? (activeCatGroups[currentAmmoCaliberFilter] ? { [currentAmmoCaliberFilter]: activeCatGroups[currentAmmoCaliberFilter] } : {})
+                : activeCatGroups;
+            const calHtml = Object.entries(renderGroups).sort(([a],[b]) => a.localeCompare(b)).map(([cal, loads]) => `
                 <div class="mb-4">
                     <div class="flex items-center gap-2 mb-2">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-blue-400/80 font-mono">${escHtml(cal)}</span>

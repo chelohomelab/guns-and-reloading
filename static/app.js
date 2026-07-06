@@ -61,6 +61,7 @@ function currentFrameType() {
 let currentComponentFilter = "powders"; // "powders", "primers", "bullets", "casings"
 let currentComponentMode = "reloading"; // "reloading" or "muzzleloader"
 let currentAmmoCategoryFilter = null; // active category for factory view
+let currentAmmoCaliberFilter = null;  // active caliber filter (all tabs)
 let currentPlatformSort = "brand";
 let currentOpticSort = "brand";
 let currentSearchQuery = "";
@@ -704,6 +705,7 @@ function switchAddForm(formId) {
 
 function switchAmmoFilter(type) {
     currentAmmoFilter = type;
+    currentAmmoCaliberFilter = null;
     const inactive = "px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer";
     const factBtn = document.getElementById('ammo-btn-factory');
     const muzzBtn = document.getElementById('ammo-btn-muzzleloader');
@@ -719,7 +721,13 @@ function switchAmmoFilter(type) {
 
 function switchAmmoCategory(cat) {
     currentAmmoCategoryFilter = cat;
+    currentAmmoCaliberFilter = null;
     loadAmmoInventory('factory');
+}
+
+function switchAmmoCaliber(cal) {
+    currentAmmoCaliberFilter = currentAmmoCaliberFilter === cal ? null : cal;
+    loadAmmoInventory(currentAmmoFilter);
 }
 
 function switchComponentFilter(type) {
@@ -1770,7 +1778,9 @@ async function loadAmmoInventory(type) {
         }
         filtered = filtered.filter(matchesSearch);
 
-        document.getElementById('inventory-count').innerText = `${filtered.length} Load${filtered.length !== 1 ? 's' : ''} Registered`;
+        document.getElementById('inventory-count').innerText = currentAmmoCaliberFilter
+            ? `${filtered.length} Load${filtered.length !== 1 ? 's' : ''} · ${currentAmmoCaliberFilter}`
+            : `${filtered.length} Load${filtered.length !== 1 ? 's' : ''} Registered`;
 
         // Group by category → caliber
         const CAT_ORDER = ['centerfire', 'handgun', 'rimfire', 'shotgun', 'shotgun_slug', 'muzzleloader'];
@@ -1795,6 +1805,30 @@ async function loadAmmoInventory(type) {
         }
 
         const catFilterRow = document.getElementById('ammo-cat-filter-row');
+        const calFilterRow = document.getElementById('ammo-cal-filter-row');
+
+        // Build caliber filter row from all filtered ammo (before caliber filter applied)
+        const allCalibers = [...new Set(filtered.map(a => a.caliber).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+        if (calFilterRow) {
+            if (allCalibers.length > 1) {
+                calFilterRow.classList.remove('hidden');
+                calFilterRow.innerHTML = allCalibers.map(cal => {
+                    const isActive = cal === currentAmmoCaliberFilter;
+                    const cls = isActive
+                        ? 'px-2.5 py-1 rounded text-[11px] font-bold bg-amber-700 text-white cursor-pointer transition'
+                        : 'px-2.5 py-1 rounded text-[11px] font-bold bg-gray-800 text-gray-400 hover:text-white border border-gray-700 cursor-pointer transition';
+                    return `<button onclick="switchAmmoCaliber('${cal.replace(/'/g,"\\'")}')" class="${cls}">${escHtml(cal)}</button>`;
+                }).join('');
+            } else {
+                calFilterRow.classList.add('hidden');
+                currentAmmoCaliberFilter = null;
+            }
+        }
+
+        // Apply caliber filter
+        if (currentAmmoCaliberFilter) {
+            filtered = filtered.filter(a => a.caliber === currentAmmoCaliberFilter);
+        }
 
         if (type === 'factory') {
             // Reset category selection if the current one has no data

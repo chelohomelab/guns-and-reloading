@@ -477,7 +477,8 @@ async function populateHandloadDropdowns() {
 
         const calSel = document.getElementById('hl-caliber');
         if (calSel) {
-            const calibers = [...new Set(bullets.filter(b => !b.is_muzzleloader && b.caliber).map(b => b.caliber))].sort();
+            // Use casing calibers (cartridge names like "270 Winchester", not bullet diameters like ".277")
+            const calibers = [...new Set(casings.map(c => c.caliber).filter(Boolean))].sort();
             calSel.innerHTML = `<option value="">— Select caliber —</option>` +
                 calibers.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
         }
@@ -2107,32 +2108,55 @@ function renderAmmoCard(ammo) {
         : 'bg-blue-950 text-blue-400 border-blue-800';
     const badgeLabel = isHandload ? 'HANDLOAD' : 'FACTORY';
     const line = ammo.line_or_powder || '';
+
+    // Handload: no photo — show all recipe data instead
+    if (isHandload) {
+        const rows = [];
+        if (ammo.bullet_type)   rows.push(['Bullet',  `${ammo.bullet_weight ? ammo.bullet_weight + 'gr ' : ''}${ammo.bullet_type}`]);
+        if (line)               rows.push(['Powder',  line]);
+        if (ammo.charge_weight) rows.push(['Charge',  `${ammo.charge_weight} gr`]);
+        if (ammo.coal)          rows.push(['COAL',    `${ammo.coal}"`]);
+        if (ammo.bullet_bc)     rows.push(['BC G1',   ammo.bullet_bc]);
+        const qty = (ammo.qty_sealed || 0) * (ammo.rounds_per_box || 20) + (ammo.qty_open || 0);
+        return `
+        <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}'"
+             class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden hover:border-emerald-500/60 transition cursor-pointer shadow-lg">
+            <div class="p-3 space-y-2">
+                <div class="flex justify-between items-start">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeCls}">${badgeLabel}</span>
+                    <div class="flex items-center gap-1.5">
+                        ${ammo.bullet_weight ? `<span class="text-[10px] font-mono font-bold text-amber-400">${ammo.bullet_weight}gr</span>` : ''}
+                        <button onclick="event.stopPropagation();deleteAmmoEntry(${ammo.id},'${escHtml(ammo.brand||'this load')}')" class="text-gray-600 hover:text-red-400 text-xs cursor-pointer" title="Delete">✕</button>
+                    </div>
+                </div>
+                <h3 class="text-sm font-bold text-white leading-tight">${ammo.brand || '—'}</h3>
+                <div class="space-y-0.5 border-t border-gray-700/60 pt-2">
+                    ${rows.map(([k,v]) => `<div class="flex justify-between text-[11px]"><span class="text-gray-500">${k}</span><span class="text-gray-200 font-mono">${escHtml(String(v))}</span></div>`).join('')}
+                </div>
+                ${qty > 0 ? `<div class="text-center pt-1 border-t border-gray-700/60"><span class="text-sm font-bold font-mono text-emerald-400">${qty}</span><span class="text-[10px] text-gray-500 ml-1">rds</span></div>` : ''}
+            </div>
+        </div>`;
+    }
+
+    // Factory / other: keep photo
     const gallery = makePhotoGallery(`ammo-${ammo.id}`, '📦', ammo.image_path, ammo.image_path_2);
 
     let detail = '';
-    if (isHandload) {
-        if (line)              detail += `<p class="text-[11px] text-gray-400">Powder: <span class="text-gray-200">${line}</span></p>`;
-        if (ammo.charge_weight) detail += `<p class="text-[11px] text-gray-400">Charge: <span class="text-gray-200 font-mono">${ammo.charge_weight}gr</span></p>`;
-        if (ammo.coal)         detail += `<p class="text-[11px] text-gray-400">COAL: <span class="text-gray-200 font-mono">${ammo.coal}&quot;</span></p>`;
-    } else {
-        if (line) detail += `<p class="text-[11px] text-gray-400">Line: <span class="text-gray-200">${line}</span></p>`;
-        if (isShotgun && ammo.shell_size) detail += `<p class="text-[11px] text-gray-400">Shell: <span class="text-gray-200 font-mono">${ammo.shell_size}"</span></p>`;
-    }
+    if (line) detail += `<p class="text-[11px] text-gray-400">Line: <span class="text-gray-200">${line}</span></p>`;
+    if (isShotgun && ammo.shell_size) detail += `<p class="text-[11px] text-gray-400">Shell: <span class="text-gray-200 font-mono">${ammo.shell_size}"</span></p>`;
 
+    const sealed = ammo.qty_sealed || 0;
+    const open = ammo.qty_open || 0;
+    const rpb = ammo.rounds_per_box || 20;
+    const price = ammo.price_paid || 0;
+    const total = sealed * rpb + open;
     let stockLine = '';
-    if (!isHandload) {
-        const sealed = ammo.qty_sealed || 0;
-        const open = ammo.qty_open || 0;
-        const rpb = ammo.rounds_per_box || 20;
-        const price = ammo.price_paid || 0;
-        const total = sealed * rpb + open;
-        if (total > 0) {
-            const boxLabel = sealed ? `${sealed} box${sealed !== 1 ? 'es' : ''}` : '';
-            stockLine = `<div class="bg-gray-900/60 rounded p-2 text-center mt-1">
-                <p class="text-sm font-bold font-mono text-blue-400">${total} <span class="text-xs text-gray-400">rds</span></p>
-                <p class="text-xs text-gray-200 font-semibold">${boxLabel}${price ? ` · $${price.toFixed(2)}/box` : ''}</p>
-            </div>`;
-        }
+    if (total > 0) {
+        const boxLabel = sealed ? `${sealed} box${sealed !== 1 ? 'es' : ''}` : '';
+        stockLine = `<div class="bg-gray-900/60 rounded p-2 text-center mt-1">
+            <p class="text-sm font-bold font-mono text-blue-400">${total} <span class="text-xs text-gray-400">rds</span></p>
+            <p class="text-xs text-gray-200 font-semibold">${boxLabel}${price ? ` · $${price.toFixed(2)}/box` : ''}</p>
+        </div>`;
     }
 
     return `

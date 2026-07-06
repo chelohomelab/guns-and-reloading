@@ -1990,7 +1990,7 @@ async function loadAmmoInventory(type) {
                             <span class="text-xs text-gray-200 font-semibold">${loads.length} load${loads.length !== 1 ? 's' : ''}</span>
                             <div class="flex-1 border-t border-gray-700/60"></div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             ${loads.map(renderAmmoCard).join('')}
                         </div>
                     </div>`).join('');
@@ -2109,31 +2109,26 @@ function renderAmmoCard(ammo) {
     const badgeLabel = isHandload ? 'HANDLOAD' : 'FACTORY';
     const line = ammo.line_or_powder || '';
 
-    // Handload: no photo — show all recipe data instead
+    // Handload: no photo — show recipe data
     if (isHandload) {
         const rows = [];
-        if (ammo.bullet_type)   rows.push(['Bullet',  `${ammo.bullet_weight ? ammo.bullet_weight + 'gr ' : ''}${ammo.bullet_type}`]);
+        if (ammo.bullet_type)   rows.push(['Bullet',  ammo.bullet_type]);
         if (line)               rows.push(['Powder',  line]);
         if (ammo.charge_weight) rows.push(['Charge',  `${ammo.charge_weight} gr`]);
         if (ammo.coal)          rows.push(['COAL',    `${ammo.coal}"`]);
-        if (ammo.bullet_bc)     rows.push(['BC G1',   ammo.bullet_bc]);
         const qty = (ammo.qty_sealed || 0) * (ammo.rounds_per_box || 20) + (ammo.qty_open || 0);
         return `
         <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}'"
              class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden hover:border-emerald-500/60 transition cursor-pointer shadow-lg">
             <div class="p-3 space-y-2">
-                <div class="flex justify-between items-start">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeCls}">${badgeLabel}</span>
-                    <div class="flex items-center gap-1.5">
-                        ${ammo.bullet_weight ? `<span class="text-[10px] font-mono font-bold text-amber-400">${ammo.bullet_weight}gr</span>` : ''}
-                        <button onclick="event.stopPropagation();deleteAmmoEntry(${ammo.id},'${escHtml(ammo.brand||'this load')}')" class="text-gray-600 hover:text-red-400 text-xs cursor-pointer" title="Delete">✕</button>
-                    </div>
+                <div class="flex justify-between items-center">
+                    <h3 class="text-base font-bold text-white leading-tight">${ammo.brand || '—'}</h3>
+                    <button onclick="event.stopPropagation();deleteAmmoEntry(${ammo.id},'${escHtml(ammo.brand||'this load')}')" class="text-gray-600 hover:text-red-400 text-xs cursor-pointer shrink-0 ml-2" title="Delete">✕</button>
                 </div>
-                <h3 class="text-sm font-bold text-white leading-tight">${ammo.brand || '—'}</h3>
-                <div class="space-y-0.5 border-t border-gray-700/60 pt-2">
-                    ${rows.map(([k,v]) => `<div class="flex justify-between text-[11px]"><span class="text-gray-500">${k}</span><span class="text-gray-200 font-mono">${escHtml(String(v))}</span></div>`).join('')}
+                <div class="space-y-1 border-t border-gray-700/60 pt-2">
+                    ${rows.map(([k,v]) => `<div class="flex justify-between text-xs"><span class="text-gray-500">${k}</span><span class="text-gray-200 font-mono font-semibold">${escHtml(String(v))}</span></div>`).join('')}
                 </div>
-                ${qty > 0 ? `<div class="text-center pt-1 border-t border-gray-700/60"><span class="text-sm font-bold font-mono text-emerald-400">${qty}</span><span class="text-[10px] text-gray-500 ml-1">rds</span></div>` : ''}
+                ${qty > 0 ? `<div class="text-center pt-1 border-t border-gray-700/60"><span class="text-base font-bold font-mono text-emerald-400">${qty}</span><span class="text-xs text-gray-500 ml-1">rds</span></div>` : ''}
             </div>
         </div>`;
     }

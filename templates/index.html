@@ -673,7 +673,9 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-gray-750 pb-4">
                         <div>
                             <label class="block text-xs text-emerald-400 font-medium mb-1">Target Caliber Configuration</label>
-                            <input type="text" name="caliber" data-ac="dl-caliber" autocomplete="off" required placeholder="e.g., 6.5 Creedmoor" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                            <select name="caliber" id="hl-caliber" required class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                <option value="">Loading calibers…</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-xs text-gray-200 font-semibold mb-1">Custom Load Recipe ID / Name</label>
@@ -690,7 +692,9 @@
                             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Propellant & Ignition Architecture</h4>
                             <div>
                                 <label class="block text-xs text-gray-200 font-semibold mb-1">Smokeless Powder Brand / Type</label>
-                                <input type="text" name="powder_id" data-ac="dl-handload-powder" autocomplete="off" required placeholder="e.g., H4350, Varget" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                <select name="powder_id" id="hl-powder" required class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                    <option value="">Loading powders…</option>
+                                </select>
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-200 font-semibold mb-1">Powder Charge Mass Weight (Grains)</label>
@@ -698,7 +702,9 @@
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-200 font-semibold mb-1">Primer Type Configuration</label>
-                                <input type="text" name="primer_id" data-ac="dl-handload-primer" autocomplete="off" placeholder="e.g., Federal 210M, CCI 200" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                <select name="primer_id" id="hl-primer" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                    <option value="">Loading primers…</option>
+                                </select>
                             </div>
                         </div>
 
@@ -706,15 +712,17 @@
                             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Projectile Component & Brass Stock</h4>
                             <div>
                                 <label class="block text-xs text-gray-200 font-semibold mb-1">Component Bullet / Projectile Variant</label>
-                                <input type="text" name="bullet_id" data-ac="dl-handload-bullet" autocomplete="off" required placeholder="e.g., Hornady 140gr ELD-M" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                <select name="bullet_id" id="hl-bullet" required onchange="autofillBulletData(this)" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                    <option value="">Loading bullets…</option>
+                                </select>
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-200 font-semibold mb-1">Bullet Weight (Grains)</label>
-                                <input type="number" step="0.1" name="bullet_weight" placeholder="e.g., 140" required class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                                <input type="number" step="0.1" name="bullet_weight" id="hl-bullet-weight" placeholder="e.g., 140" required class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-200 font-semibold mb-1">Ballistic Coefficient (G1 BC)</label>
-                                <input type="number" step="0.001" name="bullet_bc" placeholder="e.g., 0.620" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                                <input type="number" step="0.001" name="bullet_bc" id="hl-bullet-bc" placeholder="e.g., 0.620" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-200 font-semibold mb-1">Brass Casing Brand Asset</label>

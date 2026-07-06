@@ -457,6 +457,73 @@ function toggleScopeInputState() {
     }
 }
 
+let _hlBullets = [];
+
+async function populateHandloadDropdowns() {
+    try {
+        const [powderRes, primerRes, bulletRes, caliberRes] = await Promise.all([
+            fetch('/components/powders/', { cache: 'no-store' }),
+            fetch('/components/primers/', { cache: 'no-store' }),
+            fetch('/components/bullets/', { cache: 'no-store' }),
+            fetch('/lookups/', { cache: 'no-store' }),
+        ]);
+        const powders = powderRes.ok ? await powderRes.json() : [];
+        const primers = primerRes.ok ? await primerRes.json() : [];
+        const bullets = bulletRes.ok ? await bulletRes.json() : [];
+        const lookups = caliberRes.ok ? await caliberRes.json() : {};
+        _hlBullets = bullets;
+
+        const calSel = document.getElementById('hl-caliber');
+        if (calSel) {
+            const calibers = (lookups.caliber || []).sort();
+            calSel.innerHTML = `<option value="">— Select caliber —</option>` +
+                calibers.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+        }
+
+        const powSel = document.getElementById('hl-powder');
+        if (powSel) {
+            powSel.innerHTML = `<option value="">— Select powder —</option>` +
+                powders.filter(p => !p.is_muzzleloader).map(p => {
+                    const label = `${p.brand} ${p.name}`.trim();
+                    const qty = `${parseFloat(p.weight_lbs || 0).toFixed(1)} lbs`;
+                    return `<option value="${escHtml(label)}">${escHtml(label)} (${qty})</option>`;
+                }).join('');
+        }
+
+        const priSel = document.getElementById('hl-primer');
+        if (priSel) {
+            priSel.innerHTML = `<option value="">— Select primer (optional) —</option>` +
+                primers.filter(p => !p.is_muzzleloader).map(p => {
+                    const label = `${p.brand} ${p.model || ''}`.trim();
+                    return `<option value="${escHtml(label)}">${escHtml(label)} (${(p.quantity || 0).toLocaleString()} ct)</option>`;
+                }).join('');
+        }
+
+        const bulSel = document.getElementById('hl-bullet');
+        if (bulSel) {
+            bulSel.innerHTML = `<option value="">— Select bullet —</option>` +
+                bullets.filter(b => !b.is_muzzleloader).map(b => {
+                    const label = `${b.brand} ${b.product_line || ''} ${b.weight_gr}gr ${b.bullet_type || ''}`.replace(/\s+/g,' ').trim();
+                    const qty = (b.quantity || 0).toLocaleString();
+                    return `<option value="${escHtml(label)}" data-id="${b.id}">${escHtml(label)} (${qty} ct)</option>`;
+                }).join('');
+        }
+    } catch (err) { console.error('populateHandloadDropdowns error:', err); }
+}
+
+function autofillBulletData(sel) {
+    const label = sel.value;
+    if (!label) return;
+    const opt = sel.querySelector(`option[value="${CSS.escape(label)}"]`);
+    const id = opt ? parseInt(opt.dataset.id) : null;
+    const b = id ? _hlBullets.find(x => x.id === id) : null;
+    if (!b) return;
+    const wt = document.getElementById('hl-bullet-weight');
+    const bc = document.getElementById('hl-bullet-bc');
+    if (wt && b.weight_gr) wt.value = b.weight_gr;
+    if (bc && b.bc_g1) bc.value = b.bc_g1;
+}
+
 async function fetchInitialLookupData() {
     try {
         const res = await fetch('/lookups/');
@@ -2120,6 +2187,7 @@ function toggleAmmoType(type) {
         if (handForm) handForm.classList.remove('hidden');
         if (btnFact) btnFact.className = "px-3 py-1 text-xs font-bold rounded text-gray-200 bg-gray-950 hover:text-white cursor-pointer";
         if (btnHand) btnHand.className = "px-3 py-1 text-xs font-bold rounded bg-emerald-600 text-white cursor-pointer";
+        populateHandloadDropdowns();
     }
 }
 

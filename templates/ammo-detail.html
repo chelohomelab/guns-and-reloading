@@ -114,6 +114,9 @@
                     <div>
                         <label class="block text-xs text-gray-200 font-semibold mb-1">Caliber</label>
                         <input type="text" id="ef-caliber" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                        <select id="ef-caliber-select" class="hidden w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                            <option value="">Loading…</option>
+                        </select>
                     </div>
                     <div>
                         <label class="block text-xs text-gray-200 font-semibold mb-1">Product Line / Powder</label>
@@ -690,7 +693,26 @@
 
             // Hydrate edit form
             document.getElementById('ef-brand').value = a.brand || '';
-            document.getElementById('ef-caliber').value = a.caliber || '';
+            // For handloads use a casing-caliber dropdown, for factory use text input
+            const efCalInput = document.getElementById('ef-caliber');
+            const efCalSelect = document.getElementById('ef-caliber-select');
+            if (isHandload && efCalInput && efCalSelect) {
+                efCalInput.classList.add('hidden');
+                efCalSelect.classList.remove('hidden');
+                fetch('/components/casings/', { cache: 'no-store' }).then(r => r.json()).then(casings => {
+                    const cals = [...new Set(casings.map(c => c.caliber).filter(Boolean))].sort();
+                    efCalSelect.innerHTML = `<option value="">— Select caliber —</option>` +
+                        cals.map(c => `<option value="${c}" ${c === a.caliber ? 'selected' : ''}>${c}</option>`).join('');
+                    // If stored caliber not in list, add it so it's still selectable
+                    if (a.caliber && !cals.includes(a.caliber)) {
+                        efCalSelect.innerHTML += `<option value="${a.caliber}" selected>${a.caliber} (current)</option>`;
+                    }
+                });
+            } else if (efCalInput && efCalSelect) {
+                efCalInput.classList.remove('hidden');
+                efCalSelect.classList.add('hidden');
+                efCalInput.value = a.caliber || '';
+            }
             document.getElementById('ef-line').value = a.line_or_powder || '';
             document.getElementById('ef-bullet-type').value = a.bullet_type || '';
             document.getElementById('ef-weight').value = a.bullet_weight || '';
@@ -722,7 +744,9 @@
             const isShotgun = cat === 'shotgun' || cat === 'shotgun_slug';
             const payload = {
                 brand: document.getElementById('ef-brand').value.trim(),
-                caliber: document.getElementById('ef-caliber').value.trim(),
+                caliber: (ammoData?.is_handload
+                    ? document.getElementById('ef-caliber-select')?.value
+                    : document.getElementById('ef-caliber')?.value?.trim()) || '',
                 line_or_powder: document.getElementById('ef-line').value.trim(),
                 bullet_type: document.getElementById('ef-bullet-type').value.trim(),
                 bullet_weight: parseFloat(document.getElementById('ef-weight').value) || null,

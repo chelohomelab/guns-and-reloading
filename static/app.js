@@ -1807,12 +1807,16 @@ async function loadAmmoInventory(type) {
         const catFilterRow = document.getElementById('ammo-cat-filter-row');
         const calFilterRow = document.getElementById('ammo-cal-filter-row');
 
-        // Build caliber filter row from all filtered ammo (before caliber filter applied)
-        const allCalibers = [...new Set(filtered.map(a => a.caliber).filter(Boolean))].sort((a,b) => a.localeCompare(b));
-        if (calFilterRow) {
-            if (allCalibers.length > 1) {
+        function buildCaliberRow(sourceItems) {
+            if (!calFilterRow) return;
+            const cals = [...new Set(sourceItems.map(a => a.caliber).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+            if (cals.length > 1) {
+                // Validate active filter still exists in this set
+                if (currentAmmoCaliberFilter && !cals.includes(currentAmmoCaliberFilter)) {
+                    currentAmmoCaliberFilter = null;
+                }
                 calFilterRow.classList.remove('hidden');
-                calFilterRow.innerHTML = allCalibers.map(cal => {
+                calFilterRow.innerHTML = cals.map(cal => {
                     const isActive = cal === currentAmmoCaliberFilter;
                     const cls = isActive
                         ? 'px-2.5 py-1 rounded text-[11px] font-bold bg-amber-700 text-white cursor-pointer transition'
@@ -1823,11 +1827,6 @@ async function loadAmmoInventory(type) {
                 calFilterRow.classList.add('hidden');
                 currentAmmoCaliberFilter = null;
             }
-        }
-
-        // Apply caliber filter
-        if (currentAmmoCaliberFilter) {
-            filtered = filtered.filter(a => a.caliber === currentAmmoCaliberFilter);
         }
 
         if (type === 'factory') {
@@ -1847,6 +1846,10 @@ async function loadAmmoInventory(type) {
                     return `<button id="ammo-cat-btn-${cat}" onclick="switchAmmoCategory('${cat}')" class="${cls}">${CAT_LABELS[cat]} <span class="opacity-60 font-normal">${count}</span></button>`;
                 }).join('');
             }
+            // Build caliber row from active category only, then apply caliber filter
+            const activeCatItems = Object.values(catGroups[currentAmmoCategoryFilter] || {}).flat();
+            buildCaliberRow(activeCatItems);
+            if (currentAmmoCaliberFilter) filtered = filtered.filter(a => a.caliber === currentAmmoCaliberFilter);
             // Render tiles grouped and sorted by caliber
             const activeGroups = currentAmmoCategoryFilter && catGroups[currentAmmoCategoryFilter]
                 ? catGroups[currentAmmoCategoryFilter]
@@ -1862,6 +1865,9 @@ async function loadAmmoInventory(type) {
             container.innerHTML = calHtml || `<p class="text-gray-500 italic text-sm">No factory loads in this category.</p>`;
         } else {
             if (catFilterRow) catFilterRow.classList.add('hidden');
+            // Build caliber row from this tab's items, then apply filter
+            buildCaliberRow(filtered);
+            if (currentAmmoCaliberFilter) filtered = filtered.filter(a => a.caliber === currentAmmoCaliberFilter);
             // Handloads: full cards with caliber sub-groups; muzzleloader: tiles
             if (type === 'handload') {
                 const calGroups = {};

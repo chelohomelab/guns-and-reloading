@@ -497,16 +497,36 @@ async function populateHandloadDropdowns() {
                 }).join('');
         }
 
+        // Bullet dropdown populated by filterHandloadBullets() when caliber is chosen
         const bulSel = document.getElementById('hl-bullet');
-        if (bulSel) {
-            bulSel.innerHTML = `<option value="">— Select bullet —</option>` +
-                bullets.filter(b => !b.is_muzzleloader).map(b => {
-                    const label = `${b.brand} ${b.product_line || ''} ${b.weight_gr}gr ${b.bullet_type || ''}`.replace(/\s+/g,' ').trim();
-                    const qty = (b.quantity || 0).toLocaleString();
-                    return `<option value="${escHtml(label)}" data-id="${b.id}">${escHtml(label)} (${qty} ct)</option>`;
-                }).join('');
-        }
+        if (bulSel) bulSel.innerHTML = `<option value="">— Select caliber first —</option>`;
     } catch (err) { console.error('populateHandloadDropdowns error:', err); }
+}
+
+function filterHandloadBullets() {
+    const cal = document.getElementById('hl-caliber')?.value;
+    const bulSel = document.getElementById('hl-bullet');
+    if (!bulSel) return;
+    // Reset weight/bc when caliber changes
+    const wt = document.getElementById('hl-bullet-weight');
+    const bc = document.getElementById('hl-bullet-bc');
+    if (wt) wt.value = '';
+    if (bc) bc.value = '';
+    if (!cal) {
+        bulSel.innerHTML = `<option value="">— Select caliber first —</option>`;
+        return;
+    }
+    const matching = _hlBullets.filter(b => !b.is_muzzleloader && b.caliber === cal);
+    if (!matching.length) {
+        bulSel.innerHTML = `<option value="">No bullets in stock for ${escHtml(cal)}</option>`;
+        return;
+    }
+    bulSel.innerHTML = `<option value="">— Select bullet —</option>` +
+        matching.map(b => {
+            const label = `${b.brand} ${b.product_line || ''} ${b.weight_gr}gr ${b.bullet_type || ''}`.replace(/\s+/g,' ').trim();
+            const qty = (b.quantity || 0).toLocaleString();
+            return `<option value="${escHtml(label)}" data-id="${b.id}">${escHtml(label)} (${qty} ct)</option>`;
+        }).join('');
 }
 
 function autofillBulletData(sel) {

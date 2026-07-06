@@ -673,7 +673,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-gray-750 pb-4">
                         <div>
                             <label class="block text-xs text-emerald-400 font-medium mb-1">Target Caliber Configuration</label>
-                            <select name="caliber" id="hl-caliber" required class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                            <select name="caliber" id="hl-caliber" required onchange="filterHandloadBullets()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
                                 <option value="">Loading calibers…</option>
                             </select>
                         </div>

@@ -1990,7 +1990,7 @@ async function loadAmmoInventory(type) {
                             <span class="text-xs text-gray-200 font-semibold">${loads.length} load${loads.length !== 1 ? 's' : ''}</span>
                             <div class="flex-1 border-t border-gray-700/60"></div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             ${loads.map(renderAmmoCard).join('')}
                         </div>
                     </div>`).join('');

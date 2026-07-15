@@ -57,11 +57,6 @@
                 <span class="text-lg">📦</span>
                 <div><div class="text-sm font-bold text-white">Inventory</div><div class="text-[10px] text-gray-500">Browse your vault</div></div>
             </a>
-            <a href="/wishlist"
-                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-800/60 hover:bg-amber-900/30 border border-gray-700/50 hover:border-amber-500/40 transition text-left">
-                <span class="text-lg">⭐</span>
-                <div><div class="text-sm font-bold text-white">Wishlist</div><div class="text-[10px] text-amber-500/60">Items to acquire</div></div>
-            </a>
             <button id="nav-btn-measure" onclick="switchTab('measure-tab'); closeSidebar()"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">🎯</span>
@@ -107,6 +102,7 @@
             <div id="user-menu" class="hidden absolute bottom-full left-3 right-3 mb-1 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
                 {% if user.is_admin %}
                 <a href="/admin/users" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">👤 Users</a>
+                <a href="/wishlist" class="flex items-center gap-2 px-4 py-2.5 text-sm text-amber-300 hover:bg-amber-900/30 transition">⭐ Wishlist</a>
                 <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
                 <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
                 <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>

@@ -19,7 +19,7 @@
 </head>
 <body class="bg-gray-950 text-gray-100 font-sans antialiased select-none flex min-h-dvh lg:h-dvh lg:overflow-hidden overflow-x-hidden">
 
-<div id="toast-container" class="fixed bottom-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
+<div id="toast-container" class="fixed top-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
 
 <!-- ===== EDIT MODAL ===== -->
 <div id="edit-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[90] hidden backdrop-blur-xs p-4">
@@ -278,11 +278,17 @@
     <a href="/?tab=measure-tab" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition text-sm font-bold text-gray-200">
       <span>🎯</span> Range Session
     </a>
+    <a href="/?tab=ladder-tab" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 hover:border-purple-500/40 transition text-sm font-bold text-gray-200">
+      <span>🪜</span> Ladder Test
+    </a>
     <a href="/?tab=add-tab&cat=platforms" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 border border-amber-800/40 hover:border-amber-500/40 transition text-sm font-bold text-gray-200">
       <span>⚙️</span> Add Inventory
     </a>
     <a href="/?tab=add-tab&cat=ammunition" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-950/60 hover:bg-sky-900/60 border border-sky-800/40 hover:border-sky-500/40 transition text-sm font-bold text-gray-200">
       <span>🧪</span> Add Ammunition
+    </a>
+    <a href="/?tab=add-tab&cat=components" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/40 hover:border-emerald-500/40 transition text-sm font-bold text-gray-200">
+      <span>🔩</span> Add Components
     </a>
     {% if user.is_admin %}
     <div class="pt-2">
@@ -295,6 +301,9 @@
       </a>
       <a href="/admin/scanner" class="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg bg-blue-950/50 hover:bg-blue-900/50 border border-blue-700/40 transition text-sm font-bold text-blue-300">
         <span>📡</span> Scanner
+      </a>
+      <a href="/admin/backup" class="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg bg-green-950/50 hover:bg-green-900/50 border border-green-700/40 transition text-sm font-bold text-green-300">
+        <span>💾</span> Backup
       </a>
     </div>
     {% endif %}
@@ -521,7 +530,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=56"></script>
+<script src="/static/app.js?v=74"></script>
 <script>
 // ============================================================
 // STATE

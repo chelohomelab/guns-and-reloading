@@ -502,50 +502,117 @@ async function populateHandloadDropdowns() {
                 }).join('');
         }
 
-        // Bullet dropdown populated by filterHandloadBullets() when caliber is chosen
         const bulSel = document.getElementById('hl-bullet');
-        if (bulSel) bulSel.innerHTML = `<option value="">— Select caliber first —</option>`;
+        if (bulSel) bulSel.innerHTML = _buildBulletOptionsHTML(bullets, calSel ? calSel.value : null);
+
+        const casSel = document.getElementById('hl-casing');
+        if (casSel) casSel.innerHTML = _buildCasingOptionsHTML(casings, calSel ? calSel.value : null);
     } catch (err) { console.error('populateHandloadDropdowns error:', err); }
+}
+
+// Cartridge name (as used by casings, e.g. "6.5 Creedmoor") -> bullet bore diameter (as
+// used by bullets, e.g. ".264"). Ballistics naming is inconsistent — some cartridges are
+// named for their actual bore diameter (".308 Winchester"), others for a historical/
+// marketing number ("270 Winchester" is really a .277" bore) or a metric bullet diameter
+// ("6.5 Creedmoor" is .264") — there's no way to derive one from the other algorithmically,
+// hence this lookup table. Extend it as new calibers get added to inventory.
+const CARTRIDGE_BORE_DIAMETER = {
+    '17 hornet': '.172', '17 hmr': '.172', '17 remington': '.172', '17 wsm': '.172',
+    '204 ruger': '.204',
+    '221 fireball': '.224', '222 remington': '.224', '223 remington': '.224', '5.56 nato': '.224',
+    '22-250 remington': '.224', '220 swift': '.224', '224 valkyrie': '.224', '22 nosler': '.224',
+    '225 winchester': '.224',
+    '243 winchester': '.243', '6mm remington': '.243', '6mm creedmoor': '.243', '6mm arc': '.243',
+    '243 wssm': '.243', '6mm prc': '.243', '244 remington': '.243',
+    '25-06 remington': '.257', '257 roberts': '.257', '25 wssm': '.257', '257 weatherby magnum': '.257',
+    '6.5 creedmoor': '.264', '6.5x55': '.264', '6.5x55 swedish': '.264', '260 remington': '.264',
+    '6.5-284 norma': '.264', '6.5 prc': '.264', '6.5 grendel': '.264', '264 winchester magnum': '.264',
+    '6.5x47 lapua': '.264', '6.5 weatherby rpm': '.264', '6.5 rem magnum': '.264',
+    '270 winchester': '.277', '270 wsm': '.277', '270 weatherby magnum': '.277', '6.8 western': '.277',
+    '7mm-08 remington': '.284', '7mm remington magnum': '.284', '280 remington': '.284', '7mm prc': '.284',
+    '28 nosler': '.284', '7mm weatherby magnum': '.284', '7mm stw': '.284', '7mm saum': '.284',
+    '275 rigby': '.284', '280 ackley improved': '.284',
+    '30-06 springfield': '.308', '308 winchester': '.308', '300 winchester magnum': '.308',
+    '300 wsm': '.308', '300 prc': '.308', '300 remington ultra magnum': '.308', '300 weatherby magnum': '.308',
+    '30-30 winchester': '.308', '300 blackout': '.308', '300 aac blackout': '.308',
+    '300 norma magnum': '.308', '30 nosler': '.308', '308 marlin express': '.308', '7.62x51': '.308',
+    '8mm mauser': '.323', '8x57 mauser': '.323', '8mm remington magnum': '.323',
+    '338 winchester magnum': '.338', '338 lapua magnum': '.338', '338-06': '.338', '338 federal': '.338',
+    '33 nosler': '.338', '338 rcm': '.338', '338 win mag': '.338',
+    '35 whelen': '.358', '358 winchester': '.358', '35 remington': '.358',
+    '375 hh magnum': '.375', '375 ruger': '.375', '375 weatherby magnum': '.375',
+    '416 rigby': '.416', '416 remington magnum': '.416',
+    '45-70 government': '.458', '458 winchester magnum': '.458', '458 lott': '.458',
+    '50 bmg': '.510', '50 beowulf': '.500',
+    '9mm luger': '.355', '9x19': '.355', '9mm': '.355',
+    '357 magnum': '.357', '357 sig': '.357', '38 special': '.357',
+    '40 sw': '.400', '10mm auto': '.400',
+    '45 acp': '.451', '45 colt': '.451',
+    '44 magnum': '.429', '44 special': '.429', '444 marlin': '.429',
+};
+
+function _normalizeCartridgeName(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9. ]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function _boreDiameterForCartridge(cartridgeName) {
+    return CARTRIDGE_BORE_DIAMETER[_normalizeCartridgeName(cartridgeName)] || null;
+}
+
+function _normalizeBoreDiameter(s) {
+    const t = String(s || '').trim().toLowerCase();
+    const m = t.match(/^0?\.?(\d{3})$/);
+    return m ? `.${m[1]}` : t;
+}
+
+// Bullets are catalogued by bore diameter (".264") while `cartridgeCaliber` is a cartridge
+// name ("6.5 Creedmoor") — filter through CARTRIDGE_BORE_DIAMETER. If the cartridge isn't in
+// the table, or nothing matches, fall back to showing every bullet rather than a dead end.
+function _buildBulletOptionsHTML(bullets, cartridgeCaliber) {
+    let list = bullets.filter(b => !b.is_muzzleloader);
+    const bore = cartridgeCaliber ? _boreDiameterForCartridge(cartridgeCaliber) : null;
+    if (bore) {
+        const filtered = list.filter(b => _normalizeBoreDiameter(b.caliber) === bore);
+        if (filtered.length) list = filtered;
+    }
+    if (!list.length) return `<option value="">No bullets in stock</option>`;
+    return `<option value="">— Select bullet —</option>` + list.map(b => {
+        const label = `${b.brand} ${b.product_line || ''} ${b.caliber} ${b.weight_gr}gr ${b.bullet_type || ''}`.replace(/\s+/g,' ').trim();
+        return `<option value="${escHtml(label)}" data-id="${b.id}">${escHtml(label)} (${(b.quantity||0).toLocaleString()} ct)</option>`;
+    }).join('');
+}
+
+// Casing caliber is the same cartridge-name convention as the caliber selector itself, so
+// this is a plain exact match — no diameter mapping needed.
+function _buildCasingOptionsHTML(casings, cartridgeCaliber) {
+    let list = casings;
+    if (cartridgeCaliber) {
+        const filtered = casings.filter(c => c.caliber === cartridgeCaliber);
+        if (filtered.length) list = filtered;
+    }
+    return `<option value="">— Select casing (optional) —</option>` +
+        list.map(c => {
+            const label = `${c.brand} ${c.caliber}`.trim();
+            const cond = c.times_fired === 0 ? 'New' : `${c.times_fired}x fired`;
+            return `<option value="${escHtml(c.brand)}" data-id="${c.id}">${escHtml(label)} — ${cond} (${(c.quantity||0).toLocaleString()} ct)</option>`;
+        }).join('');
 }
 
 function filterHandloadBullets() {
     const cal = document.getElementById('hl-caliber')?.value;
     const bulSel = document.getElementById('hl-bullet');
     const casSel = document.getElementById('hl-casing');
+    if (bulSel) bulSel.innerHTML = _buildBulletOptionsHTML(_hlBullets, cal);
+    if (casSel) casSel.innerHTML = _buildCasingOptionsHTML(_hlCasings, cal);
+}
 
-    // Reset auto-filled fields
-    const wt = document.getElementById('hl-bullet-weight');
-    const bc = document.getElementById('hl-bullet-bc');
-    if (wt) wt.value = '';
-    if (bc) bc.value = '';
-
-    if (!cal) {
-        if (bulSel) bulSel.innerHTML = `<option value="">— Select caliber first —</option>`;
-        if (casSel) casSel.innerHTML = `<option value="">— Select caliber first —</option>`;
-        return;
-    }
-
-    // Bullets
-    if (bulSel) {
-        const matching = _hlBullets.filter(b => !b.is_muzzleloader && b.caliber === cal);
-        bulSel.innerHTML = matching.length
-            ? `<option value="">— Select bullet —</option>` + matching.map(b => {
-                const label = `${b.brand} ${b.product_line || ''} ${b.weight_gr}gr ${b.bullet_type || ''}`.replace(/\s+/g,' ').trim();
-                return `<option value="${escHtml(label)}" data-id="${b.id}">${escHtml(label)} (${(b.quantity||0).toLocaleString()} ct)</option>`;
-              }).join('')
-            : `<option value="">No bullets in stock for ${escHtml(cal)}</option>`;
-    }
-
-    // Casings — show all (casing caliber is cartridge name e.g. "270 Winchester",
-    // bullet caliber is diameter e.g. ".277" — can't match them automatically)
-    if (casSel) {
-        casSel.innerHTML = `<option value="">— Select casing (optional) —</option>` +
-            _hlCasings.map(c => {
-                const label = `${c.brand} ${c.caliber}`.trim();
-                const cond = c.times_fired === 0 ? 'New' : `${c.times_fired}x fired`;
-                return `<option value="${escHtml(c.brand)}" data-id="${c.id}">${escHtml(label)} — ${cond} (${(c.quantity||0).toLocaleString()} ct)</option>`;
-            }).join('');
-    }
+function filterLadderBullets() {
+    const cal = document.getElementById('lt-caliber')?.value;
+    const bulSel = document.getElementById('lt-bullet');
+    const casSel = document.getElementById('lt-casing');
+    if (bulSel) bulSel.innerHTML = _buildBulletOptionsHTML(_ladderBullets, cal);
+    if (casSel) casSel.innerHTML = _buildCasingOptionsHTML(_ladderCasings, cal);
+    renderLadderPlatformOptions();
 }
 
 function autofillBulletData(sel) {
@@ -619,7 +686,7 @@ async function populateScopeSelect() {
 
 function switchTab(tabId) {
     if (tabId === 'catalog-tab') { window.location.href = '/inventory'; return; }
-    ['landing-tab', 'measure-tab', 'add-tab'].forEach(id => {
+    ['landing-tab', 'measure-tab', 'add-tab', 'ladder-tab'].forEach(id => {
         document.getElementById(id)?.classList.add('hidden');
     });
 
@@ -627,6 +694,7 @@ function switchTab(tabId) {
     if (target) target.classList.remove('hidden');
 
     if (tabId === 'measure-tab') setupMeasureDropdowns();
+    if (tabId === 'ladder-tab') showLadderListView();
 }
 
 function switchInventoryTab(tab) {
@@ -2331,6 +2399,97 @@ async function saveThresholds() {
     } catch(_) { showToast('Error saving thresholds.', 'error'); }
 }
 
+// Builds <optgroup>-organized gun options (rifles/shotguns/handguns/TC barrels) shared
+// by any picker that needs to choose "which firearm was this for" — TC barrel options are
+// tagged data-type="tc" since their <option value> IS a real barrel id already, while
+function _levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    if (m === 0) return n;
+    if (n === 0) return m;
+    let prev = Array.from({ length: n + 1 }, (_, i) => i);
+    for (let i = 1; i <= m; i++) {
+        const cur = [i];
+        for (let j = 1; j <= n; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            cur[j] = Math.min(cur[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+        }
+        prev = cur;
+    }
+    return prev[n];
+}
+
+function _normalizeCaliberText(s) {
+    return String(s || '').toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+// Firearm barrel calibers and casing calibers are both free text, typed independently — real
+// inventories end up with typos ("Creedmore" vs "Creedmoor") and stray whitespace between the
+// two, so an exact string match misses real matches. Allow a small edit-distance as a safety
+// net (capped tight enough that unrelated cartridges, e.g. "6.5 Grendel" vs "6.5 Creedmoor",
+// never collide).
+function _calibersMatch(a, b) {
+    const na = _normalizeCaliberText(a), nb = _normalizeCaliberText(b);
+    if (!na || !nb) return false;
+    if (na === nb) return true;
+    if (Math.abs(na.length - nb.length) > 2) return false;
+    return _levenshtein(na, nb) <= 2;
+}
+
+// regular firearm options carry a firearm id that still needs resolveBarrelIdFromGunSelect().
+// cartridgeCaliber is optional — when given, restricts to guns/TC barrels chambered in that
+// caliber (tolerant match — see _calibersMatch). Falls back to showing everything if the
+// filter would leave zero options, same fallback pattern as bullets.
+function _buildGunOptionsHTML(items, tcBarrels, placeholder, cartridgeCaliber) {
+    let gunItems = items, tcItems = tcBarrels;
+    if (cartridgeCaliber) {
+        const filteredGuns = items.filter(g => _calibersMatch(g.caliber, cartridgeCaliber));
+        const filteredTc = tcBarrels.filter(b => _calibersMatch(b.caliber, cartridgeCaliber));
+        if (filteredGuns.length || filteredTc.length) { gunItems = filteredGuns; tcItems = filteredTc; }
+    }
+    const rifles   = gunItems.filter(g => g.frame_type !== 'Shotgun' && g.frame_type !== 'Pistol');
+    const shotguns = gunItems.filter(g => g.frame_type === 'Shotgun');
+    const handguns = gunItems.filter(g => g.frame_type === 'Pistol');
+
+    let html = `<option value="">${placeholder}</option>`;
+    if (rifles.length > 0) {
+        html += `<optgroup label="── Rifles ──">` +
+            rifles.map(g => `<option value="${g.id}">${g.brand} ${g.model}</option>`).join('') +
+            `</optgroup>`;
+    }
+    if (shotguns.length > 0) {
+        html += `<optgroup label="── Shotguns ──">` +
+            shotguns.map(g => `<option value="${g.id}">${g.brand} ${g.model}</option>`).join('') +
+            `</optgroup>`;
+    }
+    if (handguns.length > 0) {
+        html += `<optgroup label="── Handguns ──">` +
+            handguns.map(g => `<option value="${g.id}">${g.brand} ${g.model}</option>`).join('') +
+            `</optgroup>`;
+    }
+    if (tcItems.length > 0) {
+        html += `<optgroup label="── Thompson Center Barrels ──">` +
+            tcItems.map(b => `<option value="${b.id}" data-type="tc">${b.tc_platform} ${b.caliber}</option>`).join('') +
+            `</optgroup>`;
+    }
+    return html;
+}
+
+// Resolves a gun <select>'s current selection to a real barrels.id — TC options already
+// carry a barrel id; regular firearms need an async lookup for their first barrel.
+async function resolveBarrelIdFromGunSelect(selectEl) {
+    if (!selectEl || !selectEl.value) return null;
+    const opt = selectEl.options[selectEl.selectedIndex];
+    if (opt && opt.dataset.type === 'tc') return parseInt(selectEl.value);
+    try {
+        const res = await fetch(`/firearms/${selectEl.value}`);
+        if (res.ok) {
+            const data = await res.json();
+            return (data.barrels && data.barrels.length > 0) ? data.barrels[0].id : null;
+        }
+    } catch (_) {}
+    return null;
+}
+
 async function setupMeasureDropdowns() {
     const gunSelect = document.getElementById('select-gun');
     const ammoSelect = document.getElementById('select-ammo');
@@ -2348,32 +2507,7 @@ async function setupMeasureDropdowns() {
         const tcBarrels = tcRes.ok  ? await tcRes.json()   : [];
         const ammoItems = ammoRes.ok ? await ammoRes.json() : [];
 
-        const rifles   = items.filter(g => g.frame_type !== 'Shotgun' && g.frame_type !== 'Pistol');
-        const shotguns = items.filter(g => g.frame_type === 'Shotgun');
-        const handguns = items.filter(g => g.frame_type === 'Pistol');
-
-        let gunOptions = `<option value="">-- Select Platform --</option>`;
-        if (rifles.length > 0) {
-            gunOptions += `<optgroup label="── Rifles ──">` +
-                rifles.map(g => `<option value="${g.id}">${g.brand} ${g.model}</option>`).join('') +
-                `</optgroup>`;
-        }
-        if (shotguns.length > 0) {
-            gunOptions += `<optgroup label="── Shotguns ──">` +
-                shotguns.map(g => `<option value="${g.id}">${g.brand} ${g.model}</option>`).join('') +
-                `</optgroup>`;
-        }
-        if (handguns.length > 0) {
-            gunOptions += `<optgroup label="── Handguns ──">` +
-                handguns.map(g => `<option value="${g.id}">${g.brand} ${g.model}</option>`).join('') +
-                `</optgroup>`;
-        }
-        if (tcBarrels.length > 0) {
-            gunOptions += `<optgroup label="── Thompson Center Barrels ──">` +
-                tcBarrels.map(b => `<option value="${b.id}" data-type="tc">${b.tc_platform} ${b.caliber}</option>`).join('') +
-                `</optgroup>`;
-        }
-        gunSelect.innerHTML = gunOptions;
+        gunSelect.innerHTML = _buildGunOptionsHTML(items, tcBarrels, '-- Select Platform --');
 
         if (ammoItems.length > 0) {
             const _ammoLabel = a => {
@@ -3112,21 +3246,7 @@ async function commitSessionToDatabase() {
     const saveBtn = document.getElementById('db-save-session-btn');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.innerText = "Uploading…"; }
 
-    // Resolve barrel ID — TC barrels are selected directly; regular firearms need a lookup
-    let barrelId = null;
-    const gunOption = gunSelect ? gunSelect.options[gunSelect.selectedIndex] : null;
-    const isTC = gunOption && gunOption.dataset.type === 'tc';
-    if (isTC) {
-        barrelId = parseInt(defaultGunId);
-    } else {
-        try {
-            const gunRes = await fetch(`/firearms/${defaultGunId}`);
-            if (gunRes.ok) {
-                const gunData = await gunRes.json();
-                barrelId = gunData.barrels && gunData.barrels.length > 0 ? gunData.barrels[0].id : null;
-            }
-        } catch (_) {}
-    }
+    const barrelId = await resolveBarrelIdFromGunSelect(gunSelect);
 
     if (!barrelId) {
         showToast("Could not resolve barrel for selected platform.", "error");
@@ -4001,12 +4121,27 @@ async function triggerBarcodeLookup(upc) {
         _fillFormFromBarcode(data);
         // Sync the "Scanned UPC" display with the canonical UPC from the response
         if (_barcodeFormTarget === 'ammo-factory') _showPendingUpc(data.upc || upc);
-        showToast(`Found: ${data.title || upc}`, 'success');
+        // Summarize from the parsed/trusted fields that actually populate the form —
+        // data.title is raw external listing text and can be mislabeled for the UPC.
+        showToast(`Found: ${_summarizeBarcodeData(data) || upc}`, 'success');
     } catch (e) {
         showToast('Lookup failed — check connection', 'error');
     } finally {
         closeBarcodeScanner();
     }
+}
+
+// Builds a toast summary from the parsed/trusted fields (the ones that actually land
+// in the form), not the raw external title — UPC databases frequently mislabel titles.
+function _summarizeBarcodeData(data) {
+    const parts = [];
+    if (data.brand) parts.push(data.brand);
+    const line = data.product_line || data.bullet_type || data.powder_name || data.primer_model;
+    if (line) parts.push(line);
+    if (data.caliber) parts.push(data.caliber);
+    if (data.weight_gr) parts.push(`${data.weight_gr}gr`);
+    if (data.rounds_per_box) parts.push(`${data.rounds_per_box}ct`);
+    return parts.length ? parts.join(' ') : (data.title || null);
 }
 
 // Maps product_type → { category, form } for auto-navigation
@@ -4072,6 +4207,672 @@ function _setIfEmpty(id, value) {
     if (el && !el.value) el.value = value;
 }
 
+// ── Ladder Test ──────────────────────────────────────────────────────────────
+
+let _ladderBullets = [];
+let _ladderCasings = [];
+let _ladderPlatforms = [];
+let _ladderGuns = [];
+let _ladderTcBarrels = [];
+let _currentLadderTest = null;
+
+async function populateLadderPlatformSelect() {
+    const sel = document.getElementById('lt-platform');
+    if (!sel) return;
+    try {
+        const [gunsRes, tcRes, platformsRes] = await Promise.all([
+            fetch('/catalog/', { cache: 'no-store' }),
+            fetch('/tc-barrels/', { cache: 'no-store' }),
+            fetch('/test-platforms/', { cache: 'no-store' }),
+        ]);
+        _ladderGuns = gunsRes.ok ? await gunsRes.json() : [];
+        _ladderTcBarrels = tcRes.ok ? await tcRes.json() : [];
+        _ladderPlatforms = platformsRes.ok ? await platformsRes.json() : [];
+        renderLadderPlatformOptions();
+    } catch (err) { console.error('populateLadderPlatformSelect error:', err); }
+}
+
+// Rebuilds the platform <select> from the cached gun/TC-barrel/test-platform lists, filtered
+// by the currently selected caliber. Called on initial load and again whenever lt-caliber
+// changes — no re-fetch needed, just a re-render against cached data.
+function renderLadderPlatformOptions() {
+    const sel = document.getElementById('lt-platform');
+    if (!sel) return;
+    const cal = document.getElementById('lt-caliber')?.value || null;
+    const prevValue = sel.value;
+
+    let html = _buildGunOptionsHTML(_ladderGuns, _ladderTcBarrels, '— No specific platform —', cal);
+
+    let platforms = _ladderPlatforms;
+    if (cal) {
+        const filtered = _ladderPlatforms.filter(p => _calibersMatch(p.caliber, cal));
+        if (filtered.length) platforms = filtered;
+    }
+    if (platforms.length) {
+        html += `<optgroup label="── Test Platforms (not in inventory) ──">` +
+            platforms.map(p => `<option value="platform:${p.id}">${escHtml(p.name)}${p.caliber ? ' — ' + escHtml(p.caliber) : ''}</option>`).join('') +
+            `</optgroup>`;
+    }
+    html += `<option value="__new__">+ Add New Test Platform…</option>`;
+    sel.innerHTML = html;
+
+    if (Array.from(sel.options).some(o => o.value === prevValue)) sel.value = prevValue;
+}
+
+function onLadderPlatformChange() {
+    const sel = document.getElementById('lt-platform');
+    const form = document.getElementById('lt-platform-new-form');
+    if (!sel || !form) return;
+    if (sel.value === '__new__') {
+        form.classList.remove('hidden');
+        const nameEl = document.getElementById('ltp-name');
+        if (nameEl) nameEl.focus();
+    } else {
+        form.classList.add('hidden');
+    }
+}
+
+function cancelNewLadderPlatform() {
+    const form = document.getElementById('lt-platform-new-form');
+    if (form) form.classList.add('hidden');
+    ['ltp-name', 'ltp-barrel-length', 'ltp-barrel-twist'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const sel = document.getElementById('lt-platform');
+    if (sel && sel.value === '__new__') sel.value = '';
+}
+
+async function saveNewLadderPlatform() {
+    const name = document.getElementById('ltp-name')?.value.trim();
+    if (!name) { showToast('Enter a name for the test platform', 'error'); return; }
+    const caliber = document.getElementById('lt-caliber')?.value || null;
+    const barrelLength = document.getElementById('ltp-barrel-length')?.value.trim() || null;
+    const barrelTwist = document.getElementById('ltp-barrel-twist')?.value.trim() || null;
+    try {
+        const res = await fetch('/test-platforms/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, caliber, barrel_length: barrelLength, barrel_twist: barrelTwist }),
+        });
+        if (!res.ok) { showToast('Failed to save test platform', 'error'); return; }
+        const platform = await res.json();
+        await populateLadderPlatformSelect();
+        const sel = document.getElementById('lt-platform');
+        if (sel) sel.value = `platform:${platform.id}`;
+        cancelNewLadderPlatform();
+        showToast('Test platform saved', 'success');
+    } catch (err) { showToast('Failed to save test platform', 'error'); }
+}
+
+function showLadderListView() {
+    document.getElementById('ladder-list-view')?.classList.remove('hidden');
+    document.getElementById('ladder-create-view')?.classList.add('hidden');
+    document.getElementById('ladder-detail-view')?.classList.add('hidden');
+    document.getElementById('ladder-back-btn')?.classList.add('hidden');
+    loadLadderTests();
+}
+
+function showLadderCreateForm() {
+    document.getElementById('ladder-list-view')?.classList.add('hidden');
+    document.getElementById('ladder-create-view')?.classList.remove('hidden');
+    document.getElementById('ladder-detail-view')?.classList.add('hidden');
+    document.getElementById('ladder-back-btn')?.classList.remove('hidden');
+    ['lt-name', 'lt-coal', 'lt-notes', 'lt-charge-start', 'lt-charge-end', 'lt-charge-increment'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    // Defaults to the common case (one round per charge) so it's rarely something you have to
+    // think about — still editable for the rare group-testing ladder that loads more per step.
+    const roundsEl = document.getElementById('lt-rounds-per-step');
+    if (roundsEl) roundsEl.value = '1';
+    cancelNewLadderPlatform();
+    populateLadderDropdowns();
+    populateLadderPlatformSelect();
+    updateLadderChargePreview();
+}
+
+// Mirrors _generate_charge_weights in routers/ladder.py exactly, so the count shown here always
+// matches what the server will actually create.
+function _computeLadderStepCount(start, end, increment) {
+    let count = 0;
+    let c = start;
+    while (c <= end + 1e-6) {
+        count++;
+        c += increment;
+    }
+    return count;
+}
+
+// Live feedback tying the charge range to the rounds/step multiplier, so it's never silently
+// unclear how many steps — and how many total rounds/components — a range will produce.
+function updateLadderChargePreview() {
+    const el = document.getElementById('lt-charge-preview');
+    if (!el) return;
+    const start = parseFloat(document.getElementById('lt-charge-start')?.value);
+    const end = parseFloat(document.getElementById('lt-charge-end')?.value);
+    const increment = parseFloat(document.getElementById('lt-charge-increment')?.value);
+    const roundsPerStep = parseInt(document.getElementById('lt-rounds-per-step')?.value, 10);
+
+    if (!Number.isFinite(start) || !Number.isFinite(end) || !Number.isFinite(increment)) {
+        el.textContent = '';
+        return;
+    }
+    if (increment <= 0) { el.textContent = '⚠ Increment must be greater than 0.'; return; }
+    if (end < start) { el.textContent = '⚠ End charge must be ≥ start charge.'; return; }
+
+    const stepCount = _computeLadderStepCount(start, end, increment);
+    if (stepCount > 50) {
+        el.textContent = `⚠ That range/increment produces ${stepCount} steps — widen the increment (max 50).`;
+        return;
+    }
+    let text = `→ ${stepCount} step${stepCount === 1 ? '' : 's'} (${start}–${end}gr, every ${increment}gr)`;
+    if (Number.isFinite(roundsPerStep) && roundsPerStep > 0) {
+        text += ` × ${roundsPerStep} round${roundsPerStep === 1 ? '' : 's'}/step = ${stepCount * roundsPerStep} total rounds deducted on create.`;
+    } else {
+        text += ' — enter Rounds/Step (required) to see total rounds deducted.';
+    }
+    el.textContent = text;
+}
+
+function showLadderDetailView() {
+    document.getElementById('ladder-list-view')?.classList.add('hidden');
+    document.getElementById('ladder-create-view')?.classList.add('hidden');
+    document.getElementById('ladder-detail-view')?.classList.remove('hidden');
+    document.getElementById('ladder-back-btn')?.classList.remove('hidden');
+}
+
+async function populateLadderDropdowns() {
+    try {
+        const [powderRes, primerRes, bulletRes, casingRes] = await Promise.all([
+            fetch('/components/powders/', { cache: 'no-store' }),
+            fetch('/components/primers/', { cache: 'no-store' }),
+            fetch('/components/bullets/', { cache: 'no-store' }),
+            fetch('/components/casings/', { cache: 'no-store' }),
+        ]);
+        const powders = powderRes.ok ? await powderRes.json() : [];
+        const primers = primerRes.ok ? await primerRes.json() : [];
+        const bullets = bulletRes.ok ? await bulletRes.json() : [];
+        const casings = casingRes.ok ? await casingRes.json() : [];
+        _ladderBullets = bullets;
+        _ladderCasings = casings;
+
+        const calSel = document.getElementById('lt-caliber');
+        if (calSel) {
+            const calibers = [...new Set(casings.map(c => c.caliber).filter(Boolean))].sort();
+            calSel.innerHTML = `<option value="">— Select caliber —</option>` +
+                calibers.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+        }
+
+        const powSel = document.getElementById('lt-powder');
+        if (powSel) {
+            powSel.innerHTML = `<option value="">— Select powder —</option>` +
+                powders.filter(p => !p.is_muzzleloader).map(p => {
+                    const label = `${p.brand} ${p.name}`.trim();
+                    const qty = `${parseFloat(p.weight_lbs || 0).toFixed(1)} lbs`;
+                    return `<option value="${escHtml(label)}" data-id="${p.id}">${escHtml(label)} (${qty})</option>`;
+                }).join('');
+        }
+
+        const priSel = document.getElementById('lt-primer');
+        if (priSel) {
+            priSel.innerHTML = `<option value="">— Select primer (optional) —</option>` +
+                primers.filter(p => !p.is_muzzleloader).map(p => {
+                    const label = `${p.brand} ${p.model || ''}`.trim();
+                    return `<option value="${escHtml(label)}" data-id="${p.id}">${escHtml(label)} (${(p.quantity || 0).toLocaleString()} ct)</option>`;
+                }).join('');
+        }
+
+        const bulSel = document.getElementById('lt-bullet');
+        if (bulSel) bulSel.innerHTML = _buildBulletOptionsHTML(bullets, calSel ? calSel.value : null);
+        const casSel = document.getElementById('lt-casing');
+        if (casSel) casSel.innerHTML = _buildCasingOptionsHTML(casings, calSel ? calSel.value : null);
+    } catch (err) { console.error('populateLadderDropdowns error:', err); }
+}
+
+async function loadLadderTests() {
+    const container = document.getElementById('ladder-test-list');
+    if (!container) return;
+    try {
+        const res = await fetch('/ladder-tests/', { cache: 'no-store' });
+        const tests = res.ok ? await res.json() : [];
+        if (!tests.length) {
+            container.innerHTML = `<p class="text-xs text-gray-500 italic">No ladder tests yet — start one above.</p>`;
+            return;
+        }
+        container.innerHTML = tests.map(t => `
+            <div onclick="openLadderTest(${t.id})" class="bg-gray-800 p-4 rounded-lg border border-gray-700 hover:border-purple-500/50 shadow-xl cursor-pointer transition">
+                <div class="flex justify-between items-start gap-2">
+                    <h4 class="text-sm font-bold text-white">${escHtml(t.name)}</h4>
+                    ${t.has_winner ? '<span class="text-[10px] bg-amber-900/60 text-amber-400 px-1.5 py-0.5 rounded font-bold shrink-0">★ WINNER SET</span>' : ''}
+                </div>
+                <p class="text-xs text-gray-400 mt-1">${escHtml(t.bullet_label)} · ${escHtml(t.powder_name)}</p>
+                <p class="text-[11px] text-gray-500 mt-1">${t.step_count} step${t.step_count === 1 ? '' : 's'}${t.charge_min !== null ? ` · ${t.charge_min}–${t.charge_max}gr` : ''}${t.platform_label ? ` · 🔫 ${escHtml(t.platform_label)}` : ''}</p>
+            </div>
+        `).join('');
+    } catch (err) {
+        container.innerHTML = `<p class="text-xs text-red-400 italic">Failed to load ladder tests.</p>`;
+    }
+}
+
+async function resolveLadderPlatformSelection() {
+    const sel = document.getElementById('lt-platform');
+    if (!sel || !sel.value || sel.value === '__new__') return { barrel_id: null, platform_id: null };
+    if (sel.value.startsWith('platform:')) {
+        return { barrel_id: null, platform_id: parseInt(sel.value.split(':')[1]) };
+    }
+    const barrelId = await resolveBarrelIdFromGunSelect(sel);
+    return { barrel_id: barrelId, platform_id: null };
+}
+
+async function submitNewLadderTest() {
+    const name = document.getElementById('lt-name')?.value.trim();
+    const caliber = document.getElementById('lt-caliber')?.value;
+    const bulSel = document.getElementById('lt-bullet');
+    const bulletId = bulSel?.selectedOptions[0]?.dataset.id;
+    const powSel = document.getElementById('lt-powder');
+    const powder = powSel?.value;
+    const powderInvId = powSel?.selectedOptions[0]?.dataset.id;
+    const priSel = document.getElementById('lt-primer');
+    const primer = priSel?.value;
+    const primerInvId = priSel?.selectedOptions[0]?.dataset.id;
+    const casSel = document.getElementById('lt-casing');
+    const casing = casSel?.value;
+    const casingInvId = casSel?.selectedOptions[0]?.dataset.id;
+    const coal = document.getElementById('lt-coal')?.value;
+    const notes = document.getElementById('lt-notes')?.value;
+    const chargeStart = document.getElementById('lt-charge-start')?.value;
+    const chargeEnd = document.getElementById('lt-charge-end')?.value;
+    const chargeIncrement = document.getElementById('lt-charge-increment')?.value;
+    const roundsPerStep = document.getElementById('lt-rounds-per-step')?.value;
+
+    if (!name || !caliber || !bulletId || !powder) {
+        showToast('Name, caliber, bullet, and powder are required', 'error');
+        return;
+    }
+    // Rounds/Step defaults to "1" (see showLadderCreateForm), so it doesn't count toward
+    // "did the user start filling in a range" — only Start/End/Increment do. Otherwise the
+    // default value would wrongly block "leave everything blank, add steps manually" too.
+    const rangeFieldsFilled = chargeStart || chargeEnd || chargeIncrement;
+    if (rangeFieldsFilled && !(chargeStart && chargeEnd && chargeIncrement)) {
+        showToast('Fill in start, end, AND increment to auto-generate steps — or leave all three blank', 'error');
+        return;
+    }
+    if (rangeFieldsFilled && !(roundsPerStep && parseInt(roundsPerStep, 10) > 0)) {
+        showToast('Rounds/Step is required to auto-generate a charge ladder', 'error');
+        return;
+    }
+
+    const { barrel_id, platform_id } = await resolveLadderPlatformSelection();
+
+    try {
+        const res = await fetch('/ladder-tests/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name, caliber, bullet_id: parseInt(bulletId), powder_name: powder,
+                primer: primer || null, case_type: casing || null,
+                coal: coal ? parseFloat(coal) : null, notes: notes || null,
+                charge_start: chargeStart ? parseFloat(chargeStart) : null,
+                charge_end: chargeEnd ? parseFloat(chargeEnd) : null,
+                charge_increment: chargeIncrement ? parseFloat(chargeIncrement) : null,
+                rounds_per_step: roundsPerStep ? parseInt(roundsPerStep) : null,
+                barrel_id, platform_id,
+                powder_inv_id: powderInvId ? parseInt(powderInvId) : null,
+                primer_inv_id: primerInvId ? parseInt(primerInvId) : null,
+                casing_inv_id: casingInvId ? parseInt(casingInvId) : null,
+            }),
+        });
+        if (res.status === 400) {
+            const err = await res.json().catch(() => ({}));
+            showToast(err.detail || 'Invalid charge range', 'error');
+            return;
+        }
+        if (!res.ok) { showToast('Failed to create ladder test', 'error'); return; }
+        _currentLadderTest = await res.json();
+        (_currentLadderTest.warnings || []).forEach(w => showToast(w, 'error'));
+        showToast('Ladder test created', 'success');
+        showLadderDetailView();
+        renderLadderDetail();
+    } catch (err) { showToast('Failed to create ladder test', 'error'); }
+}
+
+async function openLadderTest(id) {
+    try {
+        const res = await fetch(`/ladder-tests/${id}`, { cache: 'no-store' });
+        if (!res.ok) { showToast('Failed to load ladder test', 'error'); return; }
+        _currentLadderTest = await res.json();
+        showLadderDetailView();
+        renderLadderDetail();
+    } catch (err) { showToast('Failed to load ladder test', 'error'); }
+}
+
+function renderLadderDetail() {
+    const t = _currentLadderTest;
+    if (!t) return;
+
+    const title = document.getElementById('ladder-detail-title');
+    if (title) title.textContent = t.name;
+
+    const recipe = document.getElementById('ladder-detail-recipe');
+    if (recipe) {
+        const bulletLabel = t.bullet
+            ? `${t.bullet.brand} ${t.bullet.product_line || ''} ${t.bullet.weight_gr}gr ${t.bullet.bullet_type || ''}`.replace(/\s+/g, ' ').trim()
+            : '—';
+        const parts = [t.caliber, bulletLabel, t.powder_name, t.primer, t.case_type].filter(Boolean);
+        let line = parts.join(' · ') + (t.coal ? ` · COAL ${t.coal}"` : '');
+        if (t.charge_start != null && t.charge_end != null && t.charge_increment != null) {
+            line += ` · ${t.charge_start}–${t.charge_end}gr step ${t.charge_increment}gr`;
+        }
+        if (t.rounds_per_step) line += ` · ${t.rounds_per_step} rounds/step loaded`;
+        if (t.platform_label) line += ` · 🔫 ${t.platform_label}`;
+        recipe.textContent = line;
+    }
+
+    const chartContainer = document.getElementById('ladder-chart');
+    if (chartContainer) chartContainer.innerHTML = buildLadderChartSVG(t.steps);
+
+    const suggestBox = document.getElementById('ladder-suggested-nodes');
+    if (suggestBox) suggestBox.innerHTML = _renderSuggestedNodesHTML(t.steps);
+
+    const markedBox = document.getElementById('ladder-marked-nodes');
+    if (markedBox) markedBox.innerHTML = _renderMarkedNodesHTML(t.steps);
+
+    const rows = document.getElementById('ladder-step-rows');
+    if (rows) {
+        rows.innerHTML = t.steps.length
+            ? t.steps.map(s => `
+                <tr class="border-t border-gray-700 ${s.is_winner ? 'bg-amber-900/20' : ''}">
+                    <td class="p-2 font-bold text-white">${s.charge_weight}${s.is_winner ? ' ★' : ''}</td>
+                    <td class="p-2">
+                        <div class="flex items-center gap-1.5">
+                            <input type="text" id="step-vel-${s.id}" value="${escHtml(s.velocities || '')}" placeholder="e.g. 2750,2748,2751"
+                                   onkeydown="if(event.key==='Enter'){saveLadderStepVelocities(${s.id});}"
+                                   class="w-40 bg-gray-700 border border-gray-600 rounded p-1.5 text-xs text-white focus:outline-none focus:border-amber-500">
+                            <button onclick="saveLadderStepVelocities(${s.id})" class="text-blue-400 hover:text-blue-300 text-xs cursor-pointer shrink-0" title="Save velocities">💾</button>
+                        </div>
+                    </td>
+                    <td class="p-2 text-right">
+                        <button onclick="deleteLadderStep(${s.id})" class="text-gray-500 hover:text-red-400 text-xs cursor-pointer">🗑️</button>
+                    </td>
+                </tr>
+            `).join('')
+            : `<tr><td colspan="3" class="p-3 text-center text-xs text-gray-500 italic">No charge steps yet — set a charge range above or add one manually.</td></tr>`;
+    }
+}
+
+// Steps marked as a node by clicking a dot on the chart — surfaced here since the step table no
+// longer has its own star/save column. Each gets a one-click path to load more rounds for it.
+function _renderMarkedNodesHTML(steps) {
+    const marked = steps.filter(s => s.is_winner);
+    if (!marked.length) return '';
+    return `
+        <div class="bg-gray-800 p-3 rounded-lg border border-amber-700/40 shadow-xl">
+            <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">★ Marked Nodes</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+            ${marked.map(s => `
+                <div class="bg-gray-900/40 border border-gray-700 rounded-lg p-2.5 flex items-center justify-between gap-2 text-xs text-gray-300">
+                    <span><b class="text-white">${s.charge_weight}gr</b>${s.avg_velocity != null ? ` — ${s.avg_velocity} fps` : ''}</span>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button onclick="saveWinnerAsHandload(${s.id})" class="bg-emerald-700 hover:bg-emerald-600 text-white px-2.5 py-1 rounded text-[11px] font-bold cursor-pointer">🧪 Create More Bullets</button>
+                        <button onclick="toggleLadderWinner(${s.id})" class="text-gray-500 hover:text-red-400 cursor-pointer" title="Unmark">✕</button>
+                    </div>
+                </div>
+            `).join('')}
+            </div>
+        </div>`;
+}
+
+// Combines the raw velocity readings across several steps into one group and computes avg/ES/SD
+// over all of them together — mirrors math_engine.calculate_shot_metrics server-side, but a
+// ladder node spans several charge steps (each usually just 1 shot), so there's no single step
+// to ask the backend for; this treats those shots collectively like a real group.
+function _combinedShotMetrics(velocityCsvList) {
+    const values = [];
+    velocityCsvList.forEach(csv => {
+        (csv || '').split(',').forEach(v => {
+            const n = parseFloat(v.trim());
+            if (!isNaN(n)) values.push(n);
+        });
+    });
+    const n = values.length;
+    if (n === 0) return null;
+    const avg = values.reduce((a, b) => a + b, 0) / n;
+    if (n === 1) return { avg: Math.round(avg * 10) / 10, es: 0, sd: 0, n };
+    const es = Math.max(...values) - Math.min(...values);
+    const variance = values.reduce((a, v) => a + (v - avg) ** 2, 0) / (n - 1);
+    const sd = Math.sqrt(variance);
+    return { avg: Math.round(avg * 10) / 10, es: Math.round(es * 10) / 10, sd: Math.round(sd * 10) / 10, n };
+}
+
+// Finds candidate "nodes" (flat spots in the velocity curve) by sliding a 3-point window
+// across the charge/velocity data and ranking windows by how little velocity varies inside
+// them — the classic manual technique reloaders use, automated. Returns up to 2 non-
+// overlapping windows so a ladder with two distinct plateaus gets both flagged.
+function _suggestLadderNodes(steps) {
+    const pts = steps.filter(s => s.avg_velocity != null).slice().sort((a, b) => a.charge_weight - b.charge_weight);
+    if (pts.length < 3) return [];
+    const windows = [];
+    for (let i = 0; i + 2 < pts.length; i++) {
+        const w = pts.slice(i, i + 3);
+        const vs = w.map(s => s.avg_velocity);
+        const spread = Math.max(...vs) - Math.min(...vs);
+        windows.push({ start: i, end: i + 2, points: w, spread, metrics: _combinedShotMetrics(w.map(s => s.velocities)) });
+    }
+    windows.sort((a, b) => a.spread - b.spread);
+    const chosen = [];
+    for (const w of windows) {
+        if (chosen.length >= 2) break;
+        const overlaps = chosen.some(c => w.start <= c.end && w.end >= c.start);
+        if (!overlaps) chosen.push(w);
+    }
+    return chosen.sort((a, b) => a.start - b.start);
+}
+
+function _renderSuggestedNodesHTML(steps) {
+    const suggestions = _suggestLadderNodes(steps);
+    if (!suggestions.length) return '';
+    return `
+        <div class="bg-gray-800 p-3 rounded-lg border border-emerald-700/40 shadow-xl">
+            <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2">🎯 Suggested Node${suggestions.length > 1 ? 's' : ''} (flattest velocity spots)</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+            ${suggestions.map((w, idx) => {
+                const mid = w.points[1];
+                const m = w.metrics;
+                const statsLine = m
+                    ? `Avg <b class="text-white">${m.avg}</b> fps · ES ${m.es} · SD ${m.sd} <span class="text-gray-500">(${m.n} shots)</span>`
+                    : '';
+                return `<div class="bg-gray-900/40 border border-gray-700 rounded-lg p-2.5 flex flex-col gap-1.5 text-xs text-gray-300">
+                    <div>Node ${idx + 1}: ${w.points[0].charge_weight}–${w.points[2].charge_weight}gr, centered on <b class="text-white">${mid.charge_weight}gr</b></div>
+                    ${statsLine ? `<div class="text-gray-400">${statsLine}</div>` : ''}
+                    <button onclick="saveWinnerAsHandload(${mid.id})" class="self-start bg-emerald-700 hover:bg-emerald-600 text-white px-2.5 py-1.5 rounded text-[11px] font-bold cursor-pointer">🧪 Create More Bullets</button>
+                </div>`;
+            }).join('')}
+            </div>
+        </div>`;
+}
+
+async function submitLadderStep() {
+    const t = _currentLadderTest;
+    if (!t) return;
+    const chargeEl = document.getElementById('ls-charge');
+    const velEl = document.getElementById('ls-velocities');
+    const charge = parseFloat(chargeEl?.value);
+    if (!charge) { showToast('Enter a charge weight', 'error'); return; }
+    try {
+        const res = await fetch(`/ladder-tests/${t.id}/steps/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ charge_weight: charge, velocities_csv: velEl?.value.trim() || null }),
+        });
+        if (!res.ok) { showToast('Failed to add step', 'error'); return; }
+        const saved = await res.json();
+        (saved.warnings || []).forEach(w => showToast(w, 'error'));
+        if (chargeEl) chargeEl.value = '';
+        if (velEl) velEl.value = '';
+        await openLadderTest(t.id);
+    } catch (err) { showToast('Failed to add step', 'error'); }
+}
+
+async function saveLadderStepVelocities(stepId) {
+    const t = _currentLadderTest;
+    if (!t) return;
+    const input = document.getElementById(`step-vel-${stepId}`);
+    const velocitiesCsv = input?.value.trim() || null;
+    try {
+        const res = await fetch(`/ladder-tests/${t.id}/steps/${stepId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ velocities_csv: velocitiesCsv }),
+        });
+        if (!res.ok) { showToast('Failed to save velocities', 'error'); return; }
+        showToast('Saved', 'success');
+        await openLadderTest(t.id);
+    } catch (err) { showToast('Failed to save velocities', 'error'); }
+}
+
+async function deleteLadderStep(stepId) {
+    const t = _currentLadderTest;
+    if (!t || !confirm('Delete this charge step?')) return;
+    try {
+        const res = await fetch(`/ladder-tests/${t.id}/steps/${stepId}`, { method: 'DELETE' });
+        if (!res.ok) { showToast('Failed to delete step', 'error'); return; }
+        await openLadderTest(t.id);
+    } catch (err) { showToast('Failed to delete step', 'error'); }
+}
+
+async function toggleLadderWinner(stepId) {
+    const t = _currentLadderTest;
+    if (!t) return;
+    try {
+        const res = await fetch(`/ladder-tests/${t.id}/steps/${stepId}/toggle-winner`, { method: 'POST' });
+        if (!res.ok) { showToast('Failed to update winner', 'error'); return; }
+        _currentLadderTest = await res.json();
+        renderLadderDetail();
+    } catch (err) { showToast('Failed to update winner', 'error'); }
+}
+
+async function deleteLadderTestConfirm() {
+    const t = _currentLadderTest;
+    if (!t || !confirm(`Delete ladder test "${t.name}" and all its steps?`)) return;
+    try {
+        const res = await fetch(`/ladder-tests/${t.id}`, { method: 'DELETE' });
+        if (!res.ok) { showToast('Failed to delete ladder test', 'error'); return; }
+        showToast('Ladder test deleted', 'success');
+        showLadderListView();
+    } catch (err) { showToast('Failed to delete ladder test', 'error'); }
+}
+
+function buildLadderChartSVG(steps) {
+    if (!steps || !steps.length) {
+        return `<p class="text-xs text-gray-500 italic">Add charge steps to see the chart.</p>`;
+    }
+    const withVel = steps.filter(s => s.avg_velocity != null);
+    if (!withVel.length) {
+        return `<p class="text-xs text-gray-500 italic">Add velocities to see the chart.</p>`;
+    }
+    const sorted = [...withVel].sort((a, b) => a.charge_weight - b.charge_weight);
+    const W = 600, H = 260, padL = 50, padR = 20, padT = 20, padB = 36;
+    const chargeMin = sorted[0].charge_weight, chargeMax = sorted[sorted.length - 1].charge_weight;
+    const chargeSpan = Math.max(chargeMax - chargeMin, 0.1);
+    let velMin = Math.min(...sorted.map(s => s.avg_velocity - (s.extreme_spread || 0) / 2));
+    let velMax = Math.max(...sorted.map(s => s.avg_velocity + (s.extreme_spread || 0) / 2));
+    if (velMin === velMax) { velMin -= 20; velMax += 20; }
+    const velPad = (velMax - velMin) * 0.15;
+    velMin -= velPad; velMax += velPad;
+
+    const x = c => padL + ((c - chargeMin) / chargeSpan) * (W - padL - padR);
+    const y = v => H - padB - ((v - velMin) / (velMax - velMin)) * (H - padT - padB);
+
+    const points = sorted.map(s => `${x(s.charge_weight).toFixed(1)},${y(s.avg_velocity).toFixed(1)}`).join(' ');
+
+    const esLines = sorted.filter(s => s.extreme_spread).map(s => {
+        const xPos = x(s.charge_weight).toFixed(1);
+        return `<line x1="${xPos}" y1="${y(s.avg_velocity - s.extreme_spread / 2).toFixed(1)}" x2="${xPos}" y2="${y(s.avg_velocity + s.extreme_spread / 2).toFixed(1)}" stroke="#6b7280" stroke-width="1.5" />`;
+    }).join('');
+
+    // Each point is a visible dot plus a larger invisible circle on top carrying the click
+    // handler — the bigger hit target makes it usable on a phone, while the dot itself stays
+    // visually small. Clicking toggles that step as a node (same as the old table star column).
+    const circles = sorted.map(s => {
+        const r = s.is_winner ? 6 : 4;
+        const fill = s.is_winner ? '#f59e0b' : '#60a5fa';
+        const cx = x(s.charge_weight).toFixed(1);
+        const cy = y(s.avg_velocity).toFixed(1);
+        const tip = `${s.charge_weight}gr — ${s.avg_velocity} fps${s.extreme_spread ? ` (ES ${s.extreme_spread})` : ''} — click to ${s.is_winner ? 'unmark' : 'mark'} as node`;
+        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" style="pointer-events:none" />` +
+            `<circle cx="${cx}" cy="${cy}" r="${r + 8}" fill="transparent" style="cursor:pointer" onclick="toggleLadderWinner(${s.id})"><title>${tip}</title></circle>`;
+    }).join('');
+
+    const xTicks = sorted.map(s => `<text x="${x(s.charge_weight).toFixed(1)}" y="${H - padB + 16}" font-size="10" fill="#9ca3af" text-anchor="middle">${s.charge_weight}</text>`).join('');
+
+    const yTickCount = 4;
+    const yTicks = Array.from({ length: yTickCount + 1 }, (_, i) => {
+        const v = velMin + (i / yTickCount) * (velMax - velMin);
+        const yPos = y(v);
+        return `<line x1="${padL}" y1="${yPos.toFixed(1)}" x2="${W - padR}" y2="${yPos.toFixed(1)}" stroke="#374151" stroke-width="1" />` +
+               `<text x="${padL - 8}" y="${(yPos + 3).toFixed(1)}" font-size="10" fill="#9ca3af" text-anchor="end">${Math.round(v)}</text>`;
+    }).join('');
+
+    return `<svg viewBox="0 0 ${W} ${H}" class="w-full h-auto">
+        ${yTicks}
+        ${esLines}
+        <polyline points="${points}" fill="none" stroke="#60a5fa" stroke-width="2" />
+        ${circles}
+        ${xTicks}
+        <text x="${W / 2}" y="${H - 4}" font-size="10" fill="#6b7280" text-anchor="middle">Charge Weight (gr)</text>
+    </svg>`;
+}
+
+function saveWinnerAsHandload(stepId) {
+    const t = _currentLadderTest;
+    if (!t) return;
+    const winner = t.steps.find(s => s.id === stepId);
+    if (!winner) return;
+    const handoff = {
+        caliber: t.caliber,
+        bullet_id: t.bullet_id,
+        powder_name: t.powder_name,
+        primer: t.primer,
+        case_type: t.case_type,
+        coal: t.coal,
+        recipe_name: `${t.name} @ ${winner.charge_weight}gr`,
+        powder_charge: winner.charge_weight,
+    };
+    sessionStorage.setItem('ladderHandoff', JSON.stringify(handoff));
+    window.location.href = '/?tab=add-tab&cat=ammunition&handload=1';
+}
+
+async function applyLadderHandoff() {
+    const raw = sessionStorage.getItem('ladderHandoff');
+    if (!raw) return;
+    sessionStorage.removeItem('ladderHandoff');
+    let handoff;
+    try { handoff = JSON.parse(raw); } catch (e) { return; }
+
+    toggleAmmoType('handloads');
+    await populateHandloadDropdowns();
+
+    const calSel = document.getElementById('hl-caliber');
+    if (calSel && handoff.caliber) { calSel.value = handoff.caliber; filterHandloadBullets(); }
+
+    const bulSel = document.getElementById('hl-bullet');
+    if (bulSel && handoff.bullet_id) {
+        const opt = bulSel.querySelector(`option[data-id="${handoff.bullet_id}"]`);
+        if (opt) { bulSel.value = opt.value; autofillBulletData(bulSel); }
+    }
+
+    const powSel = document.getElementById('hl-powder');
+    if (powSel && handoff.powder_name) powSel.value = handoff.powder_name;
+    const priSel = document.getElementById('hl-primer');
+    if (priSel && handoff.primer) priSel.value = handoff.primer;
+    const casSel = document.getElementById('hl-casing');
+    if (casSel && handoff.case_type) casSel.value = handoff.case_type;
+
+    const nameEl = document.querySelector('#ammo-handload-form input[name="recipe_name"]');
+    if (nameEl && handoff.recipe_name) nameEl.value = handoff.recipe_name;
+    const coalEl = document.querySelector('#ammo-handload-form input[name="coal"]');
+    if (coalEl && handoff.coal != null) coalEl.value = handoff.coal;
+    const chargeEl = document.querySelector('#ammo-handload-form input[name="powder_charge"]');
+    if (chargeEl && handoff.powder_charge != null) chargeEl.value = handoff.powder_charge;
+
+    showToast('Recipe pre-filled from ladder test winner', 'success');
+}
+
 window.onload = () => {
     fetchInitialLookupData(); applyPreferences(); loadLandingStats(); initCustomAC();
     const p = new URLSearchParams(location.search);
@@ -4084,6 +4885,7 @@ window.onload = () => {
         else if (cat === 'tc-receiver') { switchFormCategory('cat-platforms'); switchAddForm('add-tc-receiver'); }
         else switchFormCategory('cat-' + cat);
     }
+    if (p.get('handload') === '1') applyLadderHandoff();
     // Close user-menu dropdown when clicking outside
     const userMenu = document.getElementById('user-menu');
     if (userMenu) {

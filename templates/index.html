@@ -16,7 +16,7 @@
 </head>
 <body class="bg-gray-950 text-gray-100 font-sans antialiased select-none flex min-h-dvh lg:h-dvh lg:overflow-hidden">
 
-    <div id="toast-container" class="fixed bottom-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
+    <div id="toast-container" class="fixed top-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
 
     <input type="file" id="global-picture-replacer" accept="image/*" class="hidden" onchange="processPictureReplacement(this)">
 
@@ -66,6 +66,11 @@
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">🎯</span>
                 <div><div class="text-sm font-bold text-white">Range Session</div><div class="text-[10px] text-blue-400/70">Log a shot string</div></div>
+            </button>
+            <button id="nav-btn-ladder" onclick="switchTab('ladder-tab'); closeSidebar()"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 hover:border-purple-500/40 transition cursor-pointer text-left">
+                <span class="text-lg">🪜</span>
+                <div><div class="text-sm font-bold text-white">Ladder Test</div><div class="text-[10px] text-purple-400/70">Find the node</div></div>
             </button>
             <button onclick="switchTab('add-tab'); switchFormCategory('cat-platforms'); closeSidebar()"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 border border-amber-800/40 hover:border-amber-500/40 transition cursor-pointer text-left">
@@ -230,6 +235,160 @@
                     <button onclick="commitSessionToDatabase()" id="db-save-session-btn" class="hidden w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded text-xs shadow-md transition cursor-pointer">
                         🚀 Upload Data to Homelab DB
                     </button>
+                </div>
+            </div>
+        </section>
+
+        <section id="ladder-tab" class="hidden space-y-4">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                <h2 class="text-2xl font-bold">Ladder Test</h2>
+                <button onclick="showLadderListView()" id="ladder-back-btn" class="hidden px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs font-bold rounded text-white transition cursor-pointer">← All Tests</button>
+            </div>
+
+            <!-- List view -->
+            <div id="ladder-list-view" class="space-y-4">
+                <button onclick="showLadderCreateForm()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm rounded shadow-md transition cursor-pointer">+ New Ladder Test</button>
+                <div id="ladder-test-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <p class="text-xs text-gray-500 italic">Loading…</p>
+                </div>
+            </div>
+
+            <!-- Create form -->
+            <div id="ladder-create-view" class="hidden bg-gray-800 p-6 rounded-lg border border-gray-700 space-y-4 shadow-xl">
+                <h3 class="text-sm font-bold uppercase tracking-wider text-amber-400">New Ladder Test Recipe</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-200 font-semibold mb-1">Test Name</label>
+                        <input type="text" id="lt-name" placeholder="e.g., 6.5 CM 140gr ELD-M / H4350" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-200 font-semibold mb-1">Caliber</label>
+                        <select id="lt-caliber" onchange="filterLadderBullets()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                            <option value="">Loading calibers…</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-200 font-semibold mb-1">C.O.A.L. (Inches)</label>
+                        <input type="number" step="0.001" id="lt-coal" placeholder="e.g., 2.800" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Powder</label>
+                            <select id="lt-powder" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                <option value="">Loading powders…</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Primer</label>
+                            <select id="lt-primer" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                <option value="">Loading primers…</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Bullet</label>
+                            <select id="lt-bullet" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                <option value="">Loading bullets…</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Casing</label>
+                            <select id="lt-casing" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                <option value="">Loading casings…</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-200 font-semibold mb-1">Test Platform / Rifle <span class="text-gray-500 font-normal">(optional)</span></label>
+                    <select id="lt-platform" onchange="onLadderPlatformChange()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                        <option value="">Loading platforms…</option>
+                    </select>
+                    <div id="lt-platform-new-form" class="hidden grid grid-cols-1 md:grid-cols-4 gap-3 bg-gray-850 p-3 mt-2 rounded border border-gray-700">
+                        <input type="text" id="ltp-name" placeholder="e.g., Brother's Savage 110" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none md:col-span-2">
+                        <input type="text" id="ltp-barrel-length" placeholder="Barrel length (optional)" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                        <input type="text" id="ltp-barrel-twist" placeholder="Twist rate (optional)" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                        <div class="md:col-span-4 flex gap-2">
+                            <button type="button" onclick="saveNewLadderPlatform()" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-1.5 rounded text-xs transition cursor-pointer">Save Platform</button>
+                            <button type="button" onclick="cancelNewLadderPlatform()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded text-xs transition cursor-pointer">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="border-t border-gray-700 pt-4">
+                    <h4 class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2">Charge Ladder — generates one step per increment</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Start Charge (gr)</label>
+                            <input type="number" step="0.1" id="lt-charge-start" placeholder="e.g., 41.0" oninput="updateLadderChargePreview()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">End Charge (gr)</label>
+                            <input type="number" step="0.1" id="lt-charge-end" placeholder="e.g., 43.0" oninput="updateLadderChargePreview()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Increment (gr)</label>
+                            <input type="number" step="0.1" id="lt-charge-increment" placeholder="e.g., 0.3" oninput="updateLadderChargePreview()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Rounds/Step</label>
+                            <input type="number" step="1" min="1" id="lt-rounds-per-step" value="1" oninput="updateLadderChargePreview()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                        </div>
+                    </div>
+                    <p id="lt-charge-preview" class="text-[11px] text-purple-300 mt-1.5 font-mono"></p>
+                    <p class="text-[11px] text-gray-500 mt-1.5">Leave all four blank to start with no steps and add charges manually instead. Rounds/Step defaults to 1 — raise it only if you're loading more than one round per charge. Components are deducted from inventory now, for all rounds in the ladder — not later when you record velocities.</p>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-200 font-semibold mb-1">Notes</label>
+                    <input type="text" id="lt-notes" placeholder="Optional notes" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="submitNewLadderTest()" class="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded text-sm transition cursor-pointer">Create Ladder Test</button>
+                    <button onclick="showLadderListView()" class="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded text-sm transition cursor-pointer">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Detail view -->
+            <div id="ladder-detail-view" class="hidden space-y-4">
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl flex justify-between items-start gap-3">
+                    <div>
+                        <h3 id="ladder-detail-title" class="text-lg font-bold text-white"></h3>
+                        <p id="ladder-detail-recipe" class="text-xs text-gray-400 mt-1"></p>
+                    </div>
+                    <button onclick="deleteLadderTestConfirm()" class="text-gray-500 hover:text-red-400 text-xs shrink-0 cursor-pointer">🗑️ Delete Test</button>
+                </div>
+
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl">
+                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Charge Weight vs Velocity</h4>
+                    <p class="text-[11px] text-gray-500 mb-2">Click a dot to mark or unmark it as a node.</p>
+                    <div id="ladder-chart"></div>
+                </div>
+
+                <div id="ladder-suggested-nodes"></div>
+                <div id="ladder-marked-nodes"></div>
+
+                <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl overflow-hidden overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-900 text-gray-400 text-xs uppercase">
+                            <tr>
+                                <th class="p-2 text-left">Charge (gr)</th>
+                                <th class="p-2 text-left">Velocities</th>
+                                <th class="p-2"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="ladder-step-rows"></tbody>
+                    </table>
+                </div>
+
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl space-y-3">
+                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Add Extra Charge Step</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <input type="number" step="0.1" id="ls-charge" placeholder="Charge weight (gr)" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                        <input type="text" id="ls-velocities" placeholder="Velocities, comma-separated (e.g. 2750,2762)" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none md:col-span-2">
+                    </div>
+                    <button onclick="submitLadderStep()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded text-sm transition cursor-pointer">+ Add Step</button>
                 </div>
             </div>
         </section>
@@ -1152,6 +1311,6 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
-    <script src="/static/app.js?v=56"></script>
+    <script src="/static/app.js?v=74"></script>
 </body>
 </html>

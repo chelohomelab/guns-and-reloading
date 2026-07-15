@@ -16,7 +16,7 @@
 </head>
 <body class="bg-gray-950 text-gray-100 font-sans antialiased select-none flex min-h-dvh lg:h-dvh lg:overflow-hidden">
 
-<div id="toast-container" class="fixed bottom-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
+<div id="toast-container" class="fixed top-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
 
 <!-- Add/Edit Modal -->
 <div id="wish-modal" class="fixed inset-0 bg-black/75 flex items-center justify-center z-[110] hidden backdrop-blur-sm">
@@ -155,6 +155,10 @@
             <span class="text-lg">🎯</span>
             <div><div class="text-sm font-bold text-white">Range Session</div><div class="text-[10px] text-blue-400/70">Log a shot string</div></div>
         </button>
+        <button onclick="window.location.href='/?tab=ladder-tab'" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 hover:border-purple-500/40 transition cursor-pointer text-left">
+            <span class="text-lg">🪜</span>
+            <div><div class="text-sm font-bold text-white">Ladder Test</div><div class="text-[10px] text-purple-400/70">Find the node</div></div>
+        </button>
         <button onclick="window.location.href='/?tab=add-tab&cat=platforms'" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 border border-amber-800/40 hover:border-amber-500/40 transition cursor-pointer text-left">
             <span class="text-lg">⚙️</span>
             <div><div class="text-sm font-bold text-white">Add Inventory</div><div class="text-[10px] text-amber-500/70">Firearms &amp; gear</div></div>
@@ -162,6 +166,10 @@
         <button onclick="window.location.href='/?tab=add-tab&cat=ammunition'" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-sky-950/60 hover:bg-sky-900/60 border border-sky-800/40 hover:border-sky-500/40 transition cursor-pointer text-left">
             <span class="text-lg">🧪</span>
             <div><div class="text-sm font-bold text-white">Add Ammunition</div><div class="text-[10px] text-sky-400/70">Factory &amp; handloads</div></div>
+        </button>
+        <button onclick="window.location.href='/?tab=add-tab&cat=components'" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/40 hover:border-emerald-500/40 transition cursor-pointer text-left">
+            <span class="text-lg">🔩</span>
+            <div><div class="text-sm font-bold text-white">Add Components</div><div class="text-[10px] text-emerald-500/70">Powder, primers, bullets</div></div>
         </button>
     </nav>
     </div><!-- end scrollable middle -->
@@ -171,6 +179,7 @@
             <a href="/admin/users" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">👤 Users</a>
             <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
             <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
+            <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
             {% endif %}
             <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
             <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
@@ -239,7 +248,7 @@
     </main>
 </div>
 
-<script src="/static/app.js?v=56"></script>
+<script src="/static/app.js?v=74"></script>
 <script>
 let allWishItems = [];
 let activeWishFilter = 'All';

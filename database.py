@@ -174,6 +174,7 @@ class BulletInventory(Base):
     datasheet_path = Column(String, nullable=True)
 
     load_data_sets = relationship("LoadData", back_populates="bullet", cascade="all, delete-orphan")
+    ladder_tests = relationship("LadderTest", back_populates="bullet", cascade="all, delete-orphan")
 
 
 class LoadData(Base):
@@ -210,6 +211,66 @@ class LoadDataEntry(Base):
     is_most_accurate = Column(Boolean, default=False)
 
     load_data = relationship("LoadData", back_populates="entries")
+
+
+class LadderTest(Base):
+    __tablename__ = "ladder_tests"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    caliber = Column(String, nullable=True)
+    bullet_id = Column(Integer, ForeignKey("bullet_inventory.id"), nullable=False)
+    powder_name = Column(String, nullable=False)
+    primer = Column(String, nullable=True)
+    case_type = Column(String, nullable=True)
+    coal = Column(Float, nullable=True)
+    date_started = Column(String, nullable=True)
+    notes = Column(String, nullable=True)
+    created_at = Column(String, nullable=True)
+    charge_start = Column(Float, nullable=True)
+    charge_end = Column(Float, nullable=True)
+    charge_increment = Column(Float, nullable=True)
+    barrel_id = Column(Integer, ForeignKey("barrels.id"), nullable=True)
+    platform_id = Column(Integer, ForeignKey("test_platforms.id"), nullable=True)
+    powder_inv_id = Column(Integer, ForeignKey("powder_inventory.id"), nullable=True)
+    primer_inv_id = Column(Integer, ForeignKey("primer_inventory.id"), nullable=True)
+    casing_inv_id = Column(Integer, ForeignKey("casing_inventory.id"), nullable=True)
+    rounds_per_step = Column(Integer, nullable=True)
+
+    bullet = relationship("BulletInventory", back_populates="ladder_tests")
+    barrel = relationship("Barrel")
+    platform = relationship("TestPlatform", back_populates="ladder_tests")
+    steps = relationship("LadderTestStep", back_populates="ladder_test",
+                          cascade="all, delete-orphan", order_by="LadderTestStep.charge_weight")
+
+
+class TestPlatform(Base):
+    __tablename__ = "test_platforms"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    caliber = Column(String, nullable=True)
+    barrel_length = Column(String, nullable=True)
+    barrel_twist = Column(String, nullable=True)
+    notes = Column(String, nullable=True)
+    created_at = Column(String, nullable=True)
+
+    ladder_tests = relationship("LadderTest", back_populates="platform")
+
+
+class LadderTestStep(Base):
+    __tablename__ = "ladder_test_steps"
+    id = Column(Integer, primary_key=True, index=True)
+    ladder_test_id = Column(Integer, ForeignKey("ladder_tests.id"), nullable=False)
+    charge_weight = Column(Float, nullable=False)
+    velocities = Column(String, nullable=True)
+    rounds_fired = Column(Integer, nullable=True)
+    avg_velocity = Column(Float, nullable=True)
+    extreme_spread = Column(Float, nullable=True)
+    standard_deviation = Column(Float, nullable=True)
+    is_winner = Column(Boolean, default=False)
+    date_shot = Column(String, nullable=True)
+    notes = Column(String, nullable=True)
+
+    ladder_test = relationship("LadderTest", back_populates="steps")
 
 
 # --- AMMUNITION & PERFORMANCE LOGS ---
@@ -462,6 +523,17 @@ def init_db():
         _add_col('scopes', 'is_deleted', 'is_deleted BOOLEAN DEFAULT FALSE')
         _add_col('scopes', 'is_sold',    'is_sold BOOLEAN DEFAULT FALSE')
         _add_col('scopes', 'price_sold', 'price_sold FLOAT')
+
+    if 'ladder_tests' in inspector.get_table_names():
+        _add_col('ladder_tests', 'charge_start',     'charge_start FLOAT')
+        _add_col('ladder_tests', 'charge_end',       'charge_end FLOAT')
+        _add_col('ladder_tests', 'charge_increment', 'charge_increment FLOAT')
+        _add_col('ladder_tests', 'barrel_id',        'barrel_id INTEGER')
+        _add_col('ladder_tests', 'platform_id',      'platform_id INTEGER')
+        _add_col('ladder_tests', 'powder_inv_id',    'powder_inv_id INTEGER')
+        _add_col('ladder_tests', 'primer_inv_id',    'primer_inv_id INTEGER')
+        _add_col('ladder_tests', 'casing_inv_id',    'casing_inv_id INTEGER')
+        _add_col('ladder_tests', 'rounds_per_step',  'rounds_per_step INTEGER')
 
     # Seed default threshold settings if they don't exist
     _defaults = {

@@ -360,35 +360,47 @@
                     <button onclick="deleteLadderTestConfirm()" class="text-gray-500 hover:text-red-400 text-xs shrink-0 cursor-pointer">🗑️ Delete Test</button>
                 </div>
 
-                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl">
-                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Charge Weight vs Velocity</h4>
-                    <p class="text-[11px] text-gray-500 mb-2">Click a dot to mark or unmark it as a node.</p>
-                    <div id="ladder-chart"></div>
-                </div>
-
-                <div id="ladder-suggested-nodes"></div>
-                <div id="ladder-marked-nodes"></div>
-
-                <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl overflow-hidden overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-900 text-gray-400 text-xs uppercase">
-                            <tr>
-                                <th class="p-2 text-left">Charge (gr)</th>
-                                <th class="p-2 text-left">Velocities</th>
-                                <th class="p-2"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="ladder-step-rows"></tbody>
-                    </table>
-                </div>
-
-                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl space-y-3">
-                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Add Extra Charge Step</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <input type="number" step="0.1" id="ls-charge" placeholder="Charge weight (gr)" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
-                        <input type="text" id="ls-velocities" placeholder="Velocities, comma-separated (e.g. 2750,2762)" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none md:col-span-2">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <!-- Suggested Nodes + Chart + Marked Nodes: first in the DOM so it stacks on
+                         top on mobile, but visually pushed to the right column on wide screens.
+                         The trailing spacer (lg only) absorbs whatever height difference is left
+                         over so both columns' bottom edges line up, whichever side is taller. -->
+                    <div class="lg:order-2 flex flex-col gap-4 lg:h-full">
+                        <div id="ladder-suggested-nodes"></div>
+                        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl">
+                            <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Charge Weight vs Velocity</h4>
+                            <p class="text-[11px] text-gray-500 mb-2">Click a dot to mark or unmark it as a node.</p>
+                            <div id="ladder-chart"></div>
+                        </div>
+                        <div id="ladder-marked-nodes"></div>
+                        <div class="hidden lg:block flex-1"></div>
                     </div>
-                    <button onclick="submitLadderStep()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded text-sm transition cursor-pointer">+ Add Step</button>
+
+                    <!-- Step table + Add Extra Charge Step: visually the left column on wide screens. -->
+                    <div class="lg:order-1 flex flex-col gap-4 lg:h-full">
+                        <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl overflow-hidden overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-900 text-gray-400 text-xs uppercase">
+                                    <tr>
+                                        <th class="p-2 text-left">Charge (gr)</th>
+                                        <th class="p-2 text-left">Velocities</th>
+                                        <th class="p-2"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ladder-step-rows"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl space-y-3">
+                            <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Add Extra Charge Step</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <input type="number" step="0.1" id="ls-charge" placeholder="Charge weight (gr)" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                                <input type="text" id="ls-velocities" placeholder="Velocities, comma-separated (e.g. 2750,2762)" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none md:col-span-2">
+                            </div>
+                            <button onclick="submitLadderStep()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded text-sm transition cursor-pointer">+ Add Step</button>
+                        </div>
+                        <div class="hidden lg:block flex-1"></div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -1311,6 +1323,6 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
-    <script src="/static/app.js?v=74"></script>
+    <script src="/static/app.js?v=75"></script>
 </body>
 </html>

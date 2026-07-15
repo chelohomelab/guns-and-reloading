@@ -4603,14 +4603,14 @@ function _renderMarkedNodesHTML(steps) {
     return `
         <div class="bg-gray-800 p-3 rounded-lg border border-amber-700/40 shadow-xl">
             <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">★ Marked Nodes</h4>
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             ${marked.map(s => `
-                <div class="bg-gray-900/40 border border-gray-700 rounded-lg p-2.5 flex items-center justify-between gap-2 text-xs text-gray-300">
-                    <span><b class="text-white">${s.charge_weight}gr</b>${s.avg_velocity != null ? ` — ${s.avg_velocity} fps` : ''}</span>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <button onclick="saveWinnerAsHandload(${s.id})" class="bg-emerald-700 hover:bg-emerald-600 text-white px-2.5 py-1 rounded text-[11px] font-bold cursor-pointer">🧪 Create More Bullets</button>
-                        <button onclick="toggleLadderWinner(${s.id})" class="text-gray-500 hover:text-red-400 cursor-pointer" title="Unmark">✕</button>
+                <div class="bg-gray-900/40 border border-gray-700 rounded-lg p-2.5 flex flex-col gap-1.5 text-xs text-gray-300">
+                    <div class="flex items-center justify-between gap-2">
+                        <span><b class="text-white">${s.charge_weight}gr</b>${s.avg_velocity != null ? ` — ${s.avg_velocity} fps` : ''}</span>
+                        <button onclick="toggleLadderWinner(${s.id})" class="text-gray-500 hover:text-red-400 cursor-pointer shrink-0" title="Unmark">✕</button>
                     </div>
+                    <button onclick="saveWinnerAsHandload(${s.id})" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white px-2.5 py-1.5 rounded text-[11px] font-bold cursor-pointer">🧪 Create More Bullets</button>
                 </div>
             `).join('')}
             </div>
@@ -4669,7 +4669,7 @@ function _renderSuggestedNodesHTML(steps) {
     return `
         <div class="bg-gray-800 p-3 rounded-lg border border-emerald-700/40 shadow-xl">
             <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2">🎯 Suggested Node${suggestions.length > 1 ? 's' : ''} (flattest velocity spots)</h4>
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             ${suggestions.map((w, idx) => {
                 const mid = w.points[1];
                 const m = w.metrics;
@@ -4679,7 +4679,7 @@ function _renderSuggestedNodesHTML(steps) {
                 return `<div class="bg-gray-900/40 border border-gray-700 rounded-lg p-2.5 flex flex-col gap-1.5 text-xs text-gray-300">
                     <div>Node ${idx + 1}: ${w.points[0].charge_weight}–${w.points[2].charge_weight}gr, centered on <b class="text-white">${mid.charge_weight}gr</b></div>
                     ${statsLine ? `<div class="text-gray-400">${statsLine}</div>` : ''}
-                    <button onclick="saveWinnerAsHandload(${mid.id})" class="self-start bg-emerald-700 hover:bg-emerald-600 text-white px-2.5 py-1.5 rounded text-[11px] font-bold cursor-pointer">🧪 Create More Bullets</button>
+                    <button onclick="saveWinnerAsHandload(${mid.id})" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white px-2.5 py-1.5 rounded text-[11px] font-bold cursor-pointer">🧪 Create More Bullets</button>
                 </div>`;
             }).join('')}
             </div>

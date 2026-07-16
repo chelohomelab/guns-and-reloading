@@ -16,7 +16,7 @@
 </head>
 <body class="bg-gray-950 text-gray-100 font-sans antialiased select-none flex min-h-dvh lg:h-dvh lg:overflow-hidden">
 
-    <div id="toast-container" class="fixed bottom-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
+    <div id="toast-container" class="fixed top-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
 
     <input type="file" id="global-picture-replacer" accept="image/*" class="hidden" onchange="processPictureReplacement(this)">
 
@@ -57,15 +57,15 @@
                 <span class="text-lg">📦</span>
                 <div><div class="text-sm font-bold text-amber-400">Inventory</div><div class="text-[10px] text-amber-500/60">Browse your vault</div></div>
             </a>
-            <a href="/wishlist"
-                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-800/60 hover:bg-amber-900/30 border border-gray-700/50 hover:border-amber-500/40 transition text-left">
-                <span class="text-lg">⭐</span>
-                <div><div class="text-sm font-bold text-white">Wishlist</div><div class="text-[10px] text-amber-500/60">Items to acquire</div></div>
-            </a>
             <button id="nav-btn-measure" onclick="window.location.href='/?tab=measure-tab'"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">🎯</span>
                 <div><div class="text-sm font-bold text-white">Range Session</div><div class="text-[10px] text-blue-400/70">Log a shot string</div></div>
+            </button>
+            <button id="nav-btn-ladder" onclick="window.location.href='/?tab=ladder-tab'"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 hover:border-purple-500/40 transition cursor-pointer text-left">
+                <span class="text-lg">🪜</span>
+                <div><div class="text-sm font-bold text-white">Ladder Test</div><div class="text-[10px] text-purple-400/70">Find the node</div></div>
             </button>
             <button onclick="window.location.href='/?tab=add-tab&cat=platforms'"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 border border-amber-800/40 hover:border-amber-500/40 transition cursor-pointer text-left">
@@ -102,8 +102,10 @@
             <div id="user-menu" class="hidden absolute bottom-full left-3 right-3 mb-1 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
                 {% if user.is_admin %}
                 <a href="/admin/users" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">👤 Users</a>
+                <a href="/wishlist" class="flex items-center gap-2 px-4 py-2.5 text-sm text-amber-300 hover:bg-amber-900/30 transition">⭐ Wishlist</a>
                 <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
                 <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
+                <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
                 {% endif %}
                 <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
                 <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
@@ -325,7 +327,7 @@
     <datalist id="dl-handload-bullet"></datalist>
     <datalist id="dl-handload-brass"></datalist>
 
-    <script src="/static/app.js?v=56"></script>
+    <script src="/static/app.js?v=75"></script>
     <script>
     window.onload = () => {
         fetchInitialLookupData(); applyPreferences(); loadLandingStats(); initCustomAC();

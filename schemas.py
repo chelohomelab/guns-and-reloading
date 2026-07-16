@@ -117,6 +117,72 @@ class LoadDataEntryPayload(BaseModel):
     is_most_accurate: Optional[bool] = False
 
 
+class LadderTestPayload(BaseModel):
+    name: str
+    caliber: Optional[str] = None
+    bullet_id: int
+    powder_name: str
+    primer: Optional[str] = None
+    case_type: Optional[str] = None
+    coal: Optional[float] = None
+    date_started: Optional[str] = None
+    notes: Optional[str] = None
+    charge_start: Optional[float] = None
+    charge_end: Optional[float] = None
+    charge_increment: Optional[float] = None
+    barrel_id: Optional[int] = None
+    platform_id: Optional[int] = None
+    powder_inv_id: Optional[int] = None
+    primer_inv_id: Optional[int] = None
+    casing_inv_id: Optional[int] = None
+    rounds_per_step: Optional[int] = None
+
+
+class LadderTestPatch(BaseModel):
+    name: Optional[str] = None
+    caliber: Optional[str] = None
+    bullet_id: Optional[int] = None
+    powder_name: Optional[str] = None
+    primer: Optional[str] = None
+    case_type: Optional[str] = None
+    coal: Optional[float] = None
+    date_started: Optional[str] = None
+    notes: Optional[str] = None
+    charge_start: Optional[float] = None
+    charge_end: Optional[float] = None
+    charge_increment: Optional[float] = None
+    barrel_id: Optional[int] = None
+    platform_id: Optional[int] = None
+    powder_inv_id: Optional[int] = None
+    primer_inv_id: Optional[int] = None
+    casing_inv_id: Optional[int] = None
+    rounds_per_step: Optional[int] = None
+
+
+class TestPlatformPayload(BaseModel):
+    name: str
+    caliber: Optional[str] = None
+    barrel_length: Optional[str] = None
+    barrel_twist: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class LadderTestStepPayload(BaseModel):
+    charge_weight: float
+    velocities_csv: Optional[str] = None
+    rounds_fired: Optional[int] = None
+    date_shot: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class LadderTestStepPatch(BaseModel):
+    charge_weight: Optional[float] = None
+    velocities_csv: Optional[str] = None
+    rounds_fired: Optional[int] = None
+    date_shot: Optional[str] = None
+    notes: Optional[str] = None
+
+
 class SettingsPatch(BaseModel):
     low_stock_powder_lbs: Optional[str] = None
     low_stock_primers: Optional[str] = None

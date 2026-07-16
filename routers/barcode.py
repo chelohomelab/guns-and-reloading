@@ -279,6 +279,8 @@ def _parse_product_line(text: str) -> str | None:
         'Black Hills', 'Match', 'Premier Match',
         'Shooting Dynamics', 'Elite Performance', 'V-Crown', 'Elite Hunter',
         'Oryx', 'TipStrike', 'MRP',
+        # Traditions (muzzleloader projectiles)
+        'Smackdown Carnivore', 'Smackdown', 'Carnivore',
     ]
     t = text
     for line in sorted(known_lines, key=len, reverse=True):
@@ -388,7 +390,7 @@ def _parse_brand(raw_brand: str, title: str) -> str | None:
         'Sierra', 'Berger', 'Lapua', 'Barnes', 'Speer',
         'CCI', 'Fiocchi', 'PMC', 'Sellier & Bellot', 'PPU',
         'Black Hills', 'HSM', 'Weatherby', 'Magtech', 'Wolf',
-        'Norma', 'Sako', 'Vihtavuori', 'Cutting Edge', 'Hammer',
+        'Norma', 'Sako', 'Vihtavuori', 'Cutting Edge', 'Hammer', 'Traditions',
     ]
     if raw_brand and raw_brand.lower() not in _JUNK_BRANDS:
         raw_l = raw_brand.lower()
@@ -397,10 +399,11 @@ def _parse_brand(raw_brand: str, title: str) -> str | None:
             # Match exact, or prefix ("Barnes Bullets" → "Barnes")
             if raw_l == b_l or raw_l.startswith(b_l + ' '):
                 return b
-        # Unrecognized but non-junk — still check title before accepting the raw value
-        for b in known_brands:
-            if re.search(r'\b' + re.escape(b) + r'\b', title, re.IGNORECASE):
-                return b
+        # Unrecognized but non-junk — trust the manufacturer-supplied value as-is.
+        # (Previously this scanned the full combined text — title + description +
+        # offers — for a known brand name and let that win, which meant marketing
+        # copy like "...cutting edge ballistic coefficients..." could hijack a
+        # correct raw brand like "Traditions" into "Cutting Edge".)
         return raw_brand.title()
     for b in known_brands:
         if re.search(r'\b' + re.escape(b) + r'\b', title, re.IGNORECASE):

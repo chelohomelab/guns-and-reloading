@@ -92,6 +92,42 @@
             <input id="edit-product_line" type="text" class="w-full mt-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-amber-500" placeholder="ELD-X, Gold Medal…">
           </div>
         </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="text-xs text-gray-300 font-medium">BC G1</label>
+            <input id="edit-ammo_bc_g1" type="number" step="0.001" class="w-full mt-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-amber-500">
+          </div>
+          <div>
+            <label class="text-xs text-gray-300 font-medium">Factory Velocity (fps)</label>
+            <input id="edit-factory_velocity_fps" type="number" step="1" class="w-full mt-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-amber-500">
+          </div>
+          <div>
+            <label class="text-xs text-gray-300 font-medium">Muzzle Energy (ft-lb)</label>
+            <input id="edit-muzzle_energy_ftlb" type="number" step="1" class="w-full mt-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-amber-500">
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="text-xs text-gray-300 font-medium">Case Type</label>
+            <input id="edit-case_type" type="text" class="w-full mt-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-amber-500" placeholder="Brass…">
+          </div>
+          <div>
+            <label class="text-xs text-gray-300 font-medium">Reloadable</label>
+            <select id="edit-reloadable" class="w-full mt-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-amber-500">
+              <option value="">—</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-gray-300 font-medium">Lead Free</label>
+            <select id="edit-lead_free" class="w-full mt-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-amber-500">
+              <option value="">—</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div id="edit-fields-firearm" class="space-y-3 hidden">
@@ -140,7 +176,7 @@
             <input id="edit-product_line_comp" type="text" class="w-full mt-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-amber-500" placeholder="ELD-M, H4350…">
           </div>
         </div>
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="text-xs text-gray-300 font-medium">Weight (gr)</label>
             <input id="edit-weight_gr" type="number" step="0.1" class="w-full mt-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-amber-500">
@@ -148,10 +184,6 @@
           <div>
             <label class="text-xs text-gray-300 font-medium">BC G1</label>
             <input id="edit-bc_g1" type="number" step="0.001" class="w-full mt-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-amber-500">
-          </div>
-          <div>
-            <label class="text-xs text-gray-300 font-medium">BC G7</label>
-            <input id="edit-bc_g7" type="number" step="0.001" class="w-full mt-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-amber-500">
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
@@ -195,7 +227,13 @@
       </label>
     </div>
 
-    <div class="flex gap-3 px-4 py-3 border-t border-gray-700">
+    <div class="flex gap-2 px-4 pt-3">
+      <button onclick="addPhotoToEntry(parseInt(document.getElementById('edit-id').value))" class="py-2 px-3 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-bold rounded transition cursor-pointer" title="Add/replace photo">📷 Photo</button>
+      <button onclick="startAutofill(parseInt(document.getElementById('edit-id').value))" class="py-2 px-3 bg-emerald-800 hover:bg-emerald-700 text-emerald-200 text-xs font-bold rounded transition cursor-pointer">Auto-fill</button>
+      <button onclick="deleteEntryFromModal()" class="py-2 px-3 bg-red-900/50 hover:bg-red-800/60 text-red-400 text-xs font-bold rounded transition cursor-pointer ml-auto">🗑 Delete</button>
+    </div>
+
+    <div class="flex gap-3 px-4 py-3 border-t border-gray-700 mt-3">
       <button onclick="saveEditEntry()" class="flex-1 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold rounded transition cursor-pointer">Save Changes</button>
       <button onclick="closeEditModal()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm font-bold rounded transition cursor-pointer">Cancel</button>
     </div>
@@ -323,7 +361,10 @@
   <!-- Tab switcher -->
   <div class="px-4 pt-4 pb-0 shrink-0">
     <div class="flex gap-2 bg-gray-900/80 rounded-xl p-1 max-w-sm">
-      <button id="tab-btn-scan" onclick="switchTab('scan')" class="flex-1 py-2 rounded-lg text-sm font-bold transition cursor-pointer bg-blue-600 text-white">
+      <!-- Manual/UPC Scan tab hidden 2026-07-16: bookmarklet import covers the main workflow
+           now and this isn't getting used. Left in place (not deleted) — retire outright
+           if it stays unused. switchTab('scan') and #tab-scan are both still fully wired up. -->
+      <button id="tab-btn-scan" onclick="switchTab('scan')" class="hidden flex-1 py-2 rounded-lg text-sm font-bold transition cursor-pointer bg-blue-600 text-white">
         📡 Scan
       </button>
       <button id="tab-btn-review" onclick="switchTab('review')" class="flex-1 py-2 rounded-lg text-sm font-bold transition cursor-pointer text-gray-400 hover:text-white">
@@ -408,6 +449,38 @@
           <input id="scan-product_line" type="text" placeholder="Gold Medal…" class="w-full mt-1 bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-blue-500">
         </div>
       </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-gray-200 font-semibold">Factory Velocity (fps)</label>
+          <input id="scan-factory_velocity_fps" type="number" step="1" class="w-full mt-1 bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-blue-500">
+        </div>
+        <div>
+          <label class="text-xs text-gray-200 font-semibold">Muzzle Energy (ft-lb)</label>
+          <input id="scan-muzzle_energy_ftlb" type="number" step="1" class="w-full mt-1 bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-blue-500">
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="text-xs text-gray-200 font-semibold">Case Type</label>
+          <input id="scan-case_type" type="text" placeholder="Brass…" class="w-full mt-1 bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-blue-500">
+        </div>
+        <div>
+          <label class="text-xs text-gray-200 font-semibold">Reloadable</label>
+          <select id="scan-reloadable" class="w-full mt-1 bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-blue-500">
+            <option value="">—</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-200 font-semibold">Lead Free</label>
+          <select id="scan-lead_free" class="w-full mt-1 bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-blue-500">
+            <option value="">—</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+      </div>
     </div>
 
     <div id="scan-fields-firearm" class="grid grid-cols-2 gap-3" style="display:none">
@@ -450,7 +523,7 @@
           <input id="scan-product_line_comp" type="text" placeholder="ELD-M, H4350…" class="w-full mt-1 bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-blue-500">
         </div>
       </div>
-      <div class="grid grid-cols-3 gap-3">
+      <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="text-xs text-gray-200 font-semibold">Weight (gr)</label>
           <input id="scan-weight_gr" type="number" step="0.1" class="w-full mt-1 bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-blue-500">
@@ -458,10 +531,6 @@
         <div>
           <label class="text-xs text-gray-300 font-medium">BC G1</label>
           <input id="scan-bc_g1" type="number" step="0.001" class="w-full mt-1 bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-blue-500">
-        </div>
-        <div>
-          <label class="text-xs text-gray-300 font-medium">BC G7</label>
-          <input id="scan-bc_g7" type="number" step="0.001" class="w-full mt-1 bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-blue-500">
         </div>
       </div>
     </div>
@@ -511,6 +580,24 @@
 
   <!-- ===== REVIEW TAB ===== -->
   <div id="tab-review" class="hidden flex-1 overflow-y-auto px-4 py-4 space-y-4">
+    <!-- Import bookmarklet (MidwayUSA, Target Sports USA) -->
+    <div class="bg-gray-900/90 border border-gray-800 rounded-lg p-3">
+      <button onclick="toggleImportPanel()" class="w-full flex items-center justify-between text-xs text-gray-200 font-semibold cursor-pointer">
+        <span>🔖 Import Bookmarklet (MidwayUSA / Target Sports USA)</span>
+        <span id="import-panel-caret">▸</span>
+      </button>
+      <div id="import-panel" class="hidden mt-3 space-y-2">
+        <p class="text-[11px] text-gray-500">Drag this button to your bookmarks bar (or long-press → copy link → paste into a new bookmark's URL on mobile). On a MidwayUSA or Target Sports USA product page, scroll down so the specs table is visible, then tap the bookmark — it's sent straight to your Review queue below, no need to leave the page.</p>
+        <div class="flex justify-center py-1">
+          <a id="import-bookmarklet-link" href="#" onclick="return false;" class="inline-block px-4 py-2 bg-teal-700 hover:bg-teal-600 text-white text-sm font-bold rounded-lg cursor-grab select-none">Import to G&amp;R</a>
+        </div>
+        <div class="flex items-center justify-between">
+          <p id="import-token-status" class="text-[11px] text-gray-500">Loading token…</p>
+          <button onclick="regenerateImportToken()" class="text-[11px] text-red-400 hover:text-red-300 cursor-pointer">Regenerate token</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Filter buttons -->
     <div class="flex gap-2 flex-wrap items-center justify-between">
       <div class="flex gap-2 flex-wrap">
@@ -518,7 +605,27 @@
         <button onclick="setReviewFilter('incomplete')" id="rfilt-incomplete" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer bg-gray-800 border-gray-600 text-gray-300 hover:border-amber-500">Incomplete</button>
         <button onclick="setReviewFilter('reviewed')" id="rfilt-reviewed" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer bg-gray-800 border-gray-600 text-gray-300 hover:border-amber-500">Reviewed</button>
       </div>
-      <button onclick="clearAllReviewed()" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer bg-red-900/50 border-red-700/50 text-red-400 hover:bg-red-800/60">🗑 Clear Reviewed</button>
+      <div class="flex gap-2 flex-wrap">
+        <button onclick="toggleSelectMode()" id="btn-select-mode" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer bg-gray-800 border-gray-600 text-gray-300 hover:border-amber-500">☑ Select</button>
+        <button onclick="clearAllReviewed()" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer bg-red-900/50 border-red-700/50 text-red-400 hover:bg-red-800/60">🗑 Clear Reviewed</button>
+      </div>
+    </div>
+
+    <!-- Quick-select actions (select mode only) -->
+    <div id="select-quick-actions" class="hidden flex gap-2 flex-wrap">
+      <button onclick="selectAllVisible()" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer bg-gray-800 border-gray-600 text-gray-300 hover:border-blue-500">Select All</button>
+      <button onclick="selectAllComplete()" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer bg-gray-800 border-gray-600 text-gray-300 hover:border-emerald-500">✓ Select Complete</button>
+      <button onclick="clearSelection()" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer bg-gray-800 border-gray-600 text-gray-300 hover:border-amber-500">Clear Selection</button>
+      <button onclick="deleteAllVisible()" class="px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer bg-red-900/50 border-red-700/50 text-red-400 hover:bg-red-800/60">🗑 Delete All</button>
+    </div>
+
+    <!-- Bulk action bar (select mode) -->
+    <div id="bulk-action-bar" class="hidden sticky top-0 z-10 flex items-center justify-between gap-2 bg-blue-950/95 border border-blue-700/50 rounded-lg px-3 py-2 backdrop-blur-sm">
+      <span id="bulk-count" class="text-xs text-blue-200 font-bold">0 selected</span>
+      <div class="flex gap-2">
+        <button onclick="bulkAccept()" class="px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold rounded transition cursor-pointer">Accept Selected</button>
+        <button onclick="bulkDelete()" class="px-3 py-1.5 bg-red-900/50 hover:bg-red-800/60 text-red-400 text-xs font-bold rounded transition cursor-pointer">🗑 Delete Selected</button>
+      </div>
     </div>
 
     <div id="review-empty" class="hidden text-center py-16 text-gray-600">
@@ -530,7 +637,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=75"></script>
+<script src="/static/app.js?v=76"></script>
 <script>
 // ============================================================
 // STATE
@@ -541,6 +648,8 @@ let reviewFilter = 'all';
 let reviewEntries = [];
 let autofillPendingId = null;
 let autofillPendingData = null;
+let selectMode = false;
+let selectedIds = new Set();
 
 // ============================================================
 // TAB SWITCHING
@@ -551,7 +660,8 @@ function switchTab(tab) {
   document.getElementById('tab-scan').classList.toggle('flex-1', !isReview);
   document.getElementById('tab-review').classList.toggle('hidden', !isReview);
   document.getElementById('tab-review').classList.toggle('flex-1', isReview);
-  document.getElementById('tab-btn-scan').className = `flex-1 py-2 rounded-lg text-sm font-bold transition cursor-pointer ${!isReview ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`;
+  // "hidden" stays regardless of state — Scan tab's nav button is hidden for now (see markup comment).
+  document.getElementById('tab-btn-scan').className = `hidden flex-1 py-2 rounded-lg text-sm font-bold transition cursor-pointer ${!isReview ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`;
   document.getElementById('tab-btn-review').className = `flex-1 py-2 rounded-lg text-sm font-bold transition cursor-pointer ${isReview ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`;
   if (isReview) loadReviewEntries();
 }
@@ -629,11 +739,107 @@ function applyLookupData(data) {
   set('scan-product_line_comp', data.powder_name || data.product_line);
   set('scan-weight_gr', data.weight_gr);
   set('scan-bc_g1', data.bc_g1);
-  set('scan-bc_g7', data.bc_g7);
 
   // If there's an image from UPC, show it as a preview thumbnail
   if (data.image_path) {
     showUpcImagePreview(data.image_path);
+  }
+}
+
+// ============================================================
+// IMPORT FROM SAVED PAGE (MidwayUSA / Target Sports USA)
+// ============================================================
+let _importPanelLoaded = false;
+
+function toggleImportPanel() {
+  const panel = document.getElementById('import-panel');
+  const caret = document.getElementById('import-panel-caret');
+  panel.classList.toggle('hidden');
+  caret.textContent = panel.classList.contains('hidden') ? '▸' : '▾';
+  if (!panel.classList.contains('hidden') && !_importPanelLoaded) {
+    _importPanelLoaded = true;
+    loadImportToken();
+  }
+}
+
+function _bookmarkletSource(token) {
+  const endpoint = window.location.origin + '/import/capture';
+  // Runs on the retailer's page: scrolls to force lazy-loaded sections (specs table)
+  // to mount, then POSTs the live DOM straight to the Review queue.
+  return `(function(){
+    var TOKEN=${JSON.stringify(token)};
+    var ENDPOINT=${JSON.stringify(endpoint)};
+    function toast(msg,ok){
+      var d=document.createElement('div');
+      d.textContent=msg;
+      d.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:2147483647;padding:12px 20px;border-radius:8px;font:14px sans-serif;color:#fff;background:'+(ok?'#059669':'#dc2626')+';box-shadow:0 4px 12px rgba(0,0,0,.3)';
+      document.body.appendChild(d);
+      setTimeout(function(){d.remove();},4000);
+    }
+    function capture(found){
+      fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','X-Import-Token':TOKEN},body:JSON.stringify({html:document.documentElement.outerHTML,url:location.href})})
+        .then(function(r){return r.json().then(function(d){return {ok:r.ok,data:d};});})
+        .then(function(res){
+          if(!res.ok){toast('\\u2717 '+(res.data.detail||'Import failed'),false);return;}
+          var prefix=(found?'':'(specs not found) ');
+          var verb=res.data.updated?'Updated':'Imported';
+          toast('\\u2713 '+prefix+verb+': '+(res.data.title||'item'),true);
+        })
+        .catch(function(){toast('\\u2717 Network error',false);});
+    }
+    function waitAndCapture(){
+      // MutationObserver reacts the instant the specs table mounts, instead of
+      // polling on a fixed interval — handles pages where the specs API call is
+      // slow enough that a short poll window gives up before it ever appears.
+      var done=false, obs, giveUp;
+      function finish(found){
+        if(done) return;
+        done=true;
+        obs.disconnect();
+        clearTimeout(giveUp);
+        setTimeout(function(){capture(found);},150);
+      }
+      obs=new MutationObserver(function(){
+        if(document.querySelector('#specifications-content table, #specifications table, table[border="1"]')) finish(true);
+      });
+      obs.observe(document.body,{childList:true,subtree:true});
+      if(document.querySelector('#specifications-content table, #specifications table, table[border="1"]')){finish(true);return;}
+      giveUp=setTimeout(function(){finish(false);},15000);
+    }
+    window.scrollTo(0,document.body.scrollHeight);
+    waitAndCapture();
+  })();`;
+}
+
+function _applyBookmarkletLink(token) {
+  const src = _bookmarkletSource(token);
+  document.getElementById('import-bookmarklet-link').href = 'javascript:' + encodeURIComponent(src);
+}
+
+async function loadImportToken() {
+  const status = document.getElementById('import-token-status');
+  try {
+    const res = await fetch('/import/token');
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    _applyBookmarkletLink(data.token);
+    status.textContent = 'Token active — drag the button above to your bookmarks bar.';
+  } catch (e) {
+    status.textContent = 'Failed to load token — check connection.';
+  }
+}
+
+async function regenerateImportToken() {
+  if (!confirm('Regenerate the import token? Any bookmarklet you already installed will stop working until you re-add it.')) return;
+  const status = document.getElementById('import-token-status');
+  try {
+    const res = await fetch('/import/token/regenerate', { method: 'POST' });
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    _applyBookmarkletLink(data.token);
+    status.textContent = 'Token regenerated — re-install the bookmarklet below.';
+  } catch (e) {
+    status.textContent = 'Failed to regenerate token — check connection.';
   }
 }
 
@@ -702,6 +908,11 @@ function buildDataJson() {
     const p = getNum('scan-price'); if (p) d.price = p;
     const bt = getVal('scan-bullet_type'); if (bt) d.bullet_type = bt;
     const pl = getVal('scan-product_line'); if (pl) d.product_line = pl;
+    const fv = getNum('scan-factory_velocity_fps'); if (fv) d.factory_velocity_fps = fv;
+    const me = getNum('scan-muzzle_energy_ftlb'); if (me) d.muzzle_energy_ftlb = me;
+    const ct = getVal('scan-case_type'); if (ct) d.case_type = ct;
+    const rl = getVal('scan-reloadable'); if (rl) d.reloadable = rl === 'yes';
+    const lf = getVal('scan-lead_free'); if (lf) d.lead_free = lf === 'yes';
   } else if (scanCat === 'firearm') {
     const m = getVal('scan-model'); if (m) d.model = m;
     d.frame_type = getVal('scan-frame_type') || 'Rifle';
@@ -713,7 +924,6 @@ function buildDataJson() {
     const pl = getVal('scan-product_line_comp'); if (pl) d.product_line = pl;
     const w = getNum('scan-weight_gr'); if (w) d.weight_gr = w;
     const g1 = getNum('scan-bc_g1'); if (g1) d.bc_g1 = g1;
-    const g7 = getNum('scan-bc_g7'); if (g7) d.bc_g7 = g7;
   } else if (scanCat === 'tc_barrel') {
     d.platform = getVal('scan-platform') || 'Encore';
     const bl = getVal('scan-barrel_length'); if (bl) d.barrel_length = bl;
@@ -768,7 +978,7 @@ function resetScanForm() {
   ['scan-upc','scan-title','scan-brand','scan-caliber','scan-notes',
    'scan-bullet_weight','scan-rounds_per_box','scan-price','scan-bullet_type','scan-product_line',
    'scan-model','scan-model-optic','scan-magnification',
-   'scan-product_line_comp','scan-weight_gr','scan-bc_g1','scan-bc_g7',
+   'scan-product_line_comp','scan-weight_gr','scan-bc_g1',
    'scan-barrel_length'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
@@ -821,9 +1031,7 @@ function setReviewFilter(f) {
 }
 
 function renderReview() {
-  let list = reviewEntries;
-  if (reviewFilter === 'incomplete') list = list.filter(e => !e.is_complete);
-  else if (reviewFilter === 'reviewed') list = list.filter(e => e.is_reviewed);
+  const list = _filteredReviewEntries();
 
   const grid = document.getElementById('review-grid');
   const empty = document.getElementById('review-empty');
@@ -835,6 +1043,23 @@ function renderReview() {
 
 const CAT_LABEL = { ammo: 'Ammo', firearm: 'Firearm', optic: 'Optic', component: 'Component', tc_barrel: 'TC Barrel' };
 const CAT_COLOR = { ammo: 'amber', firearm: 'blue', optic: 'purple', component: 'green', tc_barrel: 'orange' };
+const DATA_LABELS = {
+  model: 'Model', frame_type: 'Frame Type', magnification: 'Magnification',
+  product_line: 'Product Line', product_subtype: 'Subtype',
+  bullet_weight: 'Bullet Weight (gr)', weight_gr: 'Weight (gr)',
+  bullet_type: 'Bullet Type', rounds_per_box: 'Rounds/Box', price: 'Price',
+  factory_velocity_fps: 'Velocity (fps)', muzzle_energy_ftlb: 'Energy (ft-lb)',
+  case_type: 'Case Type', reloadable: 'Reloadable', lead_free: 'Lead Free',
+  bc_g1: 'BC (G1)', primer_type: 'Primer Type', primer_model: 'Primer Model', mpn: 'MPN',
+  primer_name: 'Primer', powder_name: 'Powder', platform: 'Platform', barrel_length: 'Barrel Length',
+  title: 'Title', brand: 'Brand', caliber: 'Caliber', image_path_1: 'Photo',
+};
+
+function _formatDataValue(key, v) {
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+  if (key === 'price') return `$${Number(v).toFixed(2)}`;
+  return v;
+}
 
 function makeReviewCard(e) {
   const div = document.createElement('div');
@@ -848,30 +1073,53 @@ function makeReviewCard(e) {
   const parts = [e.brand, e.caliber, e.data?.model, e.data?.product_line, e.data?.platform].filter(Boolean);
   const summary = parts.join(' · ') || e.title || '—';
 
-  div.className = 'bg-gray-900/90 border border-gray-700 rounded-xl overflow-hidden flex flex-col';
+  // Prefer the manufacturer part number for the BC search (most precise), fall back
+  // to the product title when the source site doesn't expose an MPN (e.g. MidwayUSA).
+  const bcSearchQuery = e.data?.mpn || e.title || '';
+
+  const dataRows = Object.entries(e.data || {})
+    .filter(([k]) => k !== 'image_url')
+    .map(([k, v]) => `<div class="flex justify-between gap-2"><span class="text-gray-500">${DATA_LABELS[k] || k}</span><span class="text-gray-200 text-right truncate">${_formatDataValue(k, v)}</span></div>`)
+    .join('');
+
+  const mediaInner = img
+    ? `<img src="${img}" class="w-full h-full object-contain">`
+    : `<div class="w-full h-full flex items-center justify-center text-2xl">${label === 'Ammo' ? '🎯' : label === 'Firearm' ? '🔫' : label === 'Optic' ? '🔭' : label === 'TC Barrel' ? '🔩' : '⚙️'}</div>`;
+
+  const isSelected = selectMode && selectedIds.has(e.id);
+  div.className = `bg-gray-900/90 border rounded-xl overflow-hidden flex flex-col ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-gray-700'}`;
   div.innerHTML = `
-    ${img ? `<div class="aspect-video bg-gray-950"><img src="${img}" class="w-full h-full object-contain"></div>` : `<div class="aspect-video bg-gray-800/50 flex items-center justify-center text-3xl">${label === 'Ammo' ? '🎯' : label === 'Firearm' ? '🔫' : label === 'Optic' ? '🔭' : label === 'TC Barrel' ? '🔩' : '⚙️'}</div>`}
+    <div class="h-24 bg-gray-950 relative ${selectMode ? 'cursor-pointer' : ''}" ${selectMode ? `onclick="onCardMediaClick(${e.id})"` : ''}>
+      ${mediaInner}
+      ${!missing ? `<span class="absolute top-1 left-1 w-5 h-5 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center shadow" title="All fields complete">✓</span>` : ''}
+      <button onclick="event.stopPropagation(); deleteEntry(${e.id})" class="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-950/90 hover:bg-red-700 text-red-200 text-xs flex items-center justify-center shadow transition cursor-pointer" title="Delete">🗑</button>
+    </div>
     <div class="p-3 flex-1 flex flex-col gap-2">
       <div class="flex items-start justify-between gap-2">
-        <div class="flex flex-wrap gap-1">
+        <div class="flex flex-wrap gap-1 items-center">
+          ${selectMode ? `<input type="checkbox" class="rounded accent-blue-500 mr-1 cursor-pointer" ${selectedIds.has(e.id) ? 'checked' : ''} onchange="toggleSelect(${e.id}, this.checked)">` : ''}
           <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-${col}-900/50 text-${col}-300 border border-${col}-800/50">${label}</span>
           ${reviewed ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300 border border-emerald-800/50">Reviewed</span>' : ''}
           ${missing ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-900/50 text-red-300 border border-red-800/50">Incomplete</span>' : ''}
         </div>
         <span class="text-[10px] text-gray-600 shrink-0">${e.created_at || ''}</span>
       </div>
+      ${missing && (e.missing_fields || []).length ? `<div class="text-[10px] text-red-300 bg-red-950/40 border border-red-900/50 rounded px-2 py-1">⚠ Missing: ${e.missing_fields.join(', ')}</div>` : ''}
       <div>
         <div class="text-sm font-bold text-gray-100 truncate">${e.brand || '—'}</div>
         <div class="text-xs text-gray-400 truncate">${summary !== e.brand ? summary : (e.title || '—')}</div>
-        ${e.upc ? `<div class="text-[10px] text-gray-600 font-mono mt-0.5">UPC: ${e.upc}</div>` : ''}
+        <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+          ${e.upc ? `<span class="text-[10px] text-gray-600 font-mono">UPC: ${e.upc}</span>` : ''}
+          ${e.source_url ? `<a href="${e.source_url}" target="_blank" rel="noopener noreferrer" class="text-[10px] text-blue-400 hover:text-blue-300 underline">🔗 View source</a>` : ''}
+          ${e.upc ? `<a href="https://www.google.com/search?q=${encodeURIComponent(e.upc)}" target="_blank" rel="noopener noreferrer" class="text-[10px] text-blue-400 hover:text-blue-300 underline">🔍 Search UPC</a>` : ''}
+          ${!e.data?.bc_g1 && bcSearchQuery ? `<a href="https://www.google.com/search?q=${encodeURIComponent(bcSearchQuery + ' g1 bc')}" target="_blank" rel="noopener noreferrer" class="text-[10px] text-amber-400 hover:text-amber-300 underline">🔍 Find G1 BC</a>` : ''}
+        </div>
       </div>
-      <div class="flex gap-1.5 mt-auto flex-wrap">
-        <button onclick="openEditModal(${e.id})" class="flex-1 min-w-0 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-bold rounded transition cursor-pointer">Edit</button>
-        ${e.upc ? `<button onclick="startAutofill(${e.id})" class="flex-1 min-w-0 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-emerald-200 text-xs font-bold rounded transition cursor-pointer">Auto-fill</button>` : ''}
-        ${!missing && !reviewed ? `<button onclick="convertEntry(${e.id}, '${(e.brand || '').replace(/'/g, "\\'")}' )" class="flex-1 min-w-0 py-1.5 bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold rounded transition cursor-pointer">Add to Inventory</button>` : ''}
-        <button onclick="addPhotoToEntry(${e.id})" class="py-1.5 px-2.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-bold rounded transition cursor-pointer">📷</button>
-        <button onclick="deleteEntry(${e.id})" class="py-1.5 px-2.5 bg-red-900/50 hover:bg-red-800/60 text-red-400 text-xs font-bold rounded transition cursor-pointer">🗑</button>
-      </div>
+      ${dataRows ? `<div class="text-[11px] space-y-0.5 border-t border-gray-800 pt-2">${dataRows}</div>` : ''}
+      ${!selectMode ? `<div class="flex gap-1.5 mt-auto">
+        ${!missing ? `<button onclick="convertEntry(${e.id})" class="flex-1 py-1.5 bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold rounded transition cursor-pointer">Accept</button>` : ''}
+        <button onclick="openEditModal(${e.id})" class="flex-1 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-bold rounded transition cursor-pointer">Edit</button>
+      </div>` : ''}
     </div>
   `;
   return div;
@@ -902,20 +1150,140 @@ async function deleteEntry(id) {
   else showToast('Delete failed', 'error');
 }
 
+async function deleteEntryFromModal() {
+  const id = parseInt(document.getElementById('edit-id').value);
+  await deleteEntry(id);
+  closeEditModal();
+}
+
 // Convert entry to inventory
-async function convertEntry(id, name) {
-  if (!confirm(`Add "${name}" to your inventory?\n\nThis will create an inventory item and remove the scanner entry.`)) return;
+async function convertEntry(id) {
   try {
     const res = await fetch(`/scanner/entries/${id}/convert`, { method: 'POST' });
     if (res.ok) {
       const data = await res.json();
-      showToast(`Added to inventory as ${data.type}.`, 'success');
+      showToast(data.type === 'upc_cache' ? 'Saved to UPC cache — will auto-fill next scan/lookup.' : `Added to inventory as ${data.type}.`, 'success');
       loadReviewEntries();
     } else {
       const body = await res.json();
       showToast(body.detail || 'Conversion failed', 'error');
     }
   } catch { showToast('Network error', 'error'); }
+}
+
+// ============================================================
+// SELECT MODE + BULK ACTIONS
+// ============================================================
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  selectedIds.clear();
+  const btn = document.getElementById('btn-select-mode');
+  btn.className = selectMode
+    ? 'px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer bg-blue-700 border-blue-500 text-white'
+    : 'px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer bg-gray-800 border-gray-600 text-gray-300 hover:border-amber-500';
+  btn.textContent = selectMode ? '✕ Cancel Select' : '☑ Select';
+  document.getElementById('select-quick-actions').classList.toggle('hidden', !selectMode);
+  updateBulkBar();
+  renderReview();
+}
+
+function toggleSelect(id, checked) {
+  if (checked) selectedIds.add(id); else selectedIds.delete(id);
+  updateBulkBar();
+  renderReview(); // re-render so the card's selected-border highlight stays in sync
+}
+
+function onCardMediaClick(id) {
+  if (!selectMode) return;
+  toggleSelect(id, !selectedIds.has(id));
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-action-bar');
+  const n = selectedIds.size;
+  bar.classList.toggle('hidden', !(selectMode && n > 0));
+  document.getElementById('bulk-count').textContent = `${n} selected`;
+}
+
+function _exitSelectMode() {
+  selectMode = false;
+  selectedIds.clear();
+  const btn = document.getElementById('btn-select-mode');
+  btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer bg-gray-800 border-gray-600 text-gray-300 hover:border-amber-500';
+  btn.textContent = '☑ Select';
+  document.getElementById('select-quick-actions').classList.add('hidden');
+  updateBulkBar();
+}
+
+function _filteredReviewEntries() {
+  let list = reviewEntries;
+  if (reviewFilter === 'incomplete') list = list.filter(e => !e.is_complete);
+  else if (reviewFilter === 'reviewed') list = list.filter(e => e.is_reviewed);
+  return list;
+}
+
+function selectAllVisible() {
+  _filteredReviewEntries().forEach(e => selectedIds.add(e.id));
+  updateBulkBar();
+  renderReview();
+}
+
+function selectAllComplete() {
+  _filteredReviewEntries().filter(e => e.is_complete).forEach(e => selectedIds.add(e.id));
+  updateBulkBar();
+  renderReview();
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  updateBulkBar();
+  renderReview();
+}
+
+async function deleteAllVisible() {
+  const ids = _filteredReviewEntries().map(e => e.id);
+  if (ids.length === 0) { showToast('Nothing to delete', 'info'); return; }
+  const scope = reviewFilter === 'all' ? 'entries' : `"${reviewFilter}" entries`;
+  if (!confirm(`Delete ALL ${ids.length} ${scope} currently shown? This cannot be undone.`)) return;
+  let ok = 0;
+  for (const id of ids) {
+    const res = await fetch(`/scanner/entries/${id}`, { method: 'DELETE' });
+    if (res.ok) ok++;
+  }
+  showToast(`Deleted ${ok}/${ids.length}`, ok === ids.length ? 'success' : 'warn');
+  _exitSelectMode();
+  loadReviewEntries();
+}
+
+async function bulkDelete() {
+  const ids = [...selectedIds];
+  if (ids.length === 0) return;
+  if (!confirm(`Delete ${ids.length} selected entr${ids.length === 1 ? 'y' : 'ies'}? This cannot be undone.`)) return;
+  let ok = 0;
+  for (const id of ids) {
+    const res = await fetch(`/scanner/entries/${id}`, { method: 'DELETE' });
+    if (res.ok) ok++;
+  }
+  showToast(`Deleted ${ok}/${ids.length}`, ok === ids.length ? 'success' : 'warn');
+  _exitSelectMode();
+  loadReviewEntries();
+}
+
+async function bulkAccept() {
+  const ids = [...selectedIds];
+  if (ids.length === 0) return;
+  const eligible = ids.filter(id => reviewEntries.find(e => e.id === id)?.is_complete);
+  const skipped = ids.length - eligible.length;
+  if (eligible.length === 0) { showToast('None of the selected entries are complete enough to accept', 'warn'); return; }
+  if (!confirm(`Accept ${eligible.length} selected entr${eligible.length === 1 ? 'y' : 'ies'}?${skipped ? ` (${skipped} incomplete will be skipped)` : ''}`)) return;
+  let ok = 0;
+  for (const id of eligible) {
+    const res = await fetch(`/scanner/entries/${id}/convert`, { method: 'POST' });
+    if (res.ok) ok++;
+  }
+  showToast(`Accepted ${ok}/${eligible.length}${skipped ? `, skipped ${skipped} incomplete` : ''}`, ok === eligible.length ? 'success' : 'warn');
+  _exitSelectMode();
+  loadReviewEntries();
 }
 
 // Bulk-clear reviewed
@@ -956,6 +1324,20 @@ function openEditModal(id) {
   document.getElementById('edit-is-reviewed').checked = !!e.is_reviewed;
 
   const d = e.data || {};
+  // Clear every category-specific field first — otherwise a field absent from this
+  // entry's data silently keeps whatever value was left over from the last entry
+  // edited in this session (e.g. BC G1 "leaking" from a previously-edited card).
+  ['edit-bullet_weight', 'edit-rounds_per_box', 'edit-price', 'edit-bullet_type', 'edit-product_line',
+   'edit-ammo_bc_g1', 'edit-factory_velocity_fps', 'edit-muzzle_energy_ftlb', 'edit-case_type',
+   'edit-model', 'edit-model-optic', 'edit-magnification',
+   'edit-product_line_comp', 'edit-weight_gr', 'edit-bc_g1', 'edit-primer_type', 'edit-primer_model',
+   'edit-barrel_length'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('edit-reloadable').value = '';
+  document.getElementById('edit-lead_free').value = '';
+  document.getElementById('edit-frame_type').value = 'Rifle';
+  document.getElementById('edit-product_subtype').value = 'bullet';
+  document.getElementById('edit-platform').value = 'Encore';
+
   const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
 
   // Ammo
@@ -964,6 +1346,12 @@ function openEditModal(id) {
   set('edit-price', d.price);
   set('edit-bullet_type', d.bullet_type);
   set('edit-product_line', d.product_line);
+  set('edit-ammo_bc_g1', d.bc_g1);
+  set('edit-factory_velocity_fps', d.factory_velocity_fps);
+  set('edit-muzzle_energy_ftlb', d.muzzle_energy_ftlb);
+  set('edit-case_type', d.case_type);
+  if (d.reloadable != null) document.getElementById('edit-reloadable').value = d.reloadable ? 'yes' : 'no';
+  if (d.lead_free != null) document.getElementById('edit-lead_free').value = d.lead_free ? 'yes' : 'no';
 
   // Firearm
   set('edit-model', d.model);
@@ -978,7 +1366,6 @@ function openEditModal(id) {
   set('edit-product_line_comp', d.product_line);
   set('edit-weight_gr', d.weight_gr);
   set('edit-bc_g1', d.bc_g1);
-  set('edit-bc_g7', d.bc_g7);
   set('edit-primer_type', d.primer_type);
   set('edit-primer_model', d.primer_model);
 
@@ -1006,6 +1393,12 @@ function buildEditDataJson() {
     const p = getNum('edit-price'); if (p) d.price = p;
     const bt = getVal('edit-bullet_type'); if (bt) d.bullet_type = bt;
     const pl = getVal('edit-product_line'); if (pl) d.product_line = pl;
+    const g1 = getNum('edit-ammo_bc_g1'); if (g1) d.bc_g1 = g1;
+    const fv = getNum('edit-factory_velocity_fps'); if (fv) d.factory_velocity_fps = fv;
+    const me = getNum('edit-muzzle_energy_ftlb'); if (me) d.muzzle_energy_ftlb = me;
+    const ct = getVal('edit-case_type'); if (ct) d.case_type = ct;
+    const rl = getVal('edit-reloadable'); if (rl) d.reloadable = rl === 'yes';
+    const lf = getVal('edit-lead_free'); if (lf) d.lead_free = lf === 'yes';
   } else if (cat === 'firearm') {
     const m = getVal('edit-model'); if (m) d.model = m;
     d.frame_type = getVal('edit-frame_type') || 'Rifle';
@@ -1017,7 +1410,6 @@ function buildEditDataJson() {
     const pl = getVal('edit-product_line_comp'); if (pl) d.product_line = pl;
     const w = getNum('edit-weight_gr'); if (w) d.weight_gr = w;
     const g1 = getNum('edit-bc_g1'); if (g1) d.bc_g1 = g1;
-    const g7 = getNum('edit-bc_g7'); if (g7) d.bc_g7 = g7;
     const pt = getVal('edit-primer_type'); if (pt) d.primer_type = pt;
     const pm = getVal('edit-primer_model'); if (pm) d.primer_model = pm;
   } else if (cat === 'tc_barrel') {
@@ -1084,7 +1476,7 @@ function showAutofillModal(proposed, source) {
   const LABELS = {
     title: 'Title', brand: 'Brand', caliber: 'Caliber', image_path_1: 'Photo',
     product_line: 'Product Line', weight_gr: 'Weight (gr)', bullet_type: 'Bullet Type',
-    rounds_per_box: 'Rounds/Box', bc_g1: 'BC G1', bc_g7: 'BC G7',
+    rounds_per_box: 'Rounds/Box', bc_g1: 'BC G1',
     primer_type: 'Primer Type', primer_model: 'Primer Model', powder_name: 'Powder Name',
   };
   const diff = document.getElementById('autofill-diff');
@@ -1240,9 +1632,9 @@ function useCamManual() {
   doLookup();
 }
 
-// Init: set category state and focus UPC field
+// Init: set category state, default to Review tab (Scan tab hidden for now)
 setScanCat('ammo');
-document.getElementById('scan-upc').focus();
+switchTab('review');
 </script>
 </body>
 </html>

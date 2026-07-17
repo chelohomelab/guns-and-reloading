@@ -161,7 +161,6 @@ class BulletInventory(Base):
     weight_gr = Column(Float)
     bullet_type = Column(String, nullable=True)   # "BTHP", "Hybrid", "FMJ"
     bc_g1 = Column(Float, nullable=True)
-    bc_g7 = Column(Float, nullable=True)
     quantity = Column(Integer, default=0)
     qty_sealed = Column(Integer, default=0)
     qty_open = Column(Integer, default=0)
@@ -296,6 +295,11 @@ class Ammo(Base):
     shell_size = Column(String, nullable=True)
     shot_size = Column(String, nullable=True)
     upc = Column(String, nullable=True)
+    factory_velocity_fps = Column(Float, nullable=True)
+    muzzle_energy_ftlb = Column(Float, nullable=True)
+    lead_free = Column(Boolean, nullable=True)
+    case_type = Column(String, nullable=True)
+    reloadable = Column(Boolean, nullable=True)
 
     shot_strings = relationship("ShotString", back_populates="ammo")
     purchase_log = relationship("AmmoPurchaseLog", back_populates="ammo", order_by="AmmoPurchaseLog.date")
@@ -335,13 +339,17 @@ class UpcCache(Base):
     weight_gr    = Column(Float,  nullable=True)
     bullet_type  = Column(String, nullable=True)
     bc_g1        = Column(Float,  nullable=True)
-    bc_g7        = Column(Float,  nullable=True)
     rounds_per_box = Column(Integer, nullable=True)
     primer_type  = Column(String, nullable=True)
     primer_model = Column(String, nullable=True)
     powder_name  = Column(String, nullable=True)
     image_path   = Column(String, nullable=True)
     ammo_category = Column(String, nullable=True)
+    factory_velocity_fps = Column(Float, nullable=True)
+    muzzle_energy_ftlb = Column(Float, nullable=True)
+    lead_free    = Column(Boolean, nullable=True)
+    case_type    = Column(String, nullable=True)
+    reloadable   = Column(Boolean, nullable=True)
     updated_at   = Column(String, nullable=True)
 
 
@@ -427,6 +435,7 @@ class ScannerEntry(Base):
     data_json = Column(String, nullable=True)    # JSON for category-specific fields
     created_at = Column(String, nullable=True)
     is_reviewed = Column(Boolean, default=False)
+    source_url = Column(String, nullable=True)    # retailer page this was imported from, if any
 
 def init_db():
     Base.metadata.create_all(bind=engine)
@@ -451,9 +460,19 @@ def init_db():
         _add_col('ammo', 'shell_size', 'shell_size VARCHAR')
         _add_col('ammo', 'shot_size', 'shot_size VARCHAR')
         _add_col('ammo', 'upc', 'upc VARCHAR')
+        _add_col('ammo', 'factory_velocity_fps', 'factory_velocity_fps FLOAT')
+        _add_col('ammo', 'muzzle_energy_ftlb', 'muzzle_energy_ftlb FLOAT')
+        _add_col('ammo', 'lead_free', 'lead_free BOOLEAN')
+        _add_col('ammo', 'case_type', 'case_type VARCHAR')
+        _add_col('ammo', 'reloadable', 'reloadable BOOLEAN')
 
     if 'upc_cache' in inspector.get_table_names():
         _add_col('upc_cache', 'ammo_category', 'ammo_category VARCHAR')
+        _add_col('upc_cache', 'factory_velocity_fps', 'factory_velocity_fps FLOAT')
+        _add_col('upc_cache', 'muzzle_energy_ftlb', 'muzzle_energy_ftlb FLOAT')
+        _add_col('upc_cache', 'lead_free', 'lead_free BOOLEAN')
+        _add_col('upc_cache', 'case_type', 'case_type VARCHAR')
+        _add_col('upc_cache', 'reloadable', 'reloadable BOOLEAN')
 
     for tbl, col in [
         ('casing_inventory', 'image_path'),
@@ -523,6 +542,9 @@ def init_db():
         _add_col('scopes', 'is_deleted', 'is_deleted BOOLEAN DEFAULT FALSE')
         _add_col('scopes', 'is_sold',    'is_sold BOOLEAN DEFAULT FALSE')
         _add_col('scopes', 'price_sold', 'price_sold FLOAT')
+
+    if 'scanner_entries' in inspector.get_table_names():
+        _add_col('scanner_entries', 'source_url', 'source_url VARCHAR')
 
     if 'ladder_tests' in inspector.get_table_names():
         _add_col('ladder_tests', 'charge_start',     'charge_start FLOAT')

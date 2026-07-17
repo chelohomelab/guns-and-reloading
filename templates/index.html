@@ -817,6 +817,36 @@
                             <input type="number" step="0.01" min="0" name="price_paid" id="ammo-factory-price" placeholder="e.g., 29.99" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
                         </div>
                     </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Velocity (fps)</label>
+                            <input type="number" step="1" name="factory_velocity_fps" id="ammo-factory-velocity" placeholder="e.g., 2820" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Muzzle Energy (ft-lb)</label>
+                            <input type="number" step="1" name="muzzle_energy_ftlb" id="ammo-factory-energy" placeholder="e.g., 2648" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Case Type</label>
+                            <input type="text" name="case_type" id="ammo-factory-case-type" placeholder="e.g., Brass" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Lead Free</label>
+                            <select name="lead_free" id="ammo-factory-lead-free" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                <option value="">— Unknown —</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Reloadable</label>
+                            <select name="reloadable" id="ammo-factory-reloadable" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                <option value="">— Unknown —</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="border-t border-gray-700 pt-3">
                         <label class="block text-xs text-gray-200 font-semibold mb-1.5">📷 Photos <span class="text-gray-600 font-normal">(optional)</span></label>
                         <div class="flex gap-2 mb-1.5">
@@ -1133,14 +1163,10 @@
                             <input type="number" name="quantity" id="bullet-comp-quantity" placeholder="e.g., 500" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
                             <label class="block text-xs text-gray-200 font-semibold mb-1">G1 BC</label>
                             <input type="number" step="0.001" name="bc_g1" id="bullet-comp-bc-g1" placeholder="e.g., 0.620" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-200 font-semibold mb-1">G7 BC</label>
-                            <input type="number" step="0.001" name="bc_g7" id="bullet-comp-bc-g7" placeholder="e.g., 0.310" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
                         </div>
                         <div>
                             <label class="block text-xs text-gray-200 font-semibold mb-1">Sealed Boxes</label>
@@ -1319,6 +1345,6 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
-    <script src="/static/app.js?v=75"></script>
+    <script src="/static/app.js?v=76"></script>
 </body>
 </html>

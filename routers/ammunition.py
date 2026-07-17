@@ -54,6 +54,11 @@ def _ammo_dict(a: models.Ammo) -> dict:
         "shell_size": getattr(a, "shell_size", None),
         "shot_size": getattr(a, "shot_size", None),
         "upc": getattr(a, "upc", None),
+        "factory_velocity_fps": getattr(a, "factory_velocity_fps", None),
+        "muzzle_energy_ftlb": getattr(a, "muzzle_energy_ftlb", None),
+        "lead_free": getattr(a, "lead_free", None),
+        "case_type": getattr(a, "case_type", None),
+        "reloadable": getattr(a, "reloadable", None),
     }
 
 
@@ -79,10 +84,17 @@ async def add_ammo(
     ammo_category: str = Form(None),
     shell_size: str = Form(None),
     shot_size: str = Form(None),
+    factory_velocity_fps: float = Form(None),
+    muzzle_energy_ftlb: float = Form(None),
+    case_type: str = Form(None),
+    lead_free: str = Form(None),
+    reloadable: str = Form(None),
     image: UploadFile = File(None),
     image_2: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
+    lead_free_val = {"yes": True, "no": False}.get(lead_free)
+    reloadable_val = {"yes": True, "no": False}.get(reloadable)
     img_path = await save_uploaded_file(image, "ammo")
     img2 = await save_uploaded_file(image_2, "ammo")
     if not img_path and upc:
@@ -109,6 +121,11 @@ async def add_ammo(
         shell_size=shell_size,
         shot_size=shot_size,
         upc=upc,
+        factory_velocity_fps=factory_velocity_fps,
+        muzzle_energy_ftlb=muzzle_energy_ftlb,
+        case_type=case_type,
+        lead_free=lead_free_val,
+        reloadable=reloadable_val,
     )
     db.add(a)
     db.commit()
@@ -117,7 +134,10 @@ async def add_ammo(
         upsert_upc_cache(db, upc, product_type="ammo",
                          brand=brand, product_line=ammo_model, caliber=caliber,
                          weight_gr=bullet_weight, bullet_type=bullet_id or bullet_type,
-                         bc_g1=bullet_bc, rounds_per_box=rounds_per_box)
+                         bc_g1=bullet_bc, rounds_per_box=rounds_per_box,
+                         factory_velocity_fps=factory_velocity_fps,
+                         muzzle_energy_ftlb=muzzle_energy_ftlb,
+                         case_type=case_type, lead_free=lead_free_val, reloadable=reloadable_val)
     if qty_sealed > 0 or qty_open > 0:
         price_val = price_paid if (price_paid and price_paid > 0) else None
         _upsert_purchase_log(db, a.id, date.today().isoformat(), qty_sealed, qty_open, price_val)

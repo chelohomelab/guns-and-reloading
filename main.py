@@ -8,7 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 import database as models
 from config import UPLOAD_DIR
-from routers import auth, pages, firearms, scopes, tc, ammunition, components, settings, profile, admin, performance, barcode, wishlist, scanner, backup, export, ladder
+from routers import auth, pages, firearms, scopes, tc, ammunition, components, settings, profile, admin, performance, barcode, wishlist, scanner, backup, export, ladder, product_import
 
 app = FastAPI(title="Homelab Modular Firearm Catalog")
 
@@ -24,7 +24,11 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    _PUBLIC = {"/login", "/setup"}
+    # /import/capture is exempt: it's authenticated by its own X-Import-Token header
+    # (checked inside the route), not the session cookie — it's called cross-origin
+    # from whatever retailer site the import bookmarklet runs on, which never has
+    # this app's session cookie.
+    _PUBLIC = {"/login", "/setup", "/import/capture"}
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -84,3 +88,4 @@ app.include_router(wishlist.router)
 app.include_router(scanner.router)
 app.include_router(backup.router)
 app.include_router(export.router)
+app.include_router(product_import.router)

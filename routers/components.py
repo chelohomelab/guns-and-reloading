@@ -27,7 +27,7 @@ def _primer_dict(p: models.PrimerInventory) -> dict:
 def _bullet_dict(b: models.BulletInventory) -> dict:
     return {"id": b.id, "brand": b.brand, "product_line": b.product_line,
             "caliber": b.caliber, "weight_gr": b.weight_gr, "bullet_type": b.bullet_type,
-            "bc_g1": b.bc_g1, "bc_g7": b.bc_g7,
+            "bc_g1": b.bc_g1,
             "quantity": b.quantity,
             "qty_sealed": getattr(b, "qty_sealed", 0) or 0,
             "qty_open": getattr(b, "qty_open", 0) or 0,
@@ -308,7 +308,7 @@ async def add_bullet_component(
     brand: str = Form(...), caliber: str = Form(...),
     weight_gr: float = Form(...), product_line: str = Form(None),
     bullet_type: str = Form(None), bc_g1: float = Form(None),
-    bc_g7: float = Form(None), quantity: int = Form(0),
+    quantity: int = Form(0),
     qty_sealed: int = Form(0), qty_open: int = Form(0),
     price: float = Form(0.0), notes: str = Form(None), upc: str = Form(None),
     is_muzzleloader: bool = Form(False),
@@ -323,7 +323,7 @@ async def add_bullet_component(
             img1 = cached.image_path
     b = models.BulletInventory(brand=brand, product_line=product_line, caliber=caliber,
                                weight_gr=weight_gr, bullet_type=bullet_type,
-                               bc_g1=bc_g1, bc_g7=bc_g7,
+                               bc_g1=bc_g1,
                                quantity=quantity, qty_sealed=qty_sealed, qty_open=qty_open,
                                price_paid=price, notes=notes,
                                image_path=img1, image_path_2=img2, upc=upc,
@@ -331,7 +331,7 @@ async def add_bullet_component(
     db.add(b); db.commit(); db.refresh(b)
     upsert_upc_cache(db, upc, product_type="bullet", brand=brand, product_line=product_line,
                      caliber=caliber, weight_gr=weight_gr, bullet_type=bullet_type,
-                     bc_g1=bc_g1, bc_g7=bc_g7)
+                     bc_g1=bc_g1)
     return _bullet_dict(b)
 
 @router.patch("/components/bullets/{item_id}")

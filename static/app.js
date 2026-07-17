@@ -1252,7 +1252,7 @@ function renderPrimerCard(p, lowThreshold = 200) {
 function renderBulletCard(b, lowThreshold = 100) {
     const low = b.quantity < lowThreshold;
     const qtyColor = low ? 'text-red-400' : 'text-blue-400';
-    const bcInfo = b.bc_g1 ? `G1: ${b.bc_g1}` : (b.bc_g7 ? `G7: ${b.bc_g7}` : '');
+    const bcInfo = b.bc_g1 ? `G1: ${b.bc_g1}` : '';
     const gallery = makePhotoGallery(`bul-${b.id}`, '🎯', b.image_path, b.image_path_2);
     return `
     <div class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden shadow-lg hover:border-blue-500/50 transition cursor-pointer" onclick="window.location.href='bullet-detail.html?id=${b.id}'">
@@ -4170,6 +4170,11 @@ function _fillFormFromBarcode(data) {
         _setIfEmpty('ammo-factory-weight', data.weight_gr);
         _setIfEmpty('ammo-factory-bc', data.bc_g1);
         _setIfEmpty('ammo-factory-rpb', data.rounds_per_box);
+        _setIfEmpty('ammo-factory-velocity', data.factory_velocity_fps);
+        _setIfEmpty('ammo-factory-energy', data.muzzle_energy_ftlb);
+        _setIfEmpty('ammo-factory-case-type', data.case_type);
+        _setIfEmpty('ammo-factory-lead-free', data.lead_free === true ? 'yes' : data.lead_free === false ? 'no' : null);
+        _setIfEmpty('ammo-factory-reloadable', data.reloadable === true ? 'yes' : data.reloadable === false ? 'no' : null);
     } else if (_barcodeFormTarget === 'bullet-comp') {
         _setIfEmpty('bullet-comp-brand', data.brand);
         _setIfEmpty('bullet-comp-product-line', data.product_line);
@@ -4177,7 +4182,6 @@ function _fillFormFromBarcode(data) {
         _setIfEmpty('bullet-comp-weight', data.weight_gr);
         _setIfEmpty('bullet-comp-bullet-type', data.bullet_type);
         _setIfEmpty('bullet-comp-bc-g1', data.bc_g1);
-        _setIfEmpty('bullet-comp-bc-g7', data.bc_g7);
     } else if (_barcodeFormTarget === 'powder') {
         _setIfEmpty('powder-brand', data.brand);
         _setIfEmpty('powder-name', data.powder_name);

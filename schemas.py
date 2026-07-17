@@ -38,6 +38,11 @@ class AmmoPatchPayload(BaseModel):
     shell_size: Optional[str] = None
     shot_size: Optional[str] = None
     upc: Optional[str] = None
+    factory_velocity_fps: Optional[float] = None
+    muzzle_energy_ftlb: Optional[float] = None
+    lead_free: Optional[bool] = None
+    case_type: Optional[str] = None
+    reloadable: Optional[bool] = None
 
 
 class PowderPatch(BaseModel):
@@ -67,7 +72,6 @@ class BulletComponentPatch(BaseModel):
     weight_gr: Optional[float] = None
     bullet_type: Optional[str] = None
     bc_g1: Optional[float] = None
-    bc_g7: Optional[float] = None
     quantity: Optional[int] = None
     price_paid: Optional[float] = None
     notes: Optional[str] = None

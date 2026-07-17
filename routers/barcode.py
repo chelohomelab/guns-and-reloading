@@ -84,11 +84,15 @@ def _cache_to_response(entry: "_models.UpcCache") -> dict:
         "rounds_per_box": entry.rounds_per_box,
         "price": None,
         "bc_g1": entry.bc_g1,
-        "bc_g7": entry.bc_g7,
         "primer_type": entry.primer_type,
         "primer_model": entry.primer_model,
         "image_path": entry.image_path,
         "ammo_category": getattr(entry, 'ammo_category', None),
+        "factory_velocity_fps": getattr(entry, 'factory_velocity_fps', None),
+        "muzzle_energy_ftlb": getattr(entry, 'muzzle_energy_ftlb', None),
+        "lead_free": getattr(entry, 'lead_free', None),
+        "case_type": getattr(entry, 'case_type', None),
+        "reloadable": getattr(entry, 'reloadable', None),
         "source": "cache",
     }
 
@@ -135,10 +139,63 @@ def _parse_rounds(text: str) -> int | None:
     return None
 
 
+# Cartridge-name canonicalization — collapses retailer/site phrasing differences
+# (".308 Win", "308 Winchester Ammo", "308 WIN") down to one form ("308 Winchester").
+# Only for cartridge-name-style caliber text (Ammo/casing/load-data). Bare bore-diameter
+# values used for BulletInventory.caliber (e.g. ".277") are a separate convention and are
+# never passed through this — see the Speer/Sierra and bore-only branches below.
+_CALIBER_TRAILING_JUNK = re.compile(
+    r'\s*(ammo|ammunition|cartridges?|rifle ammo|pistol ammo|handgun ammo)\.?\s*$',
+    re.IGNORECASE,
+)
+_CALIBER_WORD_EXPANSIONS = {
+    'win': 'Winchester', 'rem': 'Remington', 'mag': 'Magnum',
+    'spl': 'Special', 'spc': 'Special', 'wby': 'Weatherby',
+    'creedmore': 'Creedmoor',  # common misspelling
+}
+# A bare number with no qualifying word is only ever really one cartridge in practice.
+_CALIBER_BARE_NUMBER_INFERENCE = {
+    '22': '22 LR',
+    '270': '270 Winchester',
+}
+
+
+def normalize_caliber(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    s = raw.strip()
+    s = re.sub(r'^\.(?=\d)', '', s)  # ".308 Win" → "308 Win"
+    s = re.sub(r'(?<=\d)\s+mm\b', 'mm', s, flags=re.IGNORECASE)  # "7 mm" → "7mm"
+    prev = None
+    while prev != s:
+        prev = s
+        s = _CALIBER_TRAILING_JUNK.sub('', s).strip()
+    tokens = s.split(' ')
+    out = []
+    for i, tok in enumerate(tokens):
+        key = tok.lower().rstrip('.')
+        if i == 0:
+            # Never touch the leading number/bore token (avoids mangling e.g. "300 AAC").
+            out.append(tok)
+        elif key in _CALIBER_WORD_EXPANSIONS:
+            out.append(_CALIBER_WORD_EXPANSIONS[key])
+        elif tok.isupper() and tok.isalpha() and len(tok) > 4:
+            # Shouted-case full word (e.g. site-supplied "WINCHESTER") → Title case.
+            # Short all-caps tokens (NATO, PRC, WSM, GA, LR...) are left alone — they're
+            # genuine acronyms, not just a retailer's ALL CAPS styling.
+            out.append(tok.capitalize())
+        else:
+            out.append(tok)
+    s = re.sub(r'\s+', ' ', ' '.join(out)).strip()
+    s = _CALIBER_BARE_NUMBER_INFERENCE.get(s, s)
+    return s or None
+
+
 def _parse_caliber(text: str) -> str | None:
     t = text.lower()
 
-    # Shotgun gauges — check before generic patterns
+    # Shotgun gauges — check before generic patterns. Gauge/bore phrasing keeps its own
+    # convention (e.g. ".410 Bore") and is never run through cartridge normalization.
     gauge_map = [
         (r'\b12\s*ga(?:uge)?\b', '12 Gauge'),
         (r'\b20\s*ga(?:uge)?\b', '20 Gauge'),
@@ -150,11 +207,14 @@ def _parse_caliber(text: str) -> str | None:
             return label
 
     # Speer/Sierra "caliber-weight-style" format: e.g. "277-130-BT" → caliber=.277
+    # This is a bare bore diameter (bullet components), not a cartridge name — no
+    # normalization, so it stays distinct from Ammo/casing caliber values.
     m = re.search(r'(?<!\d)(2[2-9]\d|3[0-9]\d|4[0-5]\d)-\d{2,3}-[A-Za-z]', text)
     if m:
         return f'.{m.group(1)}'
 
-    # Named abbreviations that need explicit return values
+    # Named abbreviations that need explicit return values — cartridge names, always
+    # normalized so retailer-phrasing differences collapse to one canonical form.
     abbrevs = [
         (r'\b6\.5\s*(?:mm\s*)?creedmoor\b', '6.5 Creedmoor'),
         (r'\b6\.5\s*creed\b',               '6.5 Creedmoor'),
@@ -177,9 +237,9 @@ def _parse_caliber(text: str) -> str | None:
     ]
     for abbr, name in abbrevs:
         if re.search(abbr, t, re.IGNORECASE):
-            return name
+            return normalize_caliber(name)
 
-    patterns = [
+    cartridge_patterns = [
         r'\b6\.5-284\b',
         r'\b6\.5x55\b',
         r'\b7mm-08\b',
@@ -188,10 +248,21 @@ def _parse_caliber(text: str) -> str | None:
         r'\b\.300\s*prc\b',
         r'\b\.300\s*wsm\b',
         r'\b\.22-250\b',
+    ]
+    for p in cartridge_patterns:
+        m = re.search(p, t, re.IGNORECASE)
+        if m:
+            raw = m.group(0).strip()
+            raw = raw.upper() if raw.startswith('.') or raw[0].isdigit() else raw.title()
+            return normalize_caliber(raw)
+
+    # Bare bore-diameter fallback (no full cartridge name found) — kept in its original
+    # dot-prefixed / lowercase-mm form, not run through cartridge-name normalization.
+    bore_only_patterns = [
         r'(?<!\d)\.\d{2,3}(?!\d)',   # .277, .264, .308 — lookbehind/ahead avoids matching decimals
         r'\b\d+(?:\.\d+)?mm\b',      # 7mm, 6.5mm — last resort numeric fallback
     ]
-    for p in patterns:
+    for p in bore_only_patterns:
         m = re.search(p, t, re.IGNORECASE)
         if m:
             raw = m.group(0).strip()
@@ -405,10 +476,16 @@ def _parse_brand(raw_brand: str, title: str) -> str | None:
         # copy like "...cutting edge ballistic coefficients..." could hijack a
         # correct raw brand like "Traditions" into "Cutting Edge".)
         return raw_brand.title()
+    # No usable manufacturer-supplied brand — fall back to scanning the title, but
+    # prefer whichever known brand appears earliest (retailer titles conventionally
+    # lead with the brand, e.g. "Barnes VOR-TX 308 Winchester..." — a naive first-in-list
+    # match would wrongly pick "Winchester" from the caliber name over "Barnes").
+    best, best_pos = None, None
     for b in known_brands:
-        if re.search(r'\b' + re.escape(b) + r'\b', title, re.IGNORECASE):
-            return b
-    return None
+        m = re.search(r'\b' + re.escape(b) + r'\b', title, re.IGNORECASE)
+        if m and (best_pos is None or m.start() < best_pos):
+            best, best_pos = b, m.start()
+    return best
 
 
 def _caliber_matches_hint(caliber: str, hint: str) -> bool:
@@ -435,25 +512,24 @@ def _lookup_bc(brand: str, product_line: str | None, weight_gr: float | None,
             if (entry['brand'] == brand_l and
                     entry['product_line'] == line_l and
                     abs(entry['weight_gr'] - weight_gr) < 0.6):
-                return {'bc_g1': entry.get('bc_g1'), 'bc_g7': entry.get('bc_g7')}
+                return {'bc_g1': entry.get('bc_g1')}
 
     # Tier 2: brand + weight only (unique match)
     candidates = [e for e in ref if e['brand'] == brand_l and abs(e['weight_gr'] - weight_gr) < 0.6]
     if len(candidates) == 1:
-        return {'bc_g1': candidates[0].get('bc_g1'), 'bc_g7': candidates[0].get('bc_g7')}
+        return {'bc_g1': candidates[0].get('bc_g1')}
 
     # Tier 3: brand + weight + caliber (narrows multi-weight-matches by caliber)
     if caliber and candidates:
         cal_candidates = [e for e in candidates
                           if _caliber_matches_hint(caliber, e.get('caliber_hint', ''))]
         if len(cal_candidates) == 1:
-            return {'bc_g1': cal_candidates[0].get('bc_g1'), 'bc_g7': cal_candidates[0].get('bc_g7')}
-        # Multiple entries with same caliber — return if they all agree on BC values
+            return {'bc_g1': cal_candidates[0].get('bc_g1')}
+        # Multiple entries with same caliber — return if they all agree on BC (G1)
         if cal_candidates:
-            bc_set = {(e.get('bc_g1'), e.get('bc_g7')) for e in cal_candidates}
+            bc_set = {e.get('bc_g1') for e in cal_candidates}
             if len(bc_set) == 1:
-                c = cal_candidates[0]
-                return {'bc_g1': c.get('bc_g1'), 'bc_g7': c.get('bc_g7')}
+                return {'bc_g1': cal_candidates[0].get('bc_g1')}
 
     return {}
 
@@ -662,7 +738,6 @@ def barcode_lookup(upc: str, db: Session = Depends(get_db)):
         bullet_type=bullet_type,
         rounds_per_box=rounds_per_box,
         bc_g1=bc_data.get("bc_g1"),
-        bc_g7=bc_data.get("bc_g7"),
         primer_type=primer_type,
         primer_model=primer_model,
         image_path=image_path,
@@ -686,7 +761,6 @@ def barcode_lookup(upc: str, db: Session = Depends(get_db)):
         "rounds_per_box": rounds_per_box,
         "price": lowest_price,
         "bc_g1": bc_data.get("bc_g1"),
-        "bc_g7": bc_data.get("bc_g7"),
         "primer_type": primer_type,
         "primer_model": primer_model,
         "image_path": image_path,

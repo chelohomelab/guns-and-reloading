@@ -126,7 +126,7 @@ def _ladder_test_detail(t: models.LadderTest) -> dict:
     result["bullet"] = {
         "id": t.bullet.id, "brand": t.bullet.brand, "product_line": t.bullet.product_line,
         "caliber": t.bullet.caliber, "weight_gr": t.bullet.weight_gr,
-        "bullet_type": t.bullet.bullet_type, "bc_g1": t.bullet.bc_g1, "bc_g7": t.bullet.bc_g7,
+        "bullet_type": t.bullet.bullet_type, "bc_g1": t.bullet.bc_g1,
     } if t.bullet else None
     result["steps"] = [_ladder_step_dict(s) for s in t.steps]
     return result

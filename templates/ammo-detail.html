@@ -146,6 +146,34 @@
                         <label class="block text-xs text-gray-200 font-semibold mb-1">UPC Barcode</label>
                         <input type="text" id="ef-upc" placeholder="e.g., 741569060080" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white font-mono focus:outline-none focus:border-amber-500">
                     </div>
+                    <div>
+                        <label class="block text-xs text-gray-200 font-semibold mb-1">Factory Velocity (fps)</label>
+                        <input type="number" step="1" id="ef-velocity" placeholder="e.g., 2680" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-200 font-semibold mb-1">Muzzle Energy (ft-lb)</label>
+                        <input type="number" step="1" id="ef-energy" placeholder="e.g., 2632" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-200 font-semibold mb-1">Case Type</label>
+                        <input type="text" id="ef-case-type" placeholder="e.g., Brass" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-200 font-semibold mb-1">Reloadable</label>
+                        <select id="ef-reloadable" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                            <option value="">—</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-200 font-semibold mb-1">Lead Free</label>
+                        <select id="ef-lead-free" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                            <option value="">—</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="text-xs">
@@ -647,6 +675,11 @@
                 cells += cell('C.O.A.L.', a.coal ? `${a.coal}"` : null, 'text-white font-mono');
             } else {
                 cells += cell('Product Line', line);
+                cells += cell('Factory Velocity', a.factory_velocity_fps ? `${a.factory_velocity_fps} fps` : null, 'text-white font-mono');
+                cells += cell('Muzzle Energy', a.muzzle_energy_ftlb ? `${a.muzzle_energy_ftlb} ft-lb` : null, 'text-white font-mono');
+                cells += cell('Case Type', a.case_type);
+                if (a.reloadable != null) cells += cell('Reloadable', a.reloadable ? 'Yes' : 'No', a.reloadable ? 'text-emerald-400' : 'text-gray-400');
+                if (a.lead_free != null) cells += cell('Lead Free', a.lead_free ? 'Yes' : 'No', a.lead_free ? 'text-emerald-400' : 'text-gray-400');
             }
             cells += cell('Range Sessions', a.usage_count !== undefined ? a.usage_count : '—', 'text-blue-400');
             if (a.price_paid) cells += cell('Price / Box', `$${parseFloat(a.price_paid).toFixed(2)}`, 'text-green-400 font-mono');
@@ -726,6 +759,11 @@
             document.getElementById('ef-price').value = a.price_paid || '';
             document.getElementById('ef-rpb').value = a.rounds_per_box || 20;
             document.getElementById('ef-upc').value = a.upc || '';
+            document.getElementById('ef-velocity').value = a.factory_velocity_fps || '';
+            document.getElementById('ef-energy').value = a.muzzle_energy_ftlb || '';
+            document.getElementById('ef-case-type').value = a.case_type || '';
+            document.getElementById('ef-reloadable').value = a.reloadable == null ? '' : (a.reloadable ? 'yes' : 'no');
+            document.getElementById('ef-lead-free').value = a.lead_free == null ? '' : (a.lead_free ? 'yes' : 'no');
             _toggleEditAmmoFields(a.ammo_category || '');
             if (isHandload) {
                 document.getElementById('handload-fields').classList.remove('hidden');
@@ -760,6 +798,11 @@
                 price_paid: parseFloat(document.getElementById('ef-price').value) || null,
                 rounds_per_box: parseInt(document.getElementById('ef-rpb').value) || 20,
                 upc: document.getElementById('ef-upc').value.trim() || null,
+                factory_velocity_fps: parseFloat(document.getElementById('ef-velocity').value) || null,
+                muzzle_energy_ftlb: parseFloat(document.getElementById('ef-energy').value) || null,
+                case_type: document.getElementById('ef-case-type').value.trim() || null,
+                reloadable: document.getElementById('ef-reloadable').value === '' ? null : document.getElementById('ef-reloadable').value === 'yes',
+                lead_free: document.getElementById('ef-lead-free').value === '' ? null : document.getElementById('ef-lead-free').value === 'yes',
             };
             if (ammoData?.is_handload) {
                 payload.charge_weight = parseFloat(document.getElementById('ef-charge').value) || null;

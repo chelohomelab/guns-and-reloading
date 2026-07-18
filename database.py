@@ -352,6 +352,13 @@ class UpcCache(Base):
     case_type    = Column(String, nullable=True)
     reloadable   = Column(Boolean, nullable=True)
     updated_at   = Column(String, nullable=True)
+    # Which kind of source last had "full write" rights on this row: 'site' (a
+    # bookmarklet capture of an actual retailer page — structured, reliable) or 'api'
+    # (the generic external UPC lookup — aggregated third-party data, prone to typos
+    # and thin records). A 'site' write may freely overwrite a row that isn't already
+    # 'site'-tier; once a row is 'site'-tier, further writes (from any source) only
+    # fill gaps, never overwrite. See upsert_upc_cache() in routers/barcode.py.
+    source_tier  = Column(String, nullable=True)
 
 
 class LookupValue(Base):
@@ -475,6 +482,7 @@ def init_db():
         _add_col('upc_cache', 'case_type', 'case_type VARCHAR')
         _add_col('upc_cache', 'reloadable', 'reloadable BOOLEAN')
         _add_col('upc_cache', 'mpn', 'mpn VARCHAR')
+        _add_col('upc_cache', 'source_tier', 'source_tier VARCHAR')
 
     for tbl, col in [
         ('casing_inventory', 'image_path'),

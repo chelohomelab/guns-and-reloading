@@ -9,6 +9,7 @@ import urllib.parse
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 import database as _models
@@ -66,6 +67,19 @@ AMMO_REQUIRED_FIELDS = {
 }
 
 
+def calc_muzzle_energy_ftlb(weight_gr, velocity_fps) -> float | None:
+    """Standard kinetic-energy ballistics formula: KE (ft-lb) = weight(gr) * velocity(fps)^2
+    / 450400. Used as a fallback wherever a source gives velocity but not muzzle energy
+    (e.g. Bass Pro/Cabela's) — verified against real published values within ~0.5 ft-lb.
+    """
+    if not weight_gr or not velocity_fps:
+        return None
+    try:
+        return round(float(weight_gr) * float(velocity_fps) ** 2 / 450400, 1)
+    except (TypeError, ValueError):
+        return None
+
+
 def missing_ammo_fields(brand: str | None, caliber: str | None, data: dict) -> list[str]:
     missing = []
     if not brand:
@@ -85,8 +99,28 @@ def missing_ammo_fields(brand: str | None, caliber: str | None, data: dict) -> l
     return missing
 
 
-def upsert_upc_cache(db: Session, upc: str, **kwargs) -> None:
-    """Create or update a UPC cache entry with the supplied keyword fields."""
+def upsert_upc_cache(db: Session, upc: str, prefer_existing: bool = False,
+                      source_tier: str | None = None, **kwargs) -> None:
+    """Create or update a UPC cache entry with the supplied keyword fields.
+
+    prefer_existing=True means an existing non-null value is never clobbered by a new
+    one — only genuinely empty fields get filled in. Use this whenever the caller can't
+    be sure the new source is any better than whatever's already cached (e.g. a fresh
+    bookmarklet capture of a UPC that's already cached from a different, possibly
+    richer, site — the whole point of supporting multiple sites is to use each one to
+    fill in what the others were missing, not to let a re-capture from a sparser site
+    silently downgrade already-good data). Default (False) is "last write wins".
+
+    source_tier distinguishes 'site' (a bookmarklet capture of an actual retailer page
+    or a Google-answer capture — structured, reliable) from 'api' (the generic external
+    UPC lookup — thin, sometimes typo'd third-party data) or None (unlabeled, e.g.
+    manual inventory entry). A 'site' write is always allowed to fully overwrite a row
+    that isn't already 'site'-tier, regardless of prefer_existing — upgrading a stale
+    API-sourced row the first time real site data shows up for that UPC. Once a row IS
+    'site'-tier, later writes go back to respecting prefer_existing normally (so one
+    site can't clobber another site's already-good data either — see
+    project_midwayusa_import_architecture memory for the incident that motivated this).
+    """
     if not upc:
         return
     upc = _normalize_upc(upc)
@@ -94,9 +128,27 @@ def upsert_upc_cache(db: Session, upc: str, **kwargs) -> None:
     if entry is None:
         entry = _models.UpcCache(upc=upc)
         db.add(entry)
+    existing_tier = getattr(entry, 'source_tier', None)
+    upgrading_to_site = source_tier == 'site' and existing_tier != 'site'
+    effective_prefer_existing = prefer_existing and not upgrading_to_site
+    # bc_g1 is special: unlike every other field here, it's often not actually scraped
+    # off the page but *guessed* from the static bc_reference.json table when a site
+    # doesn't list it directly (see _lookup_bc). A guess made under a pre-'site' tier
+    # (i.e. the generic external UPC API path, which only has a raw third-party brand
+    # label to go on) is exactly the kind of low-confidence value a real site capture
+    # should be able to correct — including correcting it to "unknown" by clearing it,
+    # not just leaving it stuck forever because the new capture's own value is None.
+    # Only bc_g1 gets this treatment; every other field keeps "None never overwrites."
+    if upgrading_to_site and kwargs.get('bc_g1') is None and hasattr(entry, 'bc_g1'):
+        entry.bc_g1 = None
     for k, v in kwargs.items():
-        if v is not None and hasattr(entry, k):
-            setattr(entry, k, v)
+        if v is None or not hasattr(entry, k):
+            continue
+        if effective_prefer_existing and getattr(entry, k, None) is not None:
+            continue
+        setattr(entry, k, v)
+    if source_tier and hasattr(entry, 'source_tier') and existing_tier != 'site':
+        entry.source_tier = source_tier
     entry.updated_at = datetime.now(timezone.utc).isoformat()
     db.commit()
 
@@ -107,7 +159,7 @@ def cache_ammo_capture(db: Session, upc: str, title, brand, caliber, image_path,
     auto-cache-on-complete path, so the two can never map fields differently.
     """
     upsert_upc_cache(
-        db, upc,
+        db, upc, prefer_existing=True, source_tier='site',
         title=title,
         product_type="ammo",
         brand=brand,
@@ -155,6 +207,8 @@ def _cache_to_response(entry: "_models.UpcCache") -> dict:
         "reloadable": getattr(entry, 'reloadable', None),
         "source": "cache",
     }
+    if resp["muzzle_energy_ftlb"] is None:
+        resp["muzzle_energy_ftlb"] = calc_muzzle_energy_ftlb(resp["weight_gr"], resp["factory_velocity_fps"])
     _add_completeness(resp, entry.product_type)
     return resp
 
@@ -232,6 +286,7 @@ _CALIBER_WORD_EXPANSIONS = {
 _CALIBER_BARE_NUMBER_INFERENCE = {
     '22': '22 LR',
     '270': '270 Winchester',
+    '308': '308 Winchester',
 }
 
 
@@ -589,12 +644,14 @@ def _lookup_bc(brand: str, product_line: str | None, weight_gr: float | None,
                     abs(entry['weight_gr'] - weight_gr) < 0.6):
                 return {'bc_g1': entry.get('bc_g1')}
 
-    # Tier 2: brand + weight only (unique match)
     candidates = [e for e in ref if e['brand'] == brand_l and abs(e['weight_gr'] - weight_gr) < 0.6]
-    if len(candidates) == 1:
-        return {'bc_g1': candidates[0].get('bc_g1')}
 
-    # Tier 3: brand + weight + caliber (narrows multi-weight-matches by caliber)
+    # Tier 2: brand + weight + caliber — narrow by caliber *before* ever trusting a
+    # "unique" weight match. A bullet being the only entry at a given weight in this
+    # (small) table doesn't mean it's the same bullet as the one being captured — e.g.
+    # a 140gr 6.5mm Core-Lokt and a 140gr 7mm-08 Premier CuT are unrelated bullets that
+    # happen to share a weight. Once caliber is known, only caliber-matching candidates
+    # may ever be returned.
     if caliber and candidates:
         cal_candidates = [e for e in candidates
                           if _caliber_matches_hint(caliber, e.get('caliber_hint', ''))]
@@ -605,7 +662,17 @@ def _lookup_bc(brand: str, product_line: str | None, weight_gr: float | None,
             bc_set = {e.get('bc_g1') for e in cal_candidates}
             if len(bc_set) == 1:
                 return {'bc_g1': cal_candidates[0].get('bc_g1')}
+        # Caliber is known but nothing in the table matches it — the weight-only
+        # candidates below are for other calibers, never usable here.
+        return {}
 
+    # No caliber-free "unique weight match" fallback: a bullet being the only entry at
+    # a given weight in this small table is not evidence it's the *same* bullet, and
+    # without caliber there's no way to even attempt ruling out a cross-caliber false
+    # match. This used to exist as a "Tier 3" and produced two confirmed wrong BC (G1)
+    # values for real captures (see project_midwayusa_import_architecture memory) —
+    # once via a clean caliber that just wasn't checked, once via a caliber that never
+    # got parsed at all from a messy third-party API title. No caliber, no guess.
     return {}
 
 
@@ -675,6 +742,34 @@ def _normalize_upc(upc: str) -> str:
     if len(upc) == 13 and upc.startswith('0'):
         return upc[1:]
     return upc
+
+
+@router.get("/barcode/cache")
+def search_upc_cache(q: str = "", db: Session = Depends(get_db)):
+    """Browse/search the local UPC cache directly — lets you check "do I already have
+    this?" without needing to scan or run a fresh lookup first.
+    """
+    query = db.query(_models.UpcCache)
+    q = q.strip()
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(
+            _models.UpcCache.upc.like(like),
+            _models.UpcCache.title.like(like),
+            _models.UpcCache.brand.like(like),
+            _models.UpcCache.caliber.like(like),
+            _models.UpcCache.mpn.like(like),
+            _models.UpcCache.product_line.like(like),
+        ))
+    rows = query.order_by(_models.UpcCache.updated_at.desc()).limit(200).all()
+    return [
+        {
+            "upc": r.upc, "title": r.title, "brand": r.brand, "caliber": r.caliber,
+            "product_type": r.product_type, "weight_gr": r.weight_gr,
+            "mpn": getattr(r, 'mpn', None), "updated_at": r.updated_at,
+        }
+        for r in rows
+    ]
 
 
 @router.get("/barcode/lookup")
@@ -801,8 +896,11 @@ def barcode_lookup(upc: str, db: Session = Depends(get_db)):
     primer_model = _parse_primer_model(combined)
     ammo_category = _infer_ammo_category(caliber, combined) if product_type == 'ammo' else None
 
-    # Persist to local cache so repeat scans never hit the internet
-    upsert_upc_cache(db, upc,
+    # Persist to local cache so repeat scans never hit the internet. prefer_existing
+    # guards against the (normally cache-hit-short-circuited, but defend anyway) case
+    # of this ever running against a UPC that already has richer site-sourced data;
+    # source_tier='api' means a later real site capture is still free to upgrade it.
+    upsert_upc_cache(db, upc, prefer_existing=True, source_tier='api',
         title=title,
         product_type=product_type,
         brand=powder_brand or brand,

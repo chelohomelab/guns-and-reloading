@@ -4086,15 +4086,39 @@ function _showPendingUpc(upc) {
     if (row && disp) { disp.value = upc || ''; row.classList.toggle('hidden', !upc); }
 }
 
-// Tracks the UPC/MPN from the most recent lookup on the Add Ammo (Factory) form, so
-// the Search UPC / Search Manufacturer # / Refresh from Cache buttons know what to act on.
-let _ammoFactoryLookupState = { upc: null, mpn: null };
+// Where a barcode lookup's data actually came from — shown as a toast suffix
+// everywhere, and as a persistent badge on the Add Ammo (Factory) form.
+const _LOOKUP_SOURCE_INFO = {
+    cache:     { label: '📦 Cache',       cls: 'bg-teal-900/60 text-teal-300 border border-teal-700/50' },
+    api:       { label: '🌐 External API', cls: 'bg-blue-900/60 text-blue-300 border border-blue-700/50' },
+    scrape:    { label: '🔍 Web Scrape',   cls: 'bg-amber-900/60 text-amber-300 border border-amber-700/50' },
+    inventory: { label: '✓ Already Owned', cls: 'bg-purple-900/60 text-purple-300 border border-purple-700/50' },
+};
+
+function _sourceLabel(source) {
+    return _LOOKUP_SOURCE_INFO[source]?.label || source || '';
+}
+
+function _showSourceBadge(source) {
+    const badge = document.getElementById('ammo-factory-source-badge');
+    if (!badge) return;
+    const info = _LOOKUP_SOURCE_INFO[source];
+    if (!info) { badge.classList.add('hidden'); return; }
+    badge.textContent = info.label;
+    badge.className = `px-1.5 py-0.5 rounded text-[10px] font-bold ${info.cls}`;
+}
+
+// Tracks the UPC/MPN/missing-fields from the most recent lookup on the Add Ammo
+// (Factory) form, so the Search UPC / Search Manufacturer # / Refresh from Cache
+// buttons know what to act on.
+let _ammoFactoryLookupState = { upc: null, mpn: null, missingFields: [] };
 
 function _updateAmmoCompletenessUI(data) {
     const box = document.getElementById('ammo-factory-incomplete-actions');
     if (!box) return;
     _ammoFactoryLookupState.upc = data.upc || null;
     _ammoFactoryLookupState.mpn = data.mpn || null;
+    _ammoFactoryLookupState.missingFields = data.missing_fields || [];
     // is_complete is null for non-ammo product types (not applicable) — treat as complete
     // (nothing to prompt for) rather than showing the incomplete-data actions.
     if (data.is_complete === false) {
@@ -4108,14 +4132,41 @@ function _updateAmmoCompletenessUI(data) {
     }
 }
 
+// Google ignores URL fragments (#upc=...) entirely — never sent to its server, never
+// affects the search — so this rides along invisibly for the "Import to G&R" bookmark
+// to pick up if tapped on the results page (see parse_google_search_html in
+// routers/product_import.py).
+function _googleSearchUrl(query, upc) {
+    const base = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    return upc ? `${base}#upc=${encodeURIComponent(upc)}` : base;
+}
+
 function searchAmmoFactoryUpc() {
     if (!_ammoFactoryLookupState.upc) { showToast('No UPC to search yet', 'info'); return; }
-    window.open(`https://www.google.com/search?q=${encodeURIComponent(_ammoFactoryLookupState.upc)}`, '_blank', 'noopener,noreferrer');
+    // A bare UPC search mostly surfaces barcode-lookup sites, not manufacturer specs —
+    // next to useless for finding a BC (G1) value. Build a descriptive query from
+    // whatever the form already has filled in instead (same fields as the online image
+    // search), same "append g1 bc" logic as Search Manufacturer # — this is the only
+    // BC-finding button at all for products with no MPN (that button stays hidden then).
+    const brand   = document.getElementById('ammo-factory-brand')?.value || '';
+    const caliber = document.getElementById('ammo-factory-caliber')?.value || '';
+    const model   = document.getElementById('ammo-factory-model')?.value || '';
+    const weight  = document.getElementById('ammo-factory-weight')?.value || '';
+    const desc = [brand, model, caliber, weight ? `${weight}gr` : ''].filter(Boolean).join(' ').trim();
+    const wantsBc = _ammoFactoryLookupState.missingFields.includes('BC (G1)');
+    const query = desc
+        ? (wantsBc ? `${desc} g1 bc` : desc)
+        : (wantsBc ? `${_ammoFactoryLookupState.upc} g1 bc` : _ammoFactoryLookupState.upc);
+    window.open(_googleSearchUrl(query, _ammoFactoryLookupState.upc), '_blank', 'noopener,noreferrer');
 }
 
 function searchAmmoFactoryMpn() {
     if (!_ammoFactoryLookupState.mpn) return;
-    window.open(`https://www.google.com/search?q=${encodeURIComponent(_ammoFactoryLookupState.mpn)}`, '_blank', 'noopener,noreferrer');
+    // Only steer the search toward "g1 bc" when that's actually what's missing —
+    // otherwise this is a generic MPN search like Search UPC.
+    const wantsBc = _ammoFactoryLookupState.missingFields.includes('BC (G1)');
+    const query = wantsBc ? `${_ammoFactoryLookupState.mpn} g1 bc` : _ammoFactoryLookupState.mpn;
+    window.open(_googleSearchUrl(query, _ammoFactoryLookupState.upc), '_blank', 'noopener,noreferrer');
 }
 
 async function refreshAmmoFactoryFromCache() {
@@ -4154,6 +4205,7 @@ async function triggerBarcodeLookup(upc) {
             if (_barcodeFormTarget === 'ammo-factory') {
                 _showPendingUpc(upc);
                 _updateAmmoCompletenessUI({ upc, mpn: null, is_complete: false, missing_fields: [] });
+                _showSourceBadge(null);
             }
             const errBody = await resp.json().catch(() => ({}));
             const offline = (errBody.detail || '').includes('unavailable');
@@ -4175,10 +4227,11 @@ async function triggerBarcodeLookup(upc) {
         if (_barcodeFormTarget === 'ammo-factory') {
             _showPendingUpc(data.upc || upc);
             _updateAmmoCompletenessUI({ ...data, upc: data.upc || upc });
+            _showSourceBadge(data.source);
         }
         // Summarize from the parsed/trusted fields that actually populate the form —
         // data.title is raw external listing text and can be mislabeled for the UPC.
-        showToast(`Found: ${_summarizeBarcodeData(data) || upc}`, 'success');
+        showToast(`Found (${_sourceLabel(data.source)}): ${_summarizeBarcodeData(data) || upc}`, 'success');
     } catch (e) {
         showToast('Lookup failed — check connection', 'error');
     } finally {
@@ -4208,7 +4261,37 @@ const _PRODUCT_TYPE_FORM = {
     'casing': { cat: 'cat-components', form: 'add-casing',      fill: 'casing' },
 };
 
+// Fields _fillFormFromBarcode populates via _setIfEmpty for the ammo-factory target —
+// "only fill if empty" is correct when refining the *same* UPC's still-incomplete data
+// (Search UPC/MPN, Refresh from Cache), but wrong when a genuinely different UPC gets
+// scanned: the previous product's leftover values would block the new product's real
+// values from ever being set. Clear these first whenever the incoming UPC differs from
+// whatever was loaded before.
+const _AMMO_FACTORY_SCAN_FIELD_IDS = [
+    'ammo-factory-brand', 'ammo-factory-model', 'ammo-factory-caliber',
+    'ammo-factory-bullet-type', 'ammo-factory-weight', 'ammo-factory-bc',
+    'ammo-factory-rpb', 'ammo-factory-velocity', 'ammo-factory-energy',
+    'ammo-factory-case-type', 'ammo-factory-lead-free', 'ammo-factory-reloadable',
+];
+
+function _resetAmmoFactoryScanFields() {
+    for (const id of _AMMO_FACTORY_SCAN_FIELD_IDS) {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    }
+    const catSel = document.getElementById('ammo-factory-cat');
+    if (catSel) { catSel.value = ''; _toggleFactoryAmmoFields(''); }
+    _pw['pw-ammo-factory'] = { files: [], primary: 0 };
+    _renderPW('pw-ammo-factory');
+}
+
 function _fillFormFromBarcode(data) {
+    if (_barcodeFormTarget === 'ammo-factory') {
+        const newUpc = data.upc || null;
+        if (_ammoFactoryLookupState.upc && newUpc && _ammoFactoryLookupState.upc !== newUpc) {
+            _resetAmmoFactoryScanFields();
+        }
+    }
     _lastScannedUpc = data.upc || null;
 
     if (_barcodeFormTarget === 'ammo-factory') {

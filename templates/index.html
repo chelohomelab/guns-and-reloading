@@ -716,9 +716,14 @@
                             Scan Barcode
                         </button>
                     </div>
-                    <div class="flex gap-2">
-                        <input type="text" id="ammo-factory-upc-input" placeholder="Enter UPC to auto-fill form…" inputmode="numeric" onkeydown="if(event.key==='Enter'){lookupFormUpc('ammo-factory','ammo-factory-upc-input');}" class="flex-1 bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white font-mono placeholder-gray-500 focus:outline-none focus:border-blue-500">
-                        <button type="button" onclick="lookupFormUpc('ammo-factory', 'ammo-factory-upc-input')" class="px-2.5 py-2 bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold rounded transition cursor-pointer shrink-0">🔍 Lookup</button>
+                    <!-- Ammo is scan-only — no manual UPC entry here. A dedicated "add to
+                         cache only" tool (Scanner Review tab) covers manual UPC entry. -->
+                    <input type="hidden" id="ammo-factory-upc-input">
+                    <div id="ammo-factory-incomplete-actions" class="hidden flex-wrap items-start gap-2 bg-amber-950/30 border border-amber-800/40 rounded-lg px-3 py-2.5">
+                        <p id="ammo-factory-missing-list" class="text-[11px] text-amber-300 font-semibold w-full"></p>
+                        <button type="button" onclick="searchAmmoFactoryUpc()" class="px-2.5 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-[11px] font-bold rounded transition cursor-pointer">🔍 Search UPC</button>
+                        <button type="button" id="ammo-factory-search-mpn-btn" onclick="searchAmmoFactoryMpn()" class="hidden px-2.5 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-[11px] font-bold rounded transition cursor-pointer">🔍 Search Manufacturer #</button>
+                        <button type="button" onclick="refreshAmmoFactoryFromCache()" class="px-2.5 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-emerald-200 text-[11px] font-bold rounded transition cursor-pointer">🔄 Refresh from Cache</button>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -1165,7 +1170,10 @@
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                            <label class="block text-xs text-gray-200 font-semibold mb-1">G1 BC</label>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1 flex items-center justify-between gap-2">
+                                <span>G1 BC</span>
+                                <a href="#" onclick="searchBulletG1Bc(event)" class="text-[10px] font-normal text-amber-400 hover:text-amber-300 underline normal-case">🔍 Find G1 BC</a>
+                            </label>
                             <input type="number" step="0.001" name="bc_g1" id="bullet-comp-bc-g1" placeholder="e.g., 0.620" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
                         </div>
                         <div>
@@ -1345,6 +1353,6 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
-    <script src="/static/app.js?v=76"></script>
+    <script src="/static/app.js?v=78"></script>
 </body>
 </html>

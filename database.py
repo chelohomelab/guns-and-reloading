@@ -343,6 +343,7 @@ class UpcCache(Base):
     primer_type  = Column(String, nullable=True)
     primer_model = Column(String, nullable=True)
     powder_name  = Column(String, nullable=True)
+    mpn          = Column(String, nullable=True)
     image_path   = Column(String, nullable=True)
     ammo_category = Column(String, nullable=True)
     factory_velocity_fps = Column(Float, nullable=True)
@@ -473,6 +474,7 @@ def init_db():
         _add_col('upc_cache', 'lead_free', 'lead_free BOOLEAN')
         _add_col('upc_cache', 'case_type', 'case_type VARCHAR')
         _add_col('upc_cache', 'reloadable', 'reloadable BOOLEAN')
+        _add_col('upc_cache', 'mpn', 'mpn VARCHAR')
 
     for tbl, col in [
         ('casing_inventory', 'image_path'),

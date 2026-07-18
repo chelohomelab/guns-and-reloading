@@ -598,6 +598,22 @@
       </div>
     </div>
 
+    <!-- Manual UPC → cache only (no inventory form involved) -->
+    <div class="bg-gray-900/90 border border-gray-800 rounded-lg p-3">
+      <button onclick="toggleManualCachePanel()" class="w-full flex items-center justify-between text-xs text-gray-200 font-semibold cursor-pointer">
+        <span>🗄️ Add UPC to Cache Only</span>
+        <span id="manual-cache-panel-caret">▸</span>
+      </button>
+      <div id="manual-cache-panel" class="hidden mt-3 space-y-2">
+        <p class="text-[11px] text-gray-500">Know a UPC but don't have the item in hand to scan? Type it here — this looks it up and saves it to the local cache only. Nothing gets added to inventory.</p>
+        <div class="flex gap-2">
+          <input type="text" id="manual-cache-upc-input" placeholder="Enter UPC…" inputmode="numeric" onkeydown="if(event.key==='Enter'){addUpcToCacheOnly();}" class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100 font-mono placeholder-gray-500 focus:outline-none focus:border-teal-500">
+          <button onclick="addUpcToCacheOnly()" class="px-4 py-2 bg-teal-700 hover:bg-teal-600 text-white text-sm font-bold rounded-lg transition cursor-pointer shrink-0">Add to Cache</button>
+        </div>
+        <p id="manual-cache-status" class="text-[11px] text-gray-500"></p>
+      </div>
+    </div>
+
     <!-- Filter buttons -->
     <div class="flex gap-2 flex-wrap items-center justify-between">
       <div class="flex gap-2 flex-wrap">
@@ -637,7 +653,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=76"></script>
+<script src="/static/app.js?v=78"></script>
 <script>
 // ============================================================
 // STATE
@@ -762,6 +778,50 @@ function toggleImportPanel() {
   }
 }
 
+function toggleManualCachePanel() {
+  const panel = document.getElementById('manual-cache-panel');
+  const caret = document.getElementById('manual-cache-panel-caret');
+  panel.classList.toggle('hidden');
+  caret.textContent = panel.classList.contains('hidden') ? '▸' : '▾';
+}
+
+async function addUpcToCacheOnly() {
+  const input = document.getElementById('manual-cache-upc-input');
+  const upc = (input.value || '').trim();
+  if (!upc) { showToast('Enter a UPC first', 'info'); return; }
+  const status = document.getElementById('manual-cache-status');
+  status.textContent = 'Looking up…';
+  status.className = 'text-[11px] text-gray-500';
+  try {
+    // /barcode/lookup already caches on a successful API/scrape fetch as a side effect
+    // (see upsert_upc_cache calls in routers/barcode.py) — no separate endpoint needed.
+    const res = await fetch(`/barcode/lookup?upc=${encodeURIComponent(upc)}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      status.textContent = `Not found: ${err.detail || res.status}`;
+      status.className = 'text-[11px] text-red-400';
+      showToast('UPC not found in cache or lookup services', 'warn');
+      return;
+    }
+    const data = await res.json();
+    if (data.source === 'inventory') {
+      status.textContent = 'Already in your inventory — nothing to cache.';
+      status.className = 'text-[11px] text-gray-400';
+      showToast('Already in inventory', 'info');
+      return;
+    }
+    const summary = [data.brand, data.product_line || data.bullet_type, data.caliber].filter(Boolean).join(' ') || data.title || upc;
+    status.textContent = `✓ Cached: ${summary}`;
+    status.className = 'text-[11px] text-emerald-400';
+    showToast(`Cached: ${summary}`, 'success');
+    input.value = '';
+  } catch (e) {
+    status.textContent = 'Network error';
+    status.className = 'text-[11px] text-red-400';
+    showToast('Network error', 'error');
+  }
+}
+
 function _bookmarkletSource(token) {
   const endpoint = window.location.origin + '/import/capture';
   // Runs on the retailer's page: scrolls to force lazy-loaded sections (specs table)
@@ -782,8 +842,16 @@ function _bookmarkletSource(token) {
         .then(function(res){
           if(!res.ok){toast('\\u2717 '+(res.data.detail||'Import failed'),false);return;}
           var prefix=(found?'':'(specs not found) ');
-          var verb=res.data.updated?'Updated':'Imported';
+          var complete=!!res.data.complete;
+          var verb=complete?(res.data.updated?'Cached (updated)':'Cached'):(res.data.updated?'Updated in review queue':'Queued for review');
           toast('\\u2713 '+prefix+verb+': '+(res.data.title||'item'),true);
+          // Only auto-close when the capture was complete enough to write straight to
+          // the cache — if something's still missing it stays in the review queue, so
+          // leave the tab open to search another site or fill it in manually. Chrome
+          // only allows script-initiated close on tabs with no back-history (e.g.
+          // opened via "Open Link in New Tab"), which matches this workflow; if that
+          // condition isn't met the call is a harmless no-op.
+          if(complete){setTimeout(function(){window.close();},900);}
         })
         .catch(function(){toast('\\u2717 Network error',false);});
     }

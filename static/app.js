@@ -3769,6 +3769,16 @@ if (primerForm) {
     });
 }
 
+function searchBulletG1Bc(event) {
+    event.preventDefault();
+    const val = id => document.getElementById(id)?.value.trim() || '';
+    const parts = [val('bullet-comp-brand'), val('bullet-comp-product-line'), val('bullet-comp-caliber'),
+                   val('bullet-comp-weight') && `${val('bullet-comp-weight')}gr`, val('bullet-comp-bullet-type')]
+        .filter(Boolean);
+    const query = [...parts, 'g1 bc'].join(' ');
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer');
+}
+
 const bulletCompForm = document.getElementById('bullet-comp-form');
 if (bulletCompForm) {
     bulletCompForm.addEventListener('submit', async (e) => {
@@ -4076,6 +4086,45 @@ function _showPendingUpc(upc) {
     if (row && disp) { disp.value = upc || ''; row.classList.toggle('hidden', !upc); }
 }
 
+// Tracks the UPC/MPN from the most recent lookup on the Add Ammo (Factory) form, so
+// the Search UPC / Search Manufacturer # / Refresh from Cache buttons know what to act on.
+let _ammoFactoryLookupState = { upc: null, mpn: null };
+
+function _updateAmmoCompletenessUI(data) {
+    const box = document.getElementById('ammo-factory-incomplete-actions');
+    if (!box) return;
+    _ammoFactoryLookupState.upc = data.upc || null;
+    _ammoFactoryLookupState.mpn = data.mpn || null;
+    // is_complete is null for non-ammo product types (not applicable) — treat as complete
+    // (nothing to prompt for) rather than showing the incomplete-data actions.
+    if (data.is_complete === false) {
+        box.classList.remove('hidden');
+        const missing = data.missing_fields || [];
+        document.getElementById('ammo-factory-missing-list').textContent =
+            missing.length ? `⚠ Missing: ${missing.join(', ')}` : '⚠ Not found in cache or lookup services';
+        document.getElementById('ammo-factory-search-mpn-btn').classList.toggle('hidden', !data.mpn);
+    } else {
+        box.classList.add('hidden');
+    }
+}
+
+function searchAmmoFactoryUpc() {
+    if (!_ammoFactoryLookupState.upc) { showToast('No UPC to search yet', 'info'); return; }
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(_ammoFactoryLookupState.upc)}`, '_blank', 'noopener,noreferrer');
+}
+
+function searchAmmoFactoryMpn() {
+    if (!_ammoFactoryLookupState.mpn) return;
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(_ammoFactoryLookupState.mpn)}`, '_blank', 'noopener,noreferrer');
+}
+
+async function refreshAmmoFactoryFromCache() {
+    if (!_ammoFactoryLookupState.upc) { showToast('No UPC to refresh', 'info'); return; }
+    _barcodeFormTarget = 'ammo-factory';
+    showToast('Refreshing from cache…', 'info');
+    await triggerBarcodeLookup(_ammoFactoryLookupState.upc);
+}
+
 async function lookupFormUpc(formTarget, inputId) {
     const input = document.getElementById(inputId);
     const upc = (input?.value || '').trim();
@@ -4102,7 +4151,10 @@ async function triggerBarcodeLookup(upc) {
         if (!resp.ok) {
             _lastScannedUpc = upc;
             closeBarcodeScanner();
-            if (_barcodeFormTarget === 'ammo-factory') _showPendingUpc(upc);
+            if (_barcodeFormTarget === 'ammo-factory') {
+                _showPendingUpc(upc);
+                _updateAmmoCompletenessUI({ upc, mpn: null, is_complete: false, missing_fields: [] });
+            }
             const errBody = await resp.json().catch(() => ({}));
             const offline = (errBody.detail || '').includes('unavailable');
             showToast(
@@ -4120,7 +4172,10 @@ async function triggerBarcodeLookup(upc) {
         }
         _fillFormFromBarcode(data);
         // Sync the "Scanned UPC" display with the canonical UPC from the response
-        if (_barcodeFormTarget === 'ammo-factory') _showPendingUpc(data.upc || upc);
+        if (_barcodeFormTarget === 'ammo-factory') {
+            _showPendingUpc(data.upc || upc);
+            _updateAmmoCompletenessUI({ ...data, upc: data.upc || upc });
+        }
         // Summarize from the parsed/trusted fields that actually populate the form —
         // data.title is raw external listing text and can be mislabeled for the UPC.
         showToast(`Found: ${_summarizeBarcodeData(data) || upc}`, 'success');

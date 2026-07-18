@@ -54,6 +54,37 @@ def _download_upc_image(upc: str, url: str) -> str | None:
         return None
 
 
+# The fields an ammo capture needs before it's "complete" — shared by the Scanner
+# Review queue's ✓ badge, the bookmarklet capture endpoint (decides cache-directly vs.
+# queue-for-review), and /barcode/lookup (tells the Add Ammo form what's still missing).
+# One definition so "complete" can never mean something different in different places.
+AMMO_REQUIRED_FIELDS = {
+    "bullet_weight": "Bullet Weight",
+    "bc_g1": "BC (G1)",
+    "factory_velocity_fps": "Velocity",
+    "muzzle_energy_ftlb": "Muzzle Energy",
+}
+
+
+def missing_ammo_fields(brand: str | None, caliber: str | None, data: dict) -> list[str]:
+    missing = []
+    if not brand:
+        missing.append("Brand")
+    if not caliber:
+        missing.append("Caliber")
+    # UpcCache stores bullet weight as "weight_gr" (its own component-style convention);
+    # ScannerEntry/Ammo ammo data stores it as "bullet_weight" — accept either so this
+    # check works against both shapes without callers having to translate first.
+    weight = data.get("bullet_weight")
+    if weight is None:
+        weight = data.get("weight_gr")
+    for field, label in AMMO_REQUIRED_FIELDS.items():
+        value = weight if field == "bullet_weight" else data.get(field)
+        if value is None:
+            missing.append(label)
+    return missing
+
+
 def upsert_upc_cache(db: Session, upc: str, **kwargs) -> None:
     """Create or update a UPC cache entry with the supplied keyword fields."""
     if not upc:
@@ -70,8 +101,36 @@ def upsert_upc_cache(db: Session, upc: str, **kwargs) -> None:
     db.commit()
 
 
+def cache_ammo_capture(db: Session, upc: str, title, brand, caliber, image_path, data: dict) -> None:
+    """Write a parsed/captured ammo product's fields into UpcCache — the shared field
+    mapping behind both the Review queue's Accept-to-cache action and the bookmarklet's
+    auto-cache-on-complete path, so the two can never map fields differently.
+    """
+    upsert_upc_cache(
+        db, upc,
+        title=title,
+        product_type="ammo",
+        brand=brand,
+        product_line=data.get("product_line"),
+        caliber=caliber,
+        weight_gr=data.get("bullet_weight"),
+        bullet_type=data.get("bullet_type"),
+        bc_g1=data.get("bc_g1"),
+        rounds_per_box=data.get("rounds_per_box"),
+        primer_type=data.get("primer_type"),
+        primer_model=data.get("primer_model"),
+        mpn=data.get("mpn"),
+        image_path=image_path,
+        factory_velocity_fps=data.get("factory_velocity_fps"),
+        muzzle_energy_ftlb=data.get("muzzle_energy_ftlb"),
+        lead_free=data.get("lead_free"),
+        case_type=data.get("case_type"),
+        reloadable=data.get("reloadable"),
+    )
+
+
 def _cache_to_response(entry: "_models.UpcCache") -> dict:
-    return {
+    resp = {
         "upc": entry.upc,
         "title": entry.title,
         "product_type": entry.product_type,
@@ -86,6 +145,7 @@ def _cache_to_response(entry: "_models.UpcCache") -> dict:
         "bc_g1": entry.bc_g1,
         "primer_type": entry.primer_type,
         "primer_model": entry.primer_model,
+        "mpn": getattr(entry, 'mpn', None),
         "image_path": entry.image_path,
         "ammo_category": getattr(entry, 'ammo_category', None),
         "factory_velocity_fps": getattr(entry, 'factory_velocity_fps', None),
@@ -95,6 +155,21 @@ def _cache_to_response(entry: "_models.UpcCache") -> dict:
         "reloadable": getattr(entry, 'reloadable', None),
         "source": "cache",
     }
+    _add_completeness(resp, entry.product_type)
+    return resp
+
+
+def _add_completeness(resp: dict, product_type: str | None) -> None:
+    # Only meaningful for ammo — other product types don't have this required-fields
+    # concept (yet; components are on the roadmap, see project_multisite_importer_roadmap
+    # memory). None here means "not applicable", distinct from an empty missing list.
+    if product_type == "ammo":
+        missing = missing_ammo_fields(resp.get("brand"), resp.get("caliber"), resp)
+        resp["is_complete"] = len(missing) == 0
+        resp["missing_fields"] = missing
+    else:
+        resp["is_complete"] = None
+        resp["missing_fields"] = None
 
 _BC_REF: list[dict] | None = None
 
@@ -748,7 +823,7 @@ def barcode_lookup(upc: str, db: Session = Depends(get_db)):
         _models.Ammo.upc == upc, _models.Ammo.is_handload == False
     ).first()
 
-    return {
+    resp = {
         "upc": upc,
         "title": title,
         "product_type": product_type,
@@ -763,11 +838,14 @@ def barcode_lookup(upc: str, db: Session = Depends(get_db)):
         "bc_g1": bc_data.get("bc_g1"),
         "primer_type": primer_type,
         "primer_model": primer_model,
+        "mpn": None,  # not exposed by UPCitemdb/barcodelookup.com
         "image_path": image_path,
         "ammo_category": ammo_category,
         "source": "scrape" if _scraped else "api",
         "existing_ammo_id": existing.id if existing else None,
     }
+    _add_completeness(resp, product_type)
+    return resp
 
 
 @router.get("/barcode/image-search")

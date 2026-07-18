@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 import database as _models
 from dependencies import get_db, save_uploaded_file, cleanup_item_images
+from routers.barcode import missing_ammo_fields
 
 router = APIRouter(prefix="/scanner", tags=["scanner"])
 
@@ -42,22 +43,11 @@ def _entry_dict(e: "_models.ScannerEntry") -> dict:
     }
 
 
-_AMMO_REQUIRED = {
-    "bullet_weight": "Bullet Weight",
-    "bc_g1": "BC (G1)",
-    "factory_velocity_fps": "Velocity",
-    "muzzle_energy_ftlb": "Muzzle Energy",
-}
-
-
 def _missing_fields(entry: "_models.ScannerEntry") -> list:
     """Return human-readable labels of required fields still missing for this
     entry's category — powers both the completeness check and the "what's missing"
     hint shown on incomplete review cards, so the two can never drift apart.
     """
-    missing = []
-    if not entry.brand:
-        missing.append("Brand")
     cat = entry.category
     data = {}
     if entry.data_json:
@@ -66,12 +56,13 @@ def _missing_fields(entry: "_models.ScannerEntry") -> list:
         except Exception:
             pass
     if cat == "ammo":
-        if not entry.caliber:
-            missing.append("Caliber")
-        for field, label in _AMMO_REQUIRED.items():
-            if data.get(field) is None:
-                missing.append(label)
-    elif cat in ("firearm", "optic"):
+        # Delegates to the same plain-dict check the bookmarklet capture endpoint and
+        # /barcode/lookup use, so "complete" means the same thing everywhere.
+        return missing_ammo_fields(entry.brand, entry.caliber, data)
+    missing = []
+    if not entry.brand:
+        missing.append("Brand")
+    if cat in ("firearm", "optic"):
         if not data.get("model"):
             missing.append("Model")
     elif cat == "tc_barrel":
@@ -332,27 +323,8 @@ def convert_entry_to_inventory(
         # /barcode/lookup checks first), not "I own this, put it in inventory now."
         if not entry.upc:
             raise HTTPException(400, "Can't cache — this capture has no UPC")
-        from routers.barcode import upsert_upc_cache
-        upsert_upc_cache(
-            db, entry.upc,
-            title=entry.title,
-            product_type="ammo",
-            brand=entry.brand,
-            product_line=data.get("product_line"),
-            caliber=entry.caliber,
-            weight_gr=data.get("bullet_weight"),
-            bullet_type=data.get("bullet_type"),
-            bc_g1=data.get("bc_g1"),
-            rounds_per_box=data.get("rounds_per_box"),
-            primer_type=data.get("primer_type"),
-            primer_model=data.get("primer_model"),
-            image_path=entry.image_path_1,
-            factory_velocity_fps=data.get("factory_velocity_fps"),
-            muzzle_energy_ftlb=data.get("muzzle_energy_ftlb"),
-            lead_free=data.get("lead_free"),
-            case_type=data.get("case_type"),
-            reloadable=data.get("reloadable"),
-        )
+        from routers.barcode import cache_ammo_capture
+        cache_ammo_capture(db, entry.upc, entry.title, entry.brand, entry.caliber, entry.image_path_1, data)
         result_type = "upc_cache"
         result_id = None
 

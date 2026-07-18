@@ -27,6 +27,8 @@ from routers.barcode import (
     _parse_product_line,
     _parse_rounds,
     _parse_weight,
+    cache_ammo_capture,
+    missing_ammo_fields,
     normalize_caliber,
 )
 
@@ -473,17 +475,40 @@ async def capture_page(request: Request, db: Session = Depends(get_db)):
     data = {k: result[k] for k in extra_keys if result.get(k) is not None}
     image_path = _download_product_image(result.get("image_url"))
     upc = result.get("upc")
+    title = result.get("title")
+    brand = result.get("brand")
+    caliber = result.get("caliber")
 
     # UPC already sitting in the review queue (e.g. a repeat tap of the bookmarklet on
-    # the same product) — refresh that entry in place instead of piling up duplicates.
+    # the same product, or an earlier incomplete capture) — reuse/replace it instead of
+    # piling up duplicates.
     existing_entry = db.query(_models.ScannerEntry).filter(
         _models.ScannerEntry.category == "ammo", _models.ScannerEntry.upc == upc,
     ).first() if upc else None
 
+    # A capture this good doesn't need a human to Accept it — seed the cache directly
+    # (the whole point of this feature, see project_midwayusa_import_architecture memory)
+    # and clean up any stale incomplete queue entry for the same UPC now that we have a
+    # complete one. Requires a UPC since UpcCache is keyed by it.
+    can_cache_directly = bool(upc) and not missing_ammo_fields(brand, caliber, data)
+
+    if can_cache_directly:
+        if existing_entry:
+            db.delete(existing_entry)
+            db.commit()
+        cache_ammo_capture(db, upc, title, brand, caliber, image_path, data)
+        return JSONResponse(
+            content={
+                "ok": True, "id": None, "title": title, "tier": result.get("tier"),
+                "updated": existing_entry is not None, "complete": True, "destination": "cache",
+            },
+            headers=_CORS_HEADERS,
+        )
+
     if existing_entry:
-        existing_entry.title = result.get("title")
-        existing_entry.brand = result.get("brand")
-        existing_entry.caliber = result.get("caliber")
+        existing_entry.title = title
+        existing_entry.brand = brand
+        existing_entry.caliber = caliber
         existing_entry.data_json = json.dumps(data) if data else None
         existing_entry.source_url = source_url
         if image_path:
@@ -497,9 +522,9 @@ async def capture_page(request: Request, db: Session = Depends(get_db)):
         entry = _models.ScannerEntry(
             category="ammo",
             upc=upc,
-            title=result.get("title"),
-            brand=result.get("brand"),
-            caliber=result.get("caliber"),
+            title=title,
+            brand=brand,
+            caliber=caliber,
             data_json=json.dumps(data) if data else None,
             image_path_1=image_path,
             created_at=datetime.now(timezone.utc).date().isoformat(),
@@ -511,6 +536,9 @@ async def capture_page(request: Request, db: Session = Depends(get_db)):
         updated = False
 
     return JSONResponse(
-        content={"ok": True, "id": entry.id, "title": entry.title, "tier": result.get("tier"), "updated": updated},
+        content={
+            "ok": True, "id": entry.id, "title": entry.title, "tier": result.get("tier"),
+            "updated": updated, "complete": False, "destination": "queue",
+        },
         headers=_CORS_HEADERS,
     )

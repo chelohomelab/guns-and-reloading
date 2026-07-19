@@ -7,3 +7,4 @@ bcrypt==5.0.0
 pydantic==2.10.6
 starlette==0.44.0
 beautifulsoup4==4.15.0
+pdfplumber==0.11.10

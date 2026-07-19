@@ -686,15 +686,24 @@ async function populateScopeSelect() {
 
 function switchTab(tabId) {
     if (tabId === 'catalog-tab') { window.location.href = '/inventory'; return; }
-    ['landing-tab', 'measure-tab', 'add-tab', 'ladder-tab'].forEach(id => {
+    ['landing-tab', 'measure-tab', 'add-tab', 'ladder-tab', 'reload-data-tab'].forEach(id => {
         document.getElementById(id)?.classList.add('hidden');
     });
 
     const target = document.getElementById(tabId);
     if (target) target.classList.remove('hidden');
 
+    // Keep the URL in sync with whichever tab is actually showing — otherwise a stale
+    // ?tab=... from an earlier navigation (e.g. arriving via another page's nav link)
+    // sends a page refresh back to that old tab instead of the one currently visible.
+    const newUrl = tabId === 'landing-tab' ? '/' : `/?tab=${encodeURIComponent(tabId)}`;
+    if (location.pathname + location.search !== newUrl) {
+        history.replaceState(null, '', newUrl);
+    }
+
     if (tabId === 'measure-tab') setupMeasureDropdowns();
     if (tabId === 'ladder-tab') showLadderListView();
+    if (tabId === 'reload-data-tab') openReloadDataTab();
 }
 
 function switchInventoryTab(tab) {
@@ -5013,6 +5022,250 @@ async function applyLadderHandoff() {
     if (chargeEl && handoff.powder_charge != null) chargeEl.value = handoff.powder_charge;
 
     showToast('Recipe pre-filled from ladder test winner', 'success');
+}
+
+// ── Reloading Data ───────────────────────────────────────────────────────────
+
+let _reloadDataFiltersLoaded = false;
+let _reloadDataDebounce = null;
+
+// Brand+weight+caliber can match while the model text doesn't (Hodgdon's abbreviated codes
+// like "HPBT-SMK" vs. your own inventory label like "MatchKing") — rather than guess those
+// are the same bullet, show what you actually own so you can judge it yourself.
+function bulletStockBadge(inStock, ownedModel) {
+    if (inStock) {
+        return '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800/50 ml-2">✓ In stock</span>';
+    }
+    if (ownedModel) {
+        return `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300 border border-amber-800/50 ml-2">You have: ${escHtml(ownedModel)}</span>`;
+    }
+    return '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 border border-gray-600 ml-2">Not in stock</span>';
+}
+
+async function openReloadDataTab() {
+    document.getElementById('reload-data-list-view')?.classList.remove('hidden');
+    document.getElementById('reload-data-detail-view')?.classList.add('hidden');
+    if (!_reloadDataFiltersLoaded) {
+        await loadReloadDataFilters();
+        _reloadDataFiltersLoaded = true;
+    }
+    if (document.getElementById('reload-data-sources-list')) loadReloadDataSources();
+}
+
+function openReloadDataDetail(id) {
+    const row = _reloadDataRows.find(r => r.id === id);
+    if (!row) return;
+    const box = document.getElementById('reload-data-detail-content');
+    const stockBadge = (inStock) => inStock
+        ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800/50 ml-2">✓ In stock</span>'
+        : '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 border border-gray-600 ml-2">Not in stock</span>';
+    const stat = (label, value) => `<div class="bg-gray-900/60 rounded-lg p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wide">${escHtml(label)}</div>
+            <div class="text-lg font-bold text-white">${value}</div>
+        </div>`;
+    box.innerHTML = `
+        <div class="bg-gray-800 p-5 rounded-lg border border-gray-700 shadow-xl space-y-5">
+            <div>
+                <h3 class="text-xl font-bold text-white">${escHtml(row.bullet_weight_gr ? `${row.bullet_weight_gr}gr ` : '')}${escHtml([row.bullet_brand, row.bullet_model].filter(Boolean).join(' '))}${bulletStockBadge(row.bullet_in_stock, row.bullet_owned_model)}</h3>
+                <p class="text-sm text-gray-400 mt-1">${escHtml([row.powder_brand, row.powder_name].filter(Boolean).join(' '))}${stockBadge(row.powder_in_stock)}</p>
+                <p class="text-xs text-gray-500 mt-2">${escHtml(row.caliber || '')}${row.twist ? ` · Twist ${escHtml(row.twist)}` : ''}${row.barrel_length ? ` · ${escHtml(row.barrel_length)}" barrel` : ''}${row.trim_length ? ` · Trim ${escHtml(row.trim_length)}"` : ''}</p>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                ${stat('Charge (gr)', `${rdVal(row.start_charge_gr, row.start_is_compressed ? 'C' : '')} – ${rdVal(row.max_charge_gr, row.max_is_compressed ? 'C' : '')}`)}
+                ${stat('Velocity (fps)', `${rdVal(row.start_velocity_fps)} – ${rdVal(row.max_velocity_fps)}`)}
+                ${stat('Pressure', `${rdVal(row.start_pressure)}–${rdVal(row.max_pressure)} <span class="text-xs text-gray-400">${escHtml(row.max_pressure_unit || '')}</span>`)}
+                ${stat('Load Density', `${rdVal(row.start_density_pct)}–${rdVal(row.max_density_pct, '%')}`)}
+            </div>
+            ${(row.start_charge_gr === null) ? '<p class="text-xs text-gray-500 italic">Hodgdon only publishes a single reference charge for this combination — no starting range given.</p>' : ''}
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div><span class="text-gray-500">C.O.L.:</span> <span class="text-gray-200 font-semibold">${escHtml(row.coal || '—')}"</span></div>
+                <div><span class="text-gray-500">Case:</span> <span class="text-gray-200 font-semibold">${escHtml(row.case_brand || '—')}</span></div>
+                <div class="col-span-2"><span class="text-gray-500">Primer:</span> <span class="text-gray-200 font-semibold">${escHtml(row.primer_display || '—')}</span></div>
+            </div>
+
+            ${(row.start_is_compressed || row.max_is_compressed) ? '<p class="text-xs text-amber-400">⚠ "C" marks a compressed charge.</p>' : ''}
+            <p class="text-[10px] text-gray-600">${row.data_as_of ? `Hodgdon data current as of ${escHtml(row.data_as_of)}` : ''} — always start at the starting charge and work up; never exceed the maximum shown.</p>
+        </div>`;
+    document.getElementById('reload-data-list-view')?.classList.add('hidden');
+    document.getElementById('reload-data-detail-view')?.classList.remove('hidden');
+}
+
+function closeReloadDataDetail() {
+    document.getElementById('reload-data-detail-view')?.classList.add('hidden');
+    document.getElementById('reload-data-list-view')?.classList.remove('hidden');
+}
+
+async function loadReloadDataFilters() {
+    try {
+        const res = await fetch('/reload-data/filters');
+        const data = await res.json();
+        const fill = (id, values) => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            const current = sel.value;
+            sel.innerHTML = '<option value="">Any</option>' +
+                values.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+            sel.value = current;
+        };
+        fill('rd-filter-caliber', data.calibers);
+        fill('rd-filter-bullet-brand', data.bullet_brands);
+        fill('rd-filter-powder-brand', data.powder_brands);
+        fill('rd-filter-powder-name', data.powder_names);
+    } catch (e) {
+        showToast('Failed to load reloading data filters', 'error');
+    }
+}
+
+function searchReloadData() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(_runSearchReloadData, 200);
+}
+
+async function _runSearchReloadData() {
+    const results = document.getElementById('reload-data-results');
+    const caliber = document.getElementById('rd-filter-caliber')?.value || '';
+    if (!caliber) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">Pick a caliber to search.</p>';
+        return;
+    }
+    const params = new URLSearchParams({ caliber });
+    const weight = document.getElementById('rd-filter-weight')?.value;
+    if (weight) params.set('bullet_weight_gr', weight);
+    const bulletBrand = document.getElementById('rd-filter-bullet-brand')?.value;
+    if (bulletBrand) params.set('bullet_brand', bulletBrand);
+    const powderBrand = document.getElementById('rd-filter-powder-brand')?.value;
+    if (powderBrand) params.set('powder_brand', powderBrand);
+    const powderName = document.getElementById('rd-filter-powder-name')?.value;
+    if (powderName) params.set('powder_name', powderName);
+    if (document.getElementById('rd-filter-in-stock')?.checked) params.set('in_stock_only', 'true');
+
+    results.innerHTML = '<p class="text-xs text-gray-500 italic">Searching…</p>';
+    try {
+        const res = await fetch(`/reload-data/loads?${params.toString()}`);
+        const rows = res.ok ? await res.json() : [];
+        _reloadDataRows = rows;
+        renderReloadDataResults(rows);
+    } catch (e) {
+        results.innerHTML = '<p class="text-xs text-red-400">Search failed — check connection.</p>';
+    }
+}
+
+let _reloadDataRows = [];
+
+// Some loads (e.g. single-charge "Superformance" reference recipes) only publish a max
+// value — no starting range at all. Renders "—" instead of the literal string "null".
+function rdVal(v, suffix) {
+    return (v === null || v === undefined) ? '—' : `${escHtml(v)}${suffix || ''}`;
+}
+
+function renderReloadDataResults(rows) {
+    const results = document.getElementById('reload-data-results');
+    if (rows.length === 0) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">No matching loads found.</p>';
+        return;
+    }
+    const stockBadge = (inStock) => inStock
+        ? '<span class="text-[9px] font-bold px-1 py-0.5 rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800/50 ml-1">✓ stock</span>'
+        : '';
+    const bulletBadge = (inStock, ownedModel) => inStock
+        ? stockBadge(true)
+        : ownedModel
+            ? `<span class="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-900/50 text-amber-300 border border-amber-800/50 ml-1">have: ${escHtml(ownedModel)}</span>`
+            : '';
+    results.innerHTML = `<table class="w-full text-xs text-left">
+        <thead><tr class="text-gray-400 border-b border-gray-700">
+            <th class="py-2 pr-3">Bullet</th><th class="py-2 pr-3">Powder</th>
+            <th class="py-2 pr-3">Charge (gr)</th><th class="py-2 pr-3">Velocity (fps)</th>
+            <th class="py-2 pr-3">Pressure</th><th class="py-2 pr-3">Density %</th>
+            <th class="py-2 pr-3">C.O.L.</th>
+        </tr></thead>
+        <tbody>
+        ${rows.map((r, i) => `<tr onclick="openReloadDataDetail(${r.id})" class="border-b border-gray-800 text-gray-200 cursor-pointer hover:bg-rose-950/30 ${i % 2 ? 'bg-gray-900/40' : ''}">
+            <td class="py-2 pr-3">${escHtml(r.bullet_weight_gr ? `${r.bullet_weight_gr}gr ` : '')}${escHtml([r.bullet_brand, r.bullet_model].filter(Boolean).join(' '))}${bulletBadge(r.bullet_in_stock, r.bullet_owned_model)}</td>
+            <td class="py-2 pr-3">${escHtml([r.powder_brand, r.powder_name].filter(Boolean).join(' '))}${stockBadge(r.powder_in_stock)}</td>
+            <td class="py-2 pr-3">${rdVal(r.start_charge_gr, r.start_is_compressed ? 'C' : '')} – ${rdVal(r.max_charge_gr, r.max_is_compressed ? 'C' : '')}</td>
+            <td class="py-2 pr-3">${rdVal(r.start_velocity_fps)} – ${rdVal(r.max_velocity_fps)}</td>
+            <td class="py-2 pr-3">${rdVal(r.start_pressure)}–${rdVal(r.max_pressure)} ${escHtml(r.max_pressure_unit || '')}</td>
+            <td class="py-2 pr-3">${rdVal(r.start_density_pct)}–${rdVal(r.max_density_pct)}</td>
+            <td class="py-2 pr-3">${escHtml(r.coal || '')}</td>
+        </tr>`).join('')}
+        </tbody>
+    </table>`;
+}
+
+function toggleReloadDataUploadPanel() {
+    const panel = document.getElementById('reload-data-upload-panel');
+    const caret = document.getElementById('reload-data-upload-caret');
+    if (!panel) return;
+    panel.classList.toggle('hidden');
+    caret.textContent = panel.classList.contains('hidden') ? '▸' : '▾';
+    if (!panel.classList.contains('hidden')) loadReloadDataSources();
+}
+
+async function uploadReloadDataPdf() {
+    const input = document.getElementById('reload-data-file-input');
+    const file = input?.files?.[0];
+    if (!file) { showToast('Choose a PDF first', 'info'); return; }
+    const btn = document.getElementById('reload-data-upload-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+    try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch('/reload-data/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.detail || 'Upload failed', 'error'); return; }
+        showToast(`Imported ${data.rows_imported} loads for ${data.caliber}${data.rows_rejected ? ` (${data.rows_rejected} rows skipped — see console)` : ''}`, 'success');
+        if (data.rejected_sample?.length) {
+            console.warn(`[reload-data] ${data.rows_rejected} row(s) skipped for ${data.caliber}:`, data.rejected_sample);
+        }
+        input.value = '';
+        _reloadDataFiltersLoaded = false;
+        await loadReloadDataFilters();
+        _reloadDataFiltersLoaded = true;
+        loadReloadDataSources();
+    } catch (e) {
+        showToast('Upload failed — check connection', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Upload'; }
+    }
+}
+
+async function loadReloadDataSources() {
+    const box = document.getElementById('reload-data-sources-list');
+    if (!box) return;
+    try {
+        const res = await fetch('/reload-data/sources');
+        const sources = res.ok ? await res.json() : [];
+        if (sources.length === 0) {
+            box.innerHTML = '<p class="text-[11px] text-gray-600 italic">No calibers imported yet.</p>';
+            return;
+        }
+        box.innerHTML = sources.map(s => `<div class="flex items-center justify-between bg-gray-900/60 rounded px-3 py-1.5">
+            <div>
+                <span class="text-xs font-bold text-gray-100">${escHtml(s.caliber)}</span>
+                <span class="text-[10px] text-gray-500 ml-2">${s.row_count} loads${s.data_as_of ? ` · as of ${escHtml(s.data_as_of)}` : ''}</span>
+            </div>
+            <button onclick="deleteReloadDataSource(${s.id})" class="text-gray-500 hover:text-red-400 text-xs cursor-pointer">🗑️</button>
+        </div>`).join('');
+    } catch (e) {
+        box.innerHTML = '<p class="text-[11px] text-red-400">Failed to load.</p>';
+    }
+}
+
+async function deleteReloadDataSource(id) {
+    if (!confirm('Delete this caliber\'s reloading data?')) return;
+    try {
+        const res = await fetch(`/reload-data/sources/${id}`, { method: 'DELETE' });
+        if (!res.ok) { showToast('Delete failed', 'error'); return; }
+        showToast('Deleted', 'success');
+        loadReloadDataSources();
+        _reloadDataFiltersLoaded = false;
+        loadReloadDataFilters().then(() => { _reloadDataFiltersLoaded = true; });
+    } catch (e) {
+        showToast('Delete failed — check connection', 'error');
+    }
 }
 
 window.onload = () => {

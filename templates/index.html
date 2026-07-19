@@ -739,7 +739,10 @@
                             </select>
                         </div>
                         <div id="ammo-factory-upc-row" class="hidden">
-                            <label class="block text-xs text-gray-200 font-semibold mb-1">Scanned UPC <span class="text-gray-600">(saved)</span></label>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1 flex items-center gap-2">
+                                <span>Scanned UPC <span class="text-gray-600">(saved)</span></span>
+                                <span id="ammo-factory-source-badge" class="hidden px-1.5 py-0.5 rounded text-[10px] font-bold"></span>
+                            </label>
                             <input type="text" id="ammo-factory-upc-display" readonly class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-sm text-gray-400 font-mono cursor-not-allowed">
                         </div>
                     </div>
@@ -1353,6 +1356,6 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
-    <script src="/static/app.js?v=78"></script>
+    <script src="/static/app.js?v=82"></script>
 </body>
 </html>

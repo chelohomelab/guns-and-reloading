@@ -24,11 +24,12 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    # /import/capture is exempt: it's authenticated by its own X-Import-Token header
-    # (checked inside the route), not the session cookie — it's called cross-origin
-    # from whatever retailer site the import bookmarklet runs on, which never has
+    # /import/capture and /import/capture-field are exempt: they're authenticated by
+    # their own X-Import-Token header (checked inside the route), not the session
+    # cookie — they're called cross-origin from whatever site the import bookmarklet
+    # runs on (a retailer, or google.com for the field-capture case), which never has
     # this app's session cookie.
-    _PUBLIC = {"/login", "/setup", "/import/capture"}
+    _PUBLIC = {"/login", "/setup", "/import/capture", "/import/capture-field"}
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path

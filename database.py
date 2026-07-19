@@ -212,6 +212,56 @@ class LoadDataEntry(Base):
     load_data = relationship("LoadData", back_populates="entries")
 
 
+class ReloadDataSource(Base):
+    # One row per Hodgdon "Reloading Data Center" PDF upload (one caliber per PDF).
+    # Standalone reference library, deliberately not FK'd to BulletInventory/PowderInventory —
+    # this data covers loads for bullets/powders the user may never own, unlike LoadData above,
+    # which is scoped to a specific owned bullet. See project memory on the multi-site importer's
+    # BC-guessing bugs for why in-stock matching (done at query time in routers/reload_data.py)
+    # is exact brand+name only, never a fuzzy/weight-only guess.
+    __tablename__ = "reload_data_sources"
+    id = Column(Integer, primary_key=True, index=True)
+    caliber = Column(String, nullable=False, index=True)   # normalized via routers.barcode.normalize_caliber
+    twist = Column(String, nullable=True)
+    barrel_length = Column(String, nullable=True)
+    trim_length = Column(String, nullable=True)
+    data_as_of = Column(String, nullable=True)
+    original_filename = Column(String, nullable=True)
+    source_file_path = Column(String, nullable=True)
+    uploaded_at = Column(String, nullable=True)
+
+    loads = relationship("ReloadDataLoad", back_populates="source", cascade="all, delete-orphan")
+
+
+class ReloadDataLoad(Base):
+    __tablename__ = "reload_data_loads"
+    id = Column(Integer, primary_key=True, index=True)
+    source_id = Column(Integer, ForeignKey("reload_data_sources.id"), nullable=False)
+    bullet_weight_gr = Column(Float, nullable=True)
+    bullet_brand = Column(String, nullable=True)
+    bullet_model = Column(String, nullable=True)
+    bullet_dia = Column(String, nullable=True)
+    case_brand = Column(String, nullable=True)
+    primer_display = Column(String, nullable=True)
+    powder_brand = Column(String, nullable=True)
+    powder_name = Column(String, nullable=True)
+    coal = Column(String, nullable=True)
+    start_charge_gr = Column(Float, nullable=True)
+    start_velocity_fps = Column(Integer, nullable=True)
+    start_pressure = Column(Integer, nullable=True)
+    start_pressure_unit = Column(String, nullable=True)
+    start_density_pct = Column(Float, nullable=True)
+    start_is_compressed = Column(Boolean, default=False)
+    max_charge_gr = Column(Float, nullable=True)
+    max_velocity_fps = Column(Integer, nullable=True)
+    max_pressure = Column(Integer, nullable=True)
+    max_pressure_unit = Column(String, nullable=True)
+    max_density_pct = Column(Float, nullable=True)
+    max_is_compressed = Column(Boolean, default=False)
+
+    source = relationship("ReloadDataSource", back_populates="loads")
+
+
 class LadderTest(Base):
     __tablename__ = "ladder_tests"
     id = Column(Integer, primary_key=True, index=True)

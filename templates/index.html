@@ -67,6 +67,11 @@
                 <span class="text-lg">🪜</span>
                 <div><div class="text-sm font-bold text-white">Ladder Test</div><div class="text-[10px] text-purple-400/70">Find the node</div></div>
             </button>
+            <button id="nav-btn-reload-data" onclick="switchTab('reload-data-tab'); closeSidebar()"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer text-left">
+                <span class="text-lg">📖</span>
+                <div><div class="text-sm font-bold text-white">Reloading Data</div><div class="text-[10px] text-rose-400/70">Hodgdon lookup</div></div>
+            </button>
             <button onclick="switchTab('add-tab'); switchFormCategory('cat-platforms'); closeSidebar()"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 border border-amber-800/40 hover:border-amber-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">⚙️</span>
@@ -398,6 +403,80 @@
                         <div class="hidden lg:block flex-1"></div>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <section id="reload-data-tab" class="hidden space-y-4">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                <h2 class="text-2xl font-bold">Reloading Data</h2>
+                <span class="text-xs text-gray-500">Hodgdon Reloading Data Center</span>
+            </div>
+
+            {% if user.is_admin %}
+            <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl">
+                <button onclick="toggleReloadDataUploadPanel()" class="w-full flex items-center justify-between px-4 py-3 text-xs text-gray-200 font-semibold cursor-pointer">
+                    <span>📤 Upload Reloading Data PDF (admin)</span>
+                    <span id="reload-data-upload-caret">▸</span>
+                </button>
+                <div id="reload-data-upload-panel" class="hidden px-4 pb-4 space-y-3">
+                    <p class="text-[11px] text-gray-500">Upload a Hodgdon "Reloading Data Center" PDF export
+                        (one caliber per file). Re-uploading a caliber fully replaces its existing data.</p>
+                    <div class="flex gap-2">
+                        <input type="file" id="reload-data-file-input" accept=".pdf" class="flex-1 text-xs text-gray-300 bg-gray-900 border border-gray-600 rounded p-2">
+                        <button onclick="uploadReloadDataPdf()" id="reload-data-upload-btn" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded transition cursor-pointer">Upload</button>
+                    </div>
+                    <div id="reload-data-sources-list" class="space-y-1.5 max-h-64 overflow-y-auto">
+                        <p class="text-[11px] text-gray-600 italic">Loading…</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div id="reload-data-list-view" class="space-y-4">
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Caliber</label>
+                        <select id="rd-filter-caliber" onchange="searchReloadData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                            <option value="">Any</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Weight (gr)</label>
+                        <input type="number" id="rd-filter-weight" oninput="searchReloadData()" placeholder="Any" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Brand</label>
+                        <select id="rd-filter-bullet-brand" onchange="searchReloadData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                            <option value="">Any</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder Brand</label>
+                        <select id="rd-filter-powder-brand" onchange="searchReloadData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                            <option value="">Any</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder</label>
+                        <select id="rd-filter-powder-name" onchange="searchReloadData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                            <option value="">Any</option>
+                        </select>
+                    </div>
+                    <label class="col-span-2 md:col-span-5 flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                        <input type="checkbox" id="rd-filter-in-stock" onchange="searchReloadData()" class="cursor-pointer">
+                        In stock only (bullet or powder matches your inventory)
+                    </label>
+                </div>
+
+                <div id="reload-data-results" class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-4 overflow-x-auto">
+                    <p class="text-xs text-gray-500 italic">Pick a caliber to search.</p>
+                </div>
+            </div>
+
+            <!-- Detail view: one load, laid out for bench reference -->
+            <div id="reload-data-detail-view" class="hidden space-y-4">
+                <button onclick="closeReloadDataDetail()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs font-bold rounded text-white transition cursor-pointer">← Back to results</button>
+                <div id="reload-data-detail-content"></div>
             </div>
         </section>
 
@@ -1356,6 +1435,6 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
-    <script src="/static/app.js?v=82"></script>
+    <script src="/static/app.js?v=88"></script>
 </body>
 </html>

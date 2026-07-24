@@ -5026,7 +5026,6 @@ async function applyLadderHandoff() {
 
 // ── Reloading Data ───────────────────────────────────────────────────────────
 
-let _reloadDataFiltersLoaded = false;
 let _reloadDataDebounce = null;
 
 // Brand+weight+caliber can match while the model text doesn't (Hodgdon's abbreviated codes
@@ -5042,14 +5041,45 @@ function bulletStockBadge(inStock, ownedModel) {
     return '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 border border-gray-600 ml-2">Not in stock</span>';
 }
 
+let _rdActiveManufacturer = 'Hodgdon';
+const _RD_MANUFACTURERS = ['Hodgdon', 'Nosler', 'Speer', 'Sierra', 'Barnes', 'Hornady', 'Lyman', 'Lee'];
+
+// Registry of per-manufacturer filter loaders — each tab with a real design (not yet a
+// placeholder) registers its own `loadXFilters()` here so openReloadDataTab()/
+// switchReloadDataManufacturerTab() don't need an ever-growing if/else per manufacturer.
+const _RD_FILTER_LOADERS = {};
+const _rdFiltersLoaded = {};
+function registerReloadDataFilterLoader(mfr, fn) {
+    _RD_FILTER_LOADERS[mfr] = fn;
+}
+
+async function _ensureReloadDataFiltersLoaded(mfr) {
+    if (_rdFiltersLoaded[mfr] || !_RD_FILTER_LOADERS[mfr]) return;
+    await _RD_FILTER_LOADERS[mfr]();
+    _rdFiltersLoaded[mfr] = true;
+}
+
 async function openReloadDataTab() {
-    document.getElementById('reload-data-list-view')?.classList.remove('hidden');
+    document.getElementById(`rd-mfr-pane-${_rdActiveManufacturer}`)?.classList.remove('hidden');
     document.getElementById('reload-data-detail-view')?.classList.add('hidden');
-    if (!_reloadDataFiltersLoaded) {
-        await loadReloadDataFilters();
-        _reloadDataFiltersLoaded = true;
+    await _ensureReloadDataFiltersLoaded(_rdActiveManufacturer);
+}
+
+// Reloading Data Center is organized like the Inventory page — one tab per manufacturer,
+// each scoped to only that manufacturer's data. Only Hodgdon/Nosler/Speer have real designs
+// built out so far; the rest are placeholders until each gets its own design.
+function switchReloadDataManufacturerTab(mfr) {
+    _rdActiveManufacturer = mfr;
+    document.getElementById('reload-data-detail-view')?.classList.add('hidden');
+    for (const m of _RD_MANUFACTURERS) {
+        document.getElementById(`rd-mfr-pane-${m}`)?.classList.toggle('hidden', m !== mfr);
+        const btn = document.getElementById(`rd-mfr-tab-btn-${m}`);
+        if (!btn) continue;
+        btn.className = m === mfr
+            ? 'px-3 py-1 rounded bg-gray-800 text-rose-400 cursor-pointer'
+            : 'px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer';
     }
-    if (document.getElementById('reload-data-sources-list')) loadReloadDataSources();
+    _ensureReloadDataFiltersLoaded(mfr);
 }
 
 function openReloadDataDetail(id) {
@@ -5063,59 +5093,143 @@ function openReloadDataDetail(id) {
             <div class="text-[10px] text-gray-500 uppercase tracking-wide">${escHtml(label)}</div>
             <div class="text-lg font-bold text-white">${value}</div>
         </div>`;
+    // Side-by-side layout: text/stats on the left, diagram on the right — keeps the card from
+    // growing tall when the diagram itself is a tall/portrait crop (e.g. Sierra's vector-drawn
+    // diagrams), since the image no longer stacks above the content full-width.
+    const leftCol = `
+        <div>
+            <h3 class="text-xl font-bold text-white">${escHtml(row.bullet_weight_gr ? `${row.bullet_weight_gr}gr ` : '')}${escHtml([row.bullet_brand, row.bullet_model].filter(Boolean).join(' '))}${bulletStockBadge(row.bullet_in_stock, row.bullet_owned_model)}</h3>
+            <p class="text-sm text-gray-400 mt-1">${escHtml([row.powder_brand, row.powder_name].filter(Boolean).join(' '))}${stockBadge(row.powder_in_stock)}${row.is_recommended ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300 border border-amber-800/50 ml-2">★ Potentially most accurate</span>' : ''}${row.is_reduced_load ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-900/50 text-sky-300 border border-sky-800/50 ml-2">Reduced load</span>' : ''}</p>
+            <p class="text-xs text-gray-500 mt-2">
+                <span class="text-rose-400 font-semibold">${escHtml(row.manufacturer || '')}</span> · ${escHtml(row.caliber || '')}${row.twist ? ` · Twist ${escHtml(row.twist)}` : ''}${row.barrel_length ? ` · ${escHtml(row.barrel_length)}" barrel` : ''}${row.trim_length ? ` · Trim ${escHtml(row.trim_length)}"` : ''}
+                ${row.source_file_path ? `<a href="${escHtml(row.source_file_path)}" target="_blank" rel="noopener" class="ml-2 text-blue-400 hover:text-blue-300 underline" onclick="event.stopPropagation()">View source PDF ↗</a>` : ''}
+            </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mt-5">
+            ${stat('Charge (gr)', (row.start_charge_gr !== null && row.start_charge_gr === row.max_charge_gr && row.start_is_compressed === row.max_is_compressed)
+                ? rdVal(row.start_charge_gr, row.start_is_compressed ? 'C' : '')
+                : `${rdVal(row.start_charge_gr, row.start_is_compressed ? 'C' : '')} – ${rdVal(row.max_charge_gr, row.max_is_compressed ? 'C' : '')}`)}
+            ${(row.start_velocity_fps !== null || row.max_velocity_fps !== null) ? stat('Velocity (fps)', rangeVal(row.start_velocity_fps, row.max_velocity_fps)) : ''}
+            ${(row.start_pressure !== null || row.max_pressure !== null) ? stat('Pressure', `${rangeVal(row.start_pressure, row.max_pressure)} <span class="text-xs text-gray-400">${escHtml(row.max_pressure_unit || '')}</span>`) : ''}
+            ${(row.start_density_pct !== null || row.max_density_pct !== null) ? stat('Load Density', rangeVal(row.start_density_pct, row.max_density_pct, '%')) : ''}
+        </div>
+        ${(row.start_charge_gr === null) ? '<p class="text-xs text-gray-500 italic mt-3">No starting range given for this combination — only a single reference charge is published.</p>' : ''}
+        ${(row.start_charge_gr !== null && row.start_charge_gr === row.max_charge_gr) ? '<p class="text-xs text-gray-500 italic mt-3">This manufacturer publishes a single charge for this exact velocity, not a start/max range.</p>' : ''}
+
+        ${(row.coal || row.case_brand || row.primer_display) ? `<div class="grid grid-cols-2 gap-3 text-sm mt-5">
+            ${row.coal ? `<div><span class="text-gray-500">C.O.L.:</span> <span class="text-gray-200 font-semibold">${escHtml(row.coal)}"</span></div>` : ''}
+            ${row.case_brand ? `<div><span class="text-gray-500">Case:</span> <span class="text-gray-200 font-semibold">${escHtml(row.case_brand)}</span></div>` : ''}
+            ${row.primer_display ? `<div class="col-span-2"><span class="text-gray-500">Primer:</span> <span class="text-gray-200 font-semibold">${escHtml(row.primer_display)}</span></div>` : ''}
+        </div>` : ''}
+
+        ${(row.start_is_compressed || row.max_is_compressed) ? '<p class="text-xs text-amber-400 mt-4">⚠ "C" marks a compressed charge.</p>' : ''}
+        <p class="text-[10px] text-gray-600 mt-4">${row.data_as_of ? `Data current as of ${escHtml(row.data_as_of)}` : ''} — always start at the starting charge and work up; never exceed the maximum shown.</p>`;
+
+    const rightCol = row.case_diagram_path ? `
+        <img src="${escHtml(row.case_diagram_path)}" alt="Case dimension diagram" onclick="openReloadDataImageLightbox('${escHtml(row.case_diagram_path)}')"
+            class="w-full h-auto max-h-[420px] object-contain rounded border border-gray-700 bg-white cursor-zoom-in hover:opacity-90 transition" title="Click to enlarge">` : '';
+
     box.innerHTML = `
-        <div class="bg-gray-800 p-5 rounded-lg border border-gray-700 shadow-xl space-y-5">
-            <div>
-                <h3 class="text-xl font-bold text-white">${escHtml(row.bullet_weight_gr ? `${row.bullet_weight_gr}gr ` : '')}${escHtml([row.bullet_brand, row.bullet_model].filter(Boolean).join(' '))}${bulletStockBadge(row.bullet_in_stock, row.bullet_owned_model)}</h3>
-                <p class="text-sm text-gray-400 mt-1">${escHtml([row.powder_brand, row.powder_name].filter(Boolean).join(' '))}${stockBadge(row.powder_in_stock)}</p>
-                <p class="text-xs text-gray-500 mt-2">${escHtml(row.caliber || '')}${row.twist ? ` · Twist ${escHtml(row.twist)}` : ''}${row.barrel_length ? ` · ${escHtml(row.barrel_length)}" barrel` : ''}${row.trim_length ? ` · Trim ${escHtml(row.trim_length)}"` : ''}</p>
-            </div>
-
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                ${stat('Charge (gr)', `${rdVal(row.start_charge_gr, row.start_is_compressed ? 'C' : '')} – ${rdVal(row.max_charge_gr, row.max_is_compressed ? 'C' : '')}`)}
-                ${stat('Velocity (fps)', `${rdVal(row.start_velocity_fps)} – ${rdVal(row.max_velocity_fps)}`)}
-                ${stat('Pressure', `${rdVal(row.start_pressure)}–${rdVal(row.max_pressure)} <span class="text-xs text-gray-400">${escHtml(row.max_pressure_unit || '')}</span>`)}
-                ${stat('Load Density', `${rdVal(row.start_density_pct)}–${rdVal(row.max_density_pct, '%')}`)}
-            </div>
-            ${(row.start_charge_gr === null) ? '<p class="text-xs text-gray-500 italic">Hodgdon only publishes a single reference charge for this combination — no starting range given.</p>' : ''}
-
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <div><span class="text-gray-500">C.O.L.:</span> <span class="text-gray-200 font-semibold">${escHtml(row.coal || '—')}"</span></div>
-                <div><span class="text-gray-500">Case:</span> <span class="text-gray-200 font-semibold">${escHtml(row.case_brand || '—')}</span></div>
-                <div class="col-span-2"><span class="text-gray-500">Primer:</span> <span class="text-gray-200 font-semibold">${escHtml(row.primer_display || '—')}</span></div>
-            </div>
-
-            ${(row.start_is_compressed || row.max_is_compressed) ? '<p class="text-xs text-amber-400">⚠ "C" marks a compressed charge.</p>' : ''}
-            <p class="text-[10px] text-gray-600">${row.data_as_of ? `Hodgdon data current as of ${escHtml(row.data_as_of)}` : ''} — always start at the starting charge and work up; never exceed the maximum shown.</p>
+        <div class="bg-gray-800 p-5 rounded-lg border border-gray-700 shadow-xl flex flex-col lg:flex-row gap-6">
+            <div class="flex-1 min-w-0">${leftCol}</div>
+            ${rightCol ? `<div class="lg:w-[45%] shrink-0 self-start">${rightCol}</div>` : ''}
         </div>`;
-    document.getElementById('reload-data-list-view')?.classList.add('hidden');
+    document.getElementById(`rd-mfr-pane-${_rdActiveManufacturer}`)?.classList.add('hidden');
     document.getElementById('reload-data-detail-view')?.classList.remove('hidden');
 }
 
 function closeReloadDataDetail() {
     document.getElementById('reload-data-detail-view')?.classList.add('hidden');
-    document.getElementById('reload-data-list-view')?.classList.remove('hidden');
+    document.getElementById(`rd-mfr-pane-${_rdActiveManufacturer}`)?.classList.remove('hidden');
 }
 
+// Full-size click-to-enlarge view for the case dimension diagram — the inline thumbnail is
+// kept modest so the detail card stays scannable, but the source PDF's diagram is dense and
+// needs to be read at full size at the loading bench.
+function openReloadDataImageLightbox(src) {
+    let overlay = document.getElementById('reload-data-lightbox');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'reload-data-lightbox';
+        overlay.className = 'fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 cursor-zoom-out';
+        overlay.onclick = closeReloadDataImageLightbox;
+        overlay.innerHTML = '<img id="reload-data-lightbox-img" class="max-w-[95vw] max-h-[95vh] rounded shadow-2xl bg-white">';
+        document.body.appendChild(overlay);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeReloadDataImageLightbox();
+        });
+    }
+    document.getElementById('reload-data-lightbox-img').src = src;
+    overlay.classList.remove('hidden');
+}
+
+function closeReloadDataImageLightbox() {
+    document.getElementById('reload-data-lightbox')?.classList.add('hidden');
+}
+
+function fillReloadDataSelect(id, values) {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Any</option>' +
+        values.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+    sel.value = current;
+}
+
+// All filter lists (calibers, bullet/powder brands & names) are scoped to whichever
+// manufacturer tab is active — see switchReloadDataManufacturerTab().
 async function loadReloadDataFilters() {
     try {
-        const res = await fetch('/reload-data/filters');
+        const res = await fetch(`/reload-data/filters?manufacturer=${encodeURIComponent(_rdActiveManufacturer)}`);
         const data = await res.json();
-        const fill = (id, values) => {
-            const sel = document.getElementById(id);
-            if (!sel) return;
-            const current = sel.value;
-            sel.innerHTML = '<option value="">Any</option>' +
-                values.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
-            sel.value = current;
-        };
-        fill('rd-filter-caliber', data.calibers);
-        fill('rd-filter-bullet-brand', data.bullet_brands);
-        fill('rd-filter-powder-brand', data.powder_brands);
-        fill('rd-filter-powder-name', data.powder_names);
+        fillReloadDataSelect('rd-filter-bullet-brand', data.bullet_brands);
+        fillReloadDataSelect('rd-filter-powder-brand', data.powder_brands);
+        fillReloadDataSelect('rd-filter-powder-name', data.powder_names);
+        fillReloadDataCalibers(data.calibers);
     } catch (e) {
         showToast('Failed to load reloading data filters', 'error');
     }
+}
+registerReloadDataFilterLoader('Hodgdon', loadReloadDataFilters);
+
+function fillReloadDataCalibers(values, listId = 'rd-caliber-options') {
+    const list = document.getElementById(listId);
+    if (!list) return;
+    list.innerHTML = values.map(v => `<option value="${escHtml(v)}"></option>`).join('');
+}
+
+// Bullet weight only makes sense once a caliber is picked, so its options are refetched
+// scoped to whatever caliber is currently typed (in addition to the active manufacturer).
+async function onReloadDataCaliberInput() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(async () => {
+        const caliber = document.getElementById('rd-filter-caliber')?.value || '';
+        if (caliber) {
+            try {
+                const res = await fetch(`/reload-data/filters?manufacturer=${encodeURIComponent(_rdActiveManufacturer)}&caliber=${encodeURIComponent(caliber)}`);
+                const data = await res.json();
+                fillReloadDataSelect('rd-filter-weight', data.bullet_weights);
+            } catch (e) { /* keep existing options on failure */ }
+        } else {
+            fillReloadDataSelect('rd-filter-weight', []);
+        }
+        _runSearchReloadData();
+    }, 200);
+}
+
+// Powder Name is scoped to whichever Powder Brand is picked — otherwise the dropdown offers
+// every brand's powders regardless of the brand filter, which is confusing rather than useful.
+async function onReloadDataPowderBrandChange() {
+    const powderBrand = document.getElementById('rd-filter-powder-brand')?.value || '';
+    try {
+        const params = new URLSearchParams({ manufacturer: _rdActiveManufacturer });
+        if (powderBrand) params.set('powder_brand', powderBrand);
+        const res = await fetch(`/reload-data/filters?${params.toString()}`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-filter-powder-name', data.powder_names);
+    } catch (e) { /* keep existing options on failure */ }
+    searchReloadData();
 }
 
 function searchReloadData() {
@@ -5130,7 +5244,7 @@ async function _runSearchReloadData() {
         results.innerHTML = '<p class="text-xs text-gray-500 italic">Pick a caliber to search.</p>';
         return;
     }
-    const params = new URLSearchParams({ caliber });
+    const params = new URLSearchParams({ caliber, manufacturer: _rdActiveManufacturer });
     const weight = document.getElementById('rd-filter-weight')?.value;
     if (weight) params.set('bullet_weight_gr', weight);
     const bulletBrand = document.getElementById('rd-filter-bullet-brand')?.value;
@@ -5160,8 +5274,1242 @@ function rdVal(v, suffix) {
     return (v === null || v === undefined) ? '—' : `${escHtml(v)}${suffix || ''}`;
 }
 
-function renderReloadDataResults(rows) {
-    const results = document.getElementById('reload-data-results');
+// Manufacturers like Nosler/Sierra publish single-point data (start === max) rather than a
+// true start/max range — showing "54.5 – 54.5" is just noise, so collapse to one value
+// whenever both sides agree instead of always rendering a dash-separated pair.
+function rangeVal(startVal, maxVal, suffix) {
+    if (startVal !== null && startVal !== undefined && startVal === maxVal) {
+        return rdVal(startVal, suffix);
+    }
+    return `${rdVal(startVal, suffix)} – ${rdVal(maxVal, suffix)}`;
+}
+
+// ── Nosler tab ───────────────────────────────────────────────────────────────
+// No Bullet Brand filter (every Nosler load is a Nosler bullet — filtering by it would be
+// pointless). Nosler's PDFs list 2-3 "candidate bullets" that share one page of load data
+// (same case/primer/charge table), so results show a spec box for those candidates first
+// (weight/profile/tested C.O.L./B.C./S.D., matching the PDF's own table), then every powder's
+// charge choices below with the "*" (most accurate load tested) one highlighted.
+
+async function loadNoslerFilters() {
+    try {
+        const res = await fetch(`/reload-data/filters?manufacturer=Nosler`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-nosler-filter-powder-brand', data.powder_brands);
+        fillReloadDataSelect('rd-nosler-filter-powder-name', data.powder_names);
+        fillReloadDataCalibers(data.calibers, 'rd-nosler-caliber-options');
+    } catch (e) {
+        showToast('Failed to load Nosler filters', 'error');
+    }
+}
+registerReloadDataFilterLoader('Nosler', loadNoslerFilters);
+
+async function onNoslerCaliberInput() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(async () => {
+        const caliber = document.getElementById('rd-nosler-filter-caliber')?.value || '';
+        const weightSelect = document.getElementById('rd-nosler-filter-weight');
+        if (caliber) {
+            try {
+                const res = await fetch(`/reload-data/filters?manufacturer=Nosler&caliber=${encodeURIComponent(caliber)}`);
+                const data = await res.json();
+                fillReloadDataSelect('rd-nosler-filter-weight', data.bullet_weights);
+                // A weight is required for anything to show (Nosler's whole page of data — the
+                // candidate box and its charge table — is keyed to one weight's PDF), so picking
+                // the caliber alone would otherwise land on "pick a weight too" and look broken.
+                // Auto-select the first weight so results appear right away; still changeable.
+                if (weightSelect && data.bullet_weights.length > 0) {
+                    weightSelect.value = data.bullet_weights[0];
+                }
+            } catch (e) { /* keep existing options on failure */ }
+        } else {
+            fillReloadDataSelect('rd-nosler-filter-weight', []);
+        }
+        _runSearchNoslerData();
+    }, 200);
+}
+
+// Powder Name is scoped to whichever Powder Brand is picked — same fix as the Hodgdon tab.
+async function onNoslerPowderBrandChange() {
+    const powderBrand = document.getElementById('rd-nosler-filter-powder-brand')?.value || '';
+    try {
+        const params = new URLSearchParams({ manufacturer: 'Nosler' });
+        if (powderBrand) params.set('powder_brand', powderBrand);
+        const res = await fetch(`/reload-data/filters?${params.toString()}`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-nosler-filter-powder-name', data.powder_names);
+    } catch (e) { /* keep existing options on failure */ }
+    searchNoslerData();
+}
+
+function searchNoslerData() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(_runSearchNoslerData, 200);
+}
+
+async function _runSearchNoslerData() {
+    const results = document.getElementById('rd-nosler-results');
+    const caliber = document.getElementById('rd-nosler-filter-caliber')?.value || '';
+    const weight = document.getElementById('rd-nosler-filter-weight')?.value || '';
+    // Nosler's charge table only makes sense for one specific bullet weight — its candidate
+    // bullets and the shared load data both come from one specific PDF page keyed by weight.
+    if (!caliber || !weight) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">Pick a caliber and bullet weight to search.</p>';
+        return;
+    }
+    const params = new URLSearchParams({ caliber, manufacturer: 'Nosler', bullet_weight_gr: weight });
+    const powderBrand = document.getElementById('rd-nosler-filter-powder-brand')?.value;
+    if (powderBrand) params.set('powder_brand', powderBrand);
+    const powderName = document.getElementById('rd-nosler-filter-powder-name')?.value;
+    if (powderName) params.set('powder_name', powderName);
+    if (document.getElementById('rd-nosler-filter-in-stock')?.checked) params.set('in_stock_only', 'true');
+
+    results.innerHTML = '<p class="text-xs text-gray-500 italic">Searching…</p>';
+    try {
+        const res = await fetch(`/reload-data/loads?${params.toString()}`);
+        const rows = res.ok ? await res.json() : [];
+        _reloadDataRows = rows;
+        renderNoslerResults(rows);
+    } catch (e) {
+        results.innerHTML = '<p class="text-xs text-red-400">Search failed — check connection.</p>';
+    }
+}
+
+function renderNoslerResults(rows) {
+    const results = document.getElementById('rd-nosler-results');
+    if (rows.length === 0) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">No matching loads found.</p>';
+        return;
+    }
+    const first = rows[0];
+
+    // Candidate bullets: every distinct bullet this page of data applies to (often 2-3 very
+    // similar match/target bullets sharing one case/primer/charge table) — grouped from the
+    // rows themselves rather than a separate lookup, so it only shows candidates that survived
+    // the current filters.
+    const bulletKey = r => [r.bullet_weight_gr, r.bullet_model, r.bullet_code].join('|');
+    const bullets = new Map();
+    for (const r of rows) {
+        if (!bullets.has(bulletKey(r))) bullets.set(bulletKey(r), r);
+    }
+    const codeBadge = (code) => {
+        if (!code) return '';
+        // Nosler prints each candidate's short code in a small colored tag next to the name —
+        // real color varies by product line in the PDF; a single consistent accent here reads
+        // clearly without trying to reverse-engineer their exact brand palette per code.
+        return `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-900/60 text-rose-300 border border-rose-700/50 ml-1.5 align-middle">${escHtml(code)}</span>`;
+    };
+    const candidateRows = [...bullets.values()].map(b => `
+        <tr class="border-b border-gray-800 last:border-b-0">
+            <td class="py-2 px-2">${escHtml([b.bullet_brand, b.bullet_model].filter(Boolean).join(' '))}${codeBadge(b.bullet_code)}${bulletStockBadge(b.bullet_in_stock, b.bullet_owned_model)}</td>
+            <td class="py-2 px-2 text-gray-300">${escHtml(b.bullet_weight_gr ? `${b.bullet_weight_gr}gr.` : '—')}${b.bullet_style ? ` ${escHtml(b.bullet_style)}` : ''}</td>
+            <td class="py-2 px-2 text-gray-300">${b.coal ? escHtml(b.coal) + '"' : '—'}</td>
+            <td class="py-2 px-2 text-gray-300">${rdVal(b.bullet_bc)}</td>
+            <td class="py-2 px-2 text-gray-300">${rdVal(b.bullet_sd)}</td>
+        </tr>`).join('');
+
+    const candidateBox = `<div class="mb-5 border border-gray-700 rounded overflow-hidden">
+        <table class="w-full text-xs text-left">
+            <thead>
+                <tr class="bg-gray-950 text-gray-300">
+                    <th class="py-2 px-2" colspan="2">${first.max_saami_oal ? `Maximum SAAMI O.A.C.L. <span class="text-white font-bold">${escHtml(first.max_saami_oal)}"</span>` : 'Candidate Bullets'}</th>
+                    <th class="py-2 px-2 text-gray-500 font-semibold">Tested O.A.C.L.</th>
+                    <th class="py-2 px-2 text-gray-500 font-semibold">B.C.</th>
+                    <th class="py-2 px-2 text-gray-500 font-semibold">S.D.</th>
+                </tr>
+            </thead>
+            <tbody>${candidateRows}</tbody>
+        </table>
+    </div>`;
+
+    // Charge table: dedupe across the fan-out (the exact same 3 charge tiers repeat once per
+    // candidate bullet in the raw rows, since Nosler's page has one shared table) so each
+    // powder's choices show once, not once per candidate — sorted by charge descending to
+    // match the PDF's own MAX → most-accurate → starting order regardless of query row order.
+    const seen = new Set();
+    const deduped = [];
+    for (const r of rows) {
+        const key = `${r.powder_brand}|${r.powder_name}|${r.start_charge_gr}|${r.start_velocity_fps}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(r);
+    }
+    const powders = new Map();
+    for (const r of deduped) {
+        const key = `${r.powder_brand || ''}|${r.powder_name || ''}`;
+        if (!powders.has(key)) powders.set(key, []);
+        powders.get(key).push(r);
+    }
+    for (const group of powders.values()) group.sort((a, b) => (b.start_charge_gr ?? 0) - (a.start_charge_gr ?? 0));
+
+    _noslerLastRows = rows;
+    const showDensity = deduped.some(r => r.start_density_pct !== null);
+    const powderRows = [...powders.entries()].map(([key, group]) => {
+        const [brand, name] = key.split('|');
+        return `<tr onclick="openNoslerPowderDetail('${escHtml(key).replace(/'/g, "\\'")}')" class="border-b border-gray-800 bg-gray-900/40 cursor-pointer hover:bg-rose-950/30">
+            <td class="py-1.5 px-2 font-semibold text-gray-200" colspan="${showDensity ? 3 : 2}">${escHtml([brand, name].filter(Boolean).join(' ') || '—')}${stockBadgeFor(group[0].powder_in_stock)}</td>
+        </tr>` + group.map(r => `<tr onclick="event.stopPropagation(); openReloadDataDetail(${r.id})"
+                class="border-b border-gray-800 last:border-b-0 cursor-pointer hover:bg-rose-950/30 ${r.is_recommended ? 'bg-emerald-950/30' : ''}">
+            <td class="py-1.5 px-2 pl-5 text-gray-200">${rdVal(r.start_charge_gr, r.start_is_compressed ? 'C' : '')} gr.${r.is_recommended ? ' <span class="text-emerald-400 font-bold" title="Most accurate load tested">★</span>' : ''}</td>
+            <td class="py-1.5 px-2 text-gray-200">${fmtInt(r.start_velocity_fps)} fps</td>
+            ${showDensity ? `<td class="py-1.5 px-2 text-gray-200">${rdVal(r.start_density_pct, '%')}</td>` : ''}
+        </tr>`).join('');
+    }).join('');
+
+    results.innerHTML = candidateBox + `<table class="w-full text-xs text-left border border-gray-700 rounded overflow-hidden">
+        <tbody>${powderRows}</tbody>
+    </table>
+    <p class="text-[10px] text-gray-600 mt-3">★ = most accurate load tested &nbsp;·&nbsp; "C" marks a compressed charge — always start low and work up. Click a powder's name to see all of its charges together, or a single charge row for just that one.</p>`;
+}
+
+function stockBadgeFor(inStock) {
+    return inStock
+        ? '<span class="text-[9px] font-bold px-1 py-0.5 rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800/50 ml-1.5 align-middle">✓ stock</span>'
+        : '';
+}
+
+let _noslerLastRows = [];
+
+// "Click the powder, see all its charges" — same pattern as Hornady's velocity-matrix rows
+// (openHornadyPowderDetail), adapted to Nosler's 2-3 tier (MAX / most-accurate / starting)
+// shape instead of a velocity matrix.
+function openNoslerPowderDetail(powderKey) {
+    const matching = _noslerLastRows.filter(r => `${r.powder_brand || ''}|${r.powder_name || ''}` === powderKey);
+    if (matching.length === 0) return;
+
+    const seen = new Set();
+    const tiers = [];
+    for (const r of matching) {
+        const key = `${r.start_charge_gr}|${r.start_velocity_fps}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        tiers.push(r);
+    }
+    tiers.sort((a, b) => (b.start_charge_gr ?? 0) - (a.start_charge_gr ?? 0));
+
+    const first = matching[0];
+    const showDensity = tiers.some(r => r.start_density_pct !== null);
+    const box = document.getElementById('reload-data-detail-content');
+    const stockBadge = (inStock) => inStock
+        ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800/50 ml-2">✓ In stock</span>'
+        : '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 border border-gray-600 ml-2">Not in stock</span>';
+
+    // Every candidate bullet at this weight shares the exact same charge table — list them all
+    // rather than picking just one, since Nosler often fans one page out across 2-3 bullets.
+    const bulletNames = [...new Set(matching.map(r => [r.bullet_brand, r.bullet_model].filter(Boolean).join(' ')))];
+
+    const leftCol = `
+        <div>
+            <h3 class="text-xl font-bold text-white">${escHtml([first.powder_brand, first.powder_name].filter(Boolean).join(' '))}${stockBadge(first.powder_in_stock)}</h3>
+            <p class="text-sm text-gray-400 mt-1">${escHtml(first.bullet_weight_gr ? `${first.bullet_weight_gr}gr — ` : '')}${escHtml(bulletNames.join(', '))}</p>
+            <p class="text-xs text-gray-500 mt-2">
+                <span class="text-rose-400 font-semibold">${escHtml(first.manufacturer || '')}</span> · ${escHtml(first.caliber || '')}${first.twist ? ` · Twist ${escHtml(first.twist)}` : ''}${first.barrel_length ? ` · ${escHtml(first.barrel_length)} barrel` : ''}
+                ${first.source_file_path ? `<a href="${escHtml(first.source_file_path)}" target="_blank" rel="noopener" class="ml-2 text-blue-400 hover:text-blue-300 underline" onclick="event.stopPropagation()">View source PDF ↗</a>` : ''}
+            </p>
+        </div>
+
+        <table class="w-full text-xs text-left border border-gray-700 rounded overflow-hidden mt-5">
+            <thead>
+                <tr class="bg-gray-800 text-gray-400">
+                    <th class="py-1.5 px-2">Charge (gr)</th>
+                    <th class="py-1.5 px-2">Velocity (fps)</th>
+                    ${showDensity ? '<th class="py-1.5 px-2">Load Density</th>' : ''}
+                </tr>
+            </thead>
+            <tbody>
+            ${tiers.map((r, i) => `<tr class="border-b border-gray-800 last:border-b-0 ${r.is_recommended ? 'bg-emerald-950/30' : (i % 2 ? 'bg-gray-900/40' : '')}">
+                <td class="py-1.5 px-2 text-gray-200">${rdVal(r.start_charge_gr, r.start_is_compressed ? 'C' : '')}${r.is_recommended ? ' <span class="text-emerald-400 font-bold" title="Most accurate load tested">★</span>' : ''}</td>
+                <td class="py-1.5 px-2 text-gray-200">${fmtInt(r.start_velocity_fps)}</td>
+                ${showDensity ? `<td class="py-1.5 px-2 text-gray-200">${rdVal(r.start_density_pct, '%')}</td>` : ''}
+            </tr>`).join('')}
+            </tbody>
+        </table>
+
+        ${(first.coal || first.case_brand || first.primer_display) ? `<div class="grid grid-cols-2 gap-3 text-sm mt-5">
+            ${first.coal ? `<div><span class="text-gray-500">C.O.L.:</span> <span class="text-gray-200 font-semibold">${escHtml(first.coal)}"</span></div>` : ''}
+            ${first.case_brand ? `<div><span class="text-gray-500">Case:</span> <span class="text-gray-200 font-semibold">${escHtml(first.case_brand)}</span></div>` : ''}
+            ${first.primer_display ? `<div class="col-span-2"><span class="text-gray-500">Primer:</span> <span class="text-gray-200 font-semibold">${escHtml(first.primer_display)}</span></div>` : ''}
+        </div>` : ''}
+
+        <p class="text-[10px] text-gray-600 mt-4">★ = most accurate load tested &nbsp;·&nbsp; "C" marks a compressed charge.${first.data_as_of ? ` Data current as of ${escHtml(first.data_as_of)}.` : ''} Always start at the lowest charge shown and work up.</p>`;
+
+    const rightCol = first.case_diagram_path ? `
+        <img src="${escHtml(first.case_diagram_path)}" alt="Case dimension diagram" onclick="openReloadDataImageLightbox('${escHtml(first.case_diagram_path)}')"
+            class="w-full h-auto max-h-[420px] object-contain rounded border border-gray-700 bg-white cursor-zoom-in hover:opacity-90 transition" title="Click to enlarge">` : '';
+
+    box.innerHTML = `
+        <div class="bg-gray-800 p-5 rounded-lg border border-gray-700 shadow-xl flex flex-col lg:flex-row gap-6">
+            <div class="flex-1 min-w-0">${leftCol}</div>
+            ${rightCol ? `<div class="lg:w-[45%] shrink-0 self-start">${rightCol}</div>` : ''}
+        </div>`;
+    document.getElementById(`rd-mfr-pane-${_rdActiveManufacturer}`)?.classList.add('hidden');
+    document.getElementById('reload-data-detail-view')?.classList.remove('hidden');
+}
+
+// ── Speer tab ────────────────────────────────────────────────────────────────
+// No Bullet Brand filter (every Speer load is a Speer bullet). Speer's PDFs also fan a page of
+// load data out across 1-3 candidate bullets sharing one case/primer/charge table (same shape
+// as Nosler), but unlike Nosler the charge table itself is a true start/max range with its own
+// per-row Case and Primer columns — so results are shown as a flat Propellant/Case/Primer/
+// Starting/Maximum table (matching the PDF layout directly) rather than Nosler's 3-tier list.
+
+async function loadSpeerFilters() {
+    try {
+        const res = await fetch(`/reload-data/filters?manufacturer=Speer`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-speer-filter-powder-brand', data.powder_brands);
+        fillReloadDataSelect('rd-speer-filter-powder-name', data.powder_names);
+        fillReloadDataCalibers(data.calibers, 'rd-speer-caliber-options');
+    } catch (e) {
+        showToast('Failed to load Speer filters', 'error');
+    }
+}
+registerReloadDataFilterLoader('Speer', loadSpeerFilters);
+
+async function onSpeerCaliberInput() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(async () => {
+        const caliber = document.getElementById('rd-speer-filter-caliber')?.value || '';
+        const weightSelect = document.getElementById('rd-speer-filter-weight');
+        if (caliber) {
+            try {
+                const res = await fetch(`/reload-data/filters?manufacturer=Speer&caliber=${encodeURIComponent(caliber)}`);
+                const data = await res.json();
+                fillReloadDataSelect('rd-speer-filter-weight', data.bullet_weights);
+                // Same reasoning as Nosler: one weight = one PDF page of data, so auto-pick the
+                // first weight once the caliber resolves rather than leaving results empty.
+                if (weightSelect && data.bullet_weights.length > 0) {
+                    weightSelect.value = data.bullet_weights[0];
+                }
+            } catch (e) { /* keep existing options on failure */ }
+        } else {
+            fillReloadDataSelect('rd-speer-filter-weight', []);
+        }
+        _runSearchSpeerData();
+    }, 200);
+}
+
+async function onSpeerPowderBrandChange() {
+    const powderBrand = document.getElementById('rd-speer-filter-powder-brand')?.value || '';
+    try {
+        const params = new URLSearchParams({ manufacturer: 'Speer' });
+        if (powderBrand) params.set('powder_brand', powderBrand);
+        const res = await fetch(`/reload-data/filters?${params.toString()}`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-speer-filter-powder-name', data.powder_names);
+    } catch (e) { /* keep existing options on failure */ }
+    searchSpeerData();
+}
+
+function searchSpeerData() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(_runSearchSpeerData, 200);
+}
+
+async function _runSearchSpeerData() {
+    const results = document.getElementById('rd-speer-results');
+    const caliber = document.getElementById('rd-speer-filter-caliber')?.value || '';
+    const weight = document.getElementById('rd-speer-filter-weight')?.value || '';
+    if (!caliber || !weight) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">Pick a caliber and bullet weight to search.</p>';
+        return;
+    }
+    const params = new URLSearchParams({ caliber, manufacturer: 'Speer', bullet_weight_gr: weight });
+    const powderBrand = document.getElementById('rd-speer-filter-powder-brand')?.value;
+    if (powderBrand) params.set('powder_brand', powderBrand);
+    const powderName = document.getElementById('rd-speer-filter-powder-name')?.value;
+    if (powderName) params.set('powder_name', powderName);
+    if (document.getElementById('rd-speer-filter-in-stock')?.checked) params.set('in_stock_only', 'true');
+
+    results.innerHTML = '<p class="text-xs text-gray-500 italic">Searching…</p>';
+    try {
+        const res = await fetch(`/reload-data/loads?${params.toString()}`);
+        const rows = res.ok ? await res.json() : [];
+        _reloadDataRows = rows;
+        renderSpeerResults(rows);
+    } catch (e) {
+        results.innerHTML = '<p class="text-xs text-red-400">Search failed — check connection.</p>';
+    }
+}
+
+function renderSpeerResults(rows) {
+    const results = document.getElementById('rd-speer-results');
+    if (rows.length === 0) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">No matching loads found.</p>';
+        return;
+    }
+    const first = rows[0];
+
+    // Spec box — page-level constants straight from the PDF, only the fields that are present.
+    const specField = (label, value) => value ? `<div><span class="text-gray-500">${escHtml(label)}:</span> <span class="text-gray-200 font-semibold ml-1">${escHtml(value)}</span></div>` : '';
+    const specBox = `<div class="mb-5 bg-gray-900/60 rounded-lg border border-gray-700 p-4 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+        ${specField('Max Case Length', first.max_case_length)}
+        ${specField('Trim-to Length', first.trim_length)}
+        ${first.max_saami_oal ? `<div><span class="text-gray-500">Max Cart. OAL:</span> <span class="text-gray-200 font-semibold ml-1">${escHtml(first.max_saami_oal)}"</span></div>` : ''}
+        ${specField('RCBS Shell Holder', first.rcbs_shell_holder)}
+        ${specField('Test Firearm', first.test_firearm)}
+        ${first.barrel_length ? `<div><span class="text-gray-500">Barrel Length:</span> <span class="text-gray-200 font-semibold ml-1">${escHtml(first.barrel_length)}</span></div>` : ''}
+    </div>`;
+
+    // Candidate bullets: every distinct bullet this page of data applies to, grouped from the
+    // rows themselves (same pattern as Nosler) so it only shows candidates that survived filters.
+    const bulletKey = r => [r.bullet_weight_gr, r.bullet_model, r.bullet_code].join('|');
+    const bullets = new Map();
+    for (const r of rows) {
+        if (!bullets.has(bulletKey(r))) bullets.set(bulletKey(r), r);
+    }
+    const candidateRows = [...bullets.values()].map(b => `
+        <tr class="border-b border-gray-800 last:border-b-0">
+            <td class="py-2 px-2 font-semibold text-gray-200">${escHtml(b.bullet_weight_gr ? `${b.bullet_weight_gr}gr ` : '')}${escHtml([b.bullet_brand, b.bullet_model].filter(Boolean).join(' '))}${bulletStockBadge(b.bullet_in_stock, b.bullet_owned_model)}</td>
+            <td class="py-2 px-2 text-gray-300">${escHtml(b.bullet_code || '—')}</td>
+            <td class="py-2 px-2 text-gray-300">${escHtml(b.bullet_weight_gr ?? '—')}</td>
+            <td class="py-2 px-2 text-gray-300">${b.coal ? escHtml(b.coal) + '"' : '—'}</td>
+            <td class="py-2 px-2 text-gray-300">${rdVal(b.bullet_bc)}</td>
+            <td class="py-2 px-2 text-gray-300">${rdVal(b.bullet_sd)}</td>
+        </tr>`).join('');
+
+    const candidateBox = `<div class="mb-5 border border-gray-700 rounded overflow-hidden">
+        <table class="w-full text-xs text-left">
+            <thead>
+                <tr class="bg-gray-950 text-gray-500 font-semibold">
+                    <th class="py-2 px-2">Bullet</th>
+                    <th class="py-2 px-2">Speer Part No.</th>
+                    <th class="py-2 px-2">Weight, grains</th>
+                    <th class="py-2 px-2">COAL Tested</th>
+                    <th class="py-2 px-2">Ballistic Coefficient</th>
+                    <th class="py-2 px-2">Sectional Density</th>
+                </tr>
+            </thead>
+            <tbody>${candidateRows}</tbody>
+        </table>
+    </div>`;
+
+    // Charge table: dedupe across the candidate fan-out (same physical table repeated once per
+    // candidate bullet in the raw rows) so each powder shows once, in the order the PDF lists
+    // them (already alphabetical from the backend's own ORDER BY powder_name).
+    const seen = new Set();
+    const deduped = [];
+    for (const r of rows) {
+        const key = `${r.powder_brand}|${r.powder_name}|${r.case_brand}|${r.primer_display}|${r.start_charge_gr}|${r.max_charge_gr}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(r);
+    }
+
+    const chargeTable = `<table class="w-full text-xs text-left border border-gray-700 rounded overflow-hidden">
+        <thead>
+            <tr class="bg-gray-800 text-gray-400">
+                <th class="py-1.5 px-2" rowspan="2">Propellant</th>
+                <th class="py-1.5 px-2" rowspan="2">Case</th>
+                <th class="py-1.5 px-2" rowspan="2">Primer</th>
+                <th class="py-1 px-2 text-center border-l border-gray-700 text-emerald-400" colspan="2">Starting Load</th>
+                <th class="py-1 px-2 text-center border-l border-gray-700 text-rose-400" colspan="2">Maximum Load</th>
+            </tr>
+            <tr class="bg-gray-800/60 text-gray-500 text-[10px]">
+                <th class="py-1 px-2 border-l border-gray-700">Grs.</th>
+                <th class="py-1 px-2">Vel. (ft/s)</th>
+                <th class="py-1 px-2 border-l border-gray-700">Grs.</th>
+                <th class="py-1 px-2">Vel. (ft/s)</th>
+            </tr>
+        </thead>
+        <tbody>
+        ${deduped.map((r, i) => `<tr onclick="openReloadDataDetail(${r.id})" class="border-b border-gray-800 last:border-b-0 cursor-pointer hover:bg-rose-950/30 ${i % 2 ? 'bg-gray-900/40' : ''}">
+            <td class="py-1.5 px-2 text-gray-200">${escHtml([r.powder_brand, r.powder_name].filter(Boolean).join(' ') || '—')}${stockBadgeFor(r.powder_in_stock)}</td>
+            <td class="py-1.5 px-2 text-gray-300">${escHtml(r.case_brand || '—')}</td>
+            <td class="py-1.5 px-2 text-gray-300">${escHtml(r.primer_display || '—')}</td>
+            <td class="py-1.5 px-2 text-gray-200 border-l border-gray-800">${rdVal(r.start_charge_gr, r.start_is_compressed ? 'C' : '')}</td>
+            <td class="py-1.5 px-2 text-gray-200">${fmtInt(r.start_velocity_fps)}</td>
+            <td class="py-1.5 px-2 text-gray-200 border-l border-gray-800">${rdVal(r.max_charge_gr, r.max_is_compressed ? 'C' : '')}</td>
+            <td class="py-1.5 px-2 text-gray-200">${fmtInt(r.max_velocity_fps)}</td>
+        </tr>`).join('')}
+        </tbody>
+    </table>
+    <p class="text-[10px] text-gray-600 mt-3">"C" marks a compressed charge — always start low and work up.</p>`;
+
+    results.innerHTML = specBox + candidateBox + chargeTable;
+}
+
+// ── Sierra tab ───────────────────────────────────────────────────────────────
+// No Bullet Brand filter (always Sierra). Sierra's own PDF spec box is split into a "Test
+// Specifications:" section (Firearm Used/Barrel Length/Twist) and a "Components:" section
+// (Case/Trim-to Length/Primer) with alternating striped rows — replicated directly rather than
+// folded into one generic box, per the user's reference screenshot. The charge table itself is a
+// genuine velocity-matrix in the PDF (powder rows × velocity columns, charge grains in each
+// populated cell) rather than a start/max range, so it's rendered as that same matrix shape
+// instead of reusing Hodgdon's/Speer's Starting/Maximum column layout.
+
+async function loadSierraFilters() {
+    try {
+        const res = await fetch(`/reload-data/filters?manufacturer=Sierra`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-sierra-filter-powder-brand', data.powder_brands);
+        fillReloadDataSelect('rd-sierra-filter-powder-name', data.powder_names);
+        fillReloadDataCalibers(data.calibers, 'rd-sierra-caliber-options');
+    } catch (e) {
+        showToast('Failed to load Sierra filters', 'error');
+    }
+}
+registerReloadDataFilterLoader('Sierra', loadSierraFilters);
+
+async function onSierraCaliberInput() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(async () => {
+        const caliber = document.getElementById('rd-sierra-filter-caliber')?.value || '';
+        const weightSelect = document.getElementById('rd-sierra-filter-weight');
+        if (caliber) {
+            try {
+                const res = await fetch(`/reload-data/filters?manufacturer=Sierra&caliber=${encodeURIComponent(caliber)}`);
+                const data = await res.json();
+                fillReloadDataSelect('rd-sierra-filter-weight', data.bullet_weights);
+                if (weightSelect && data.bullet_weights.length > 0) {
+                    weightSelect.value = data.bullet_weights[0];
+                }
+            } catch (e) { /* keep existing options on failure */ }
+        } else {
+            fillReloadDataSelect('rd-sierra-filter-weight', []);
+        }
+        _runSearchSierraData();
+    }, 200);
+}
+
+async function onSierraPowderBrandChange() {
+    const powderBrand = document.getElementById('rd-sierra-filter-powder-brand')?.value || '';
+    try {
+        const params = new URLSearchParams({ manufacturer: 'Sierra' });
+        if (powderBrand) params.set('powder_brand', powderBrand);
+        const res = await fetch(`/reload-data/filters?${params.toString()}`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-sierra-filter-powder-name', data.powder_names);
+    } catch (e) { /* keep existing options on failure */ }
+    searchSierraData();
+}
+
+function searchSierraData() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(_runSearchSierraData, 200);
+}
+
+async function _runSearchSierraData() {
+    const results = document.getElementById('rd-sierra-results');
+    const caliber = document.getElementById('rd-sierra-filter-caliber')?.value || '';
+    const weight = document.getElementById('rd-sierra-filter-weight')?.value || '';
+    if (!caliber || !weight) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">Pick a caliber and bullet weight to search.</p>';
+        return;
+    }
+    const params = new URLSearchParams({ caliber, manufacturer: 'Sierra', bullet_weight_gr: weight });
+    const powderBrand = document.getElementById('rd-sierra-filter-powder-brand')?.value;
+    if (powderBrand) params.set('powder_brand', powderBrand);
+    const powderName = document.getElementById('rd-sierra-filter-powder-name')?.value;
+    if (powderName) params.set('powder_name', powderName);
+    if (document.getElementById('rd-sierra-filter-in-stock')?.checked) params.set('in_stock_only', 'true');
+
+    results.innerHTML = '<p class="text-xs text-gray-500 italic">Searching…</p>';
+    try {
+        const res = await fetch(`/reload-data/loads?${params.toString()}`);
+        const rows = res.ok ? await res.json() : [];
+        _reloadDataRows = rows;
+        renderSierraResults(rows);
+    } catch (e) {
+        results.innerHTML = '<p class="text-xs text-red-400">Search failed — check connection.</p>';
+    }
+}
+
+function renderSierraResults(rows) {
+    const results = document.getElementById('rd-sierra-results');
+    if (rows.length === 0) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">No matching loads found.</p>';
+        return;
+    }
+    const first = rows[0];
+
+    // Spec box — striped rows under two headers, matching the PDF's own "Test Specifications:"/
+    // "Components:" layout directly rather than one generic grid.
+    const specRow = (label, value, striped) => value
+        ? `<div class="flex justify-between px-3 py-2 ${striped ? 'bg-emerald-950/40' : ''}"><span class="text-gray-400">${escHtml(label)}:</span><span class="font-semibold text-white">${escHtml(value)}</span></div>`
+        : '';
+    const specBox = `<div class="mb-5 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+        <div class="rounded-lg border border-gray-700 overflow-hidden">
+            <div class="bg-gray-950 text-white font-bold px-3 py-2">Test Specifications:</div>
+            ${specRow('Firearm Used', first.test_firearm, true)}
+            ${specRow('Barrel Length', first.barrel_length, false)}
+            ${specRow('Twist', first.twist, true)}
+        </div>
+        <div class="rounded-lg border border-gray-700 overflow-hidden">
+            <div class="bg-gray-950 text-white font-bold px-3 py-2">Components:</div>
+            ${specRow('Case', first.case_brand, true)}
+            ${specRow('Trim-to Length', first.trim_length, false)}
+            ${specRow('Primer', first.primer_display, true)}
+        </div>
+    </div>`;
+
+    // Candidate bullets — column labels straight from the PDF's own table header
+    // ("Bullet Caliber Weight Type C.O.A.L."), grouped from the current rows like every other tab.
+    const bulletKey = r => [r.bullet_weight_gr, r.bullet_model, r.bullet_code].join('|');
+    const bullets = new Map();
+    for (const r of rows) {
+        if (!bullets.has(bulletKey(r))) bullets.set(bulletKey(r), r);
+    }
+    const candidateRows = [...bullets.values()].map(b => `
+        <tr class="border-b border-gray-800 last:border-b-0">
+            <td class="py-2 px-2 text-gray-300">${b.bullet_code ? '#' + escHtml(b.bullet_code) : '—'}</td>
+            <td class="py-2 px-2 text-gray-300">${escHtml(b.bullet_dia || '—')}</td>
+            <td class="py-2 px-2 text-gray-300">${escHtml(b.bullet_weight_gr ? `${b.bullet_weight_gr}gr.` : '—')}</td>
+            <td class="py-2 px-2 font-semibold text-gray-200">${escHtml(b.bullet_model || '—')}${bulletStockBadge(b.bullet_in_stock, b.bullet_owned_model)}</td>
+            <td class="py-2 px-2 text-gray-300">${b.coal ? escHtml(b.coal) + '"' : '—'}</td>
+        </tr>`).join('');
+
+    const candidateBox = `<div class="mb-5 border border-gray-700 rounded overflow-hidden">
+        <table class="w-full text-xs text-left">
+            <thead>
+                <tr class="bg-gray-950 text-gray-500 font-semibold">
+                    <th class="py-2 px-2">Bullet</th>
+                    <th class="py-2 px-2">Caliber</th>
+                    <th class="py-2 px-2">Weight</th>
+                    <th class="py-2 px-2">Type</th>
+                    <th class="py-2 px-2">C.O.A.L.</th>
+                </tr>
+            </thead>
+            <tbody>${candidateRows}</tbody>
+        </table>
+    </div>`;
+
+    // Velocity matrix — dedupe across the candidate fan-out (same table repeated once per
+    // candidate bullet), then pivot into powder rows × velocity columns, matching the PDF
+    // exactly instead of a start/max range (Sierra doesn't publish one — a cell IS the charge
+    // needed to reach that velocity, full stop).
+    const seen = new Set();
+    const deduped = [];
+    for (const r of rows) {
+        const key = `${r.powder_brand}|${r.powder_name}|${r.start_velocity_fps}|${r.start_charge_gr}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(r);
+    }
+    const velocities = [...new Set(deduped.map(r => r.start_velocity_fps))].sort((a, b) => a - b);
+    const powders = new Map();
+    for (const r of deduped) {
+        const key = `${r.powder_brand || ''}|${r.powder_name || ''}`;
+        if (!powders.has(key)) powders.set(key, { label: [r.powder_brand, r.powder_name].filter(Boolean).join(' ') || '—', inStock: r.powder_in_stock, cells: {} });
+        powders.get(key).cells[r.start_velocity_fps] = r;
+    }
+
+    // Click anywhere on a powder's row (not one cell) to see that whole line — every velocity/
+    // charge pair it publishes — on the detail page, rather than jumping to just the one clicked
+    // value's single load.
+    _sierraLastRows = rows;
+    const matrixTable = `<table class="w-full text-xs text-left border border-gray-700 rounded overflow-hidden">
+        <thead>
+            <tr class="bg-gray-800 text-gray-400">
+                <th class="py-1.5 px-2">Powder</th>
+                ${velocities.map(v => `<th class="py-1.5 px-2 text-center border-l border-gray-700">${fmtInt(v)}</th>`).join('')}
+            </tr>
+        </thead>
+        <tbody>
+        ${[...powders.entries()].map(([key, p], i) => `<tr onclick="openSierraPowderDetail('${escHtml(key).replace(/'/g, "\\'")}')" class="border-b border-gray-800 last:border-b-0 cursor-pointer hover:bg-rose-950/30 ${i % 2 ? 'bg-gray-900/40' : ''}">
+            <td class="py-1.5 px-2 text-gray-200">${escHtml(p.label)}${stockBadgeFor(p.inStock)}</td>
+            ${velocities.map(v => {
+                const r = p.cells[v];
+                return r
+                    ? `<td class="py-1.5 px-2 text-center border-l border-gray-800 text-gray-200">${rdVal(r.start_charge_gr, r.start_is_compressed ? 'C' : '')}</td>`
+                    : `<td class="py-1.5 px-2 text-center border-l border-gray-800 text-gray-700">—</td>`;
+            }).join('')}
+        </tr>`).join('')}
+        </tbody>
+    </table>
+    <p class="text-[10px] text-gray-600 mt-3">Velocity (ft/sec) across the top — each cell is the charge (gr.) needed to reach it. Click a row to see the whole line. "C" marks a compressed charge.</p>`;
+
+    results.innerHTML = specBox + candidateBox + matrixTable;
+}
+
+let _sierraLastRows = [];
+
+// Sierra's matrix has one row per powder but many velocity/charge pairs — clicking the row
+// shows the whole line (every pair that powder publishes) rather than jumping straight to a
+// single load the way the shared detail view does for every other tab.
+function openSierraPowderDetail(powderKey) {
+    const matching = _sierraLastRows.filter(r => `${r.powder_brand || ''}|${r.powder_name || ''}` === powderKey);
+    if (matching.length === 0) return;
+
+    const seenVel = new Set();
+    const pairs = [];
+    for (const r of matching) {
+        if (seenVel.has(r.start_velocity_fps)) continue;
+        seenVel.add(r.start_velocity_fps);
+        pairs.push(r);
+    }
+    pairs.sort((a, b) => (a.start_velocity_fps ?? 0) - (b.start_velocity_fps ?? 0));
+
+    const first = matching[0];
+    const box = document.getElementById('reload-data-detail-content');
+    const stockBadge = (inStock) => inStock
+        ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800/50 ml-2">✓ In stock</span>'
+        : '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 border border-gray-600 ml-2">Not in stock</span>';
+
+    const leftCol = `
+        <div>
+            <h3 class="text-xl font-bold text-white">${escHtml([first.powder_brand, first.powder_name].filter(Boolean).join(' '))}${stockBadge(first.powder_in_stock)}</h3>
+            <p class="text-sm text-gray-400 mt-1">${escHtml(first.bullet_weight_gr ? `${first.bullet_weight_gr}gr ` : '')}${escHtml([first.bullet_brand, first.bullet_model].filter(Boolean).join(' '))}</p>
+            <p class="text-xs text-gray-500 mt-2">
+                <span class="text-rose-400 font-semibold">${escHtml(first.manufacturer || '')}</span> · ${escHtml(first.caliber || '')}${first.twist ? ` · Twist ${escHtml(first.twist)}` : ''}${first.barrel_length ? ` · ${escHtml(first.barrel_length)}" barrel` : ''}${first.trim_length ? ` · Trim ${escHtml(first.trim_length)}"` : ''}
+                ${first.source_file_path ? `<a href="${escHtml(first.source_file_path)}" target="_blank" rel="noopener" class="ml-2 text-blue-400 hover:text-blue-300 underline" onclick="event.stopPropagation()">View source PDF ↗</a>` : ''}
+            </p>
+        </div>
+
+        <table class="w-full text-xs text-left border border-gray-700 rounded overflow-hidden mt-5">
+            <thead>
+                <tr class="bg-gray-800 text-gray-400">
+                    <th class="py-1.5 px-2">Velocity (fps)</th>
+                    <th class="py-1.5 px-2">Charge (gr)</th>
+                </tr>
+            </thead>
+            <tbody>
+            ${pairs.map((r, i) => `<tr class="border-b border-gray-800 last:border-b-0 ${i % 2 ? 'bg-gray-900/40' : ''}">
+                <td class="py-1.5 px-2 text-gray-200">${fmtInt(r.start_velocity_fps)}</td>
+                <td class="py-1.5 px-2 text-gray-200">${rdVal(r.start_charge_gr, r.start_is_compressed ? 'C' : '')}</td>
+            </tr>`).join('')}
+            </tbody>
+        </table>
+
+        ${(first.coal || first.case_brand || first.primer_display) ? `<div class="grid grid-cols-2 gap-3 text-sm mt-5">
+            ${first.coal ? `<div><span class="text-gray-500">C.O.L.:</span> <span class="text-gray-200 font-semibold">${escHtml(first.coal)}"</span></div>` : ''}
+            ${first.case_brand ? `<div><span class="text-gray-500">Case:</span> <span class="text-gray-200 font-semibold">${escHtml(first.case_brand)}</span></div>` : ''}
+            ${first.primer_display ? `<div class="col-span-2"><span class="text-gray-500">Primer:</span> <span class="text-gray-200 font-semibold">${escHtml(first.primer_display)}</span></div>` : ''}
+        </div>` : ''}
+
+        ${pairs.some(r => r.start_is_compressed) ? '<p class="text-xs text-amber-400 mt-4">⚠ "C" marks a compressed charge.</p>' : ''}
+        <p class="text-[10px] text-gray-600 mt-4">${first.data_as_of ? `Data current as of ${escHtml(first.data_as_of)}` : ''} — Sierra publishes the charge needed to reach each velocity, not a start/max range.</p>`;
+
+    const rightCol = first.case_diagram_path ? `
+        <img src="${escHtml(first.case_diagram_path)}" alt="Case dimension diagram" onclick="openReloadDataImageLightbox('${escHtml(first.case_diagram_path)}')"
+            class="w-full h-auto max-h-[420px] object-contain rounded border border-gray-700 bg-white cursor-zoom-in hover:opacity-90 transition" title="Click to enlarge">` : '';
+
+    box.innerHTML = `
+        <div class="bg-gray-800 p-5 rounded-lg border border-gray-700 shadow-xl flex flex-col lg:flex-row gap-6">
+            <div class="flex-1 min-w-0">${leftCol}</div>
+            ${rightCol ? `<div class="lg:w-[45%] shrink-0 self-start">${rightCol}</div>` : ''}
+        </div>`;
+    document.getElementById(`rd-mfr-pane-${_rdActiveManufacturer}`)?.classList.add('hidden');
+    document.getElementById('reload-data-detail-view')?.classList.remove('hidden');
+}
+
+// ── Barnes tab ───────────────────────────────────────────────────────────────
+// No Bullet Brand filter (always Barnes). No case diagram (Barnes doesn't publish one) and no
+// per-row Case/Primer (constant for the whole file, shown in the spec box instead of per powder
+// row like Speer). The charge table is a true min/max range, so it reuses the grouped-column
+// layout — but with Barnes' own "Minimum"/"Maximum" header text rather than Hodgdon's wording.
+
+async function loadBarnesFilters() {
+    try {
+        const res = await fetch(`/reload-data/filters?manufacturer=Barnes`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-barnes-filter-powder-brand', data.powder_brands);
+        fillReloadDataSelect('rd-barnes-filter-powder-name', data.powder_names);
+        fillReloadDataCalibers(data.calibers, 'rd-barnes-caliber-options');
+    } catch (e) {
+        showToast('Failed to load Barnes filters', 'error');
+    }
+}
+registerReloadDataFilterLoader('Barnes', loadBarnesFilters);
+
+async function onBarnesCaliberInput() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(async () => {
+        const caliber = document.getElementById('rd-barnes-filter-caliber')?.value || '';
+        const weightSelect = document.getElementById('rd-barnes-filter-weight');
+        if (caliber) {
+            try {
+                const res = await fetch(`/reload-data/filters?manufacturer=Barnes&caliber=${encodeURIComponent(caliber)}`);
+                const data = await res.json();
+                fillReloadDataSelect('rd-barnes-filter-weight', data.bullet_weights);
+                if (weightSelect && data.bullet_weights.length > 0) {
+                    weightSelect.value = data.bullet_weights[0];
+                }
+            } catch (e) { /* keep existing options on failure */ }
+        } else {
+            fillReloadDataSelect('rd-barnes-filter-weight', []);
+        }
+        _runSearchBarnesData();
+    }, 200);
+}
+
+async function onBarnesPowderBrandChange() {
+    const powderBrand = document.getElementById('rd-barnes-filter-powder-brand')?.value || '';
+    try {
+        const params = new URLSearchParams({ manufacturer: 'Barnes' });
+        if (powderBrand) params.set('powder_brand', powderBrand);
+        const res = await fetch(`/reload-data/filters?${params.toString()}`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-barnes-filter-powder-name', data.powder_names);
+    } catch (e) { /* keep existing options on failure */ }
+    searchBarnesData();
+}
+
+function searchBarnesData() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(_runSearchBarnesData, 200);
+}
+
+async function _runSearchBarnesData() {
+    const results = document.getElementById('rd-barnes-results');
+    const caliber = document.getElementById('rd-barnes-filter-caliber')?.value || '';
+    const weight = document.getElementById('rd-barnes-filter-weight')?.value || '';
+    if (!caliber || !weight) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">Pick a caliber and bullet weight to search.</p>';
+        return;
+    }
+    const params = new URLSearchParams({ caliber, manufacturer: 'Barnes', bullet_weight_gr: weight });
+    const powderBrand = document.getElementById('rd-barnes-filter-powder-brand')?.value;
+    if (powderBrand) params.set('powder_brand', powderBrand);
+    const powderName = document.getElementById('rd-barnes-filter-powder-name')?.value;
+    if (powderName) params.set('powder_name', powderName);
+    if (document.getElementById('rd-barnes-filter-in-stock')?.checked) params.set('in_stock_only', 'true');
+
+    results.innerHTML = '<p class="text-xs text-gray-500 italic">Searching…</p>';
+    try {
+        const res = await fetch(`/reload-data/loads?${params.toString()}`);
+        const rows = res.ok ? await res.json() : [];
+        _reloadDataRows = rows;
+        renderBarnesResults(rows);
+    } catch (e) {
+        results.innerHTML = '<p class="text-xs text-red-400">Search failed — check connection.</p>';
+    }
+}
+
+function renderBarnesResults(rows) {
+    const results = document.getElementById('rd-barnes-results');
+    if (rows.length === 0) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">No matching loads found.</p>';
+        return;
+    }
+    const first = rows[0];
+
+    // Spec box — Case/Primer/dimensions/twist/test-barrel straight from the PDF header, only
+    // the fields that are present.
+    const specField = (label, value) => value ? `<div><span class="text-gray-500">${escHtml(label)}:</span> <span class="text-gray-200 font-semibold ml-1">${escHtml(value)}</span></div>` : '';
+    const specBox = `<div class="mb-5 bg-gray-900/60 rounded-lg border border-gray-700 p-4 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+        ${specField('Case', first.case_brand)}
+        ${specField('Primer', first.primer_display)}
+        ${first.trim_length ? `<div><span class="text-gray-500">Case Trim:</span> <span class="text-gray-200 font-semibold ml-1">${escHtml(first.trim_length)}</span></div>` : ''}
+        ${first.barrel_length ? `<div><span class="text-gray-500">Barrel Length:</span> <span class="text-gray-200 font-semibold ml-1">${escHtml(first.barrel_length)}</span></div>` : ''}
+        ${first.twist ? `<div><span class="text-gray-500">Twist Rate:</span> <span class="text-gray-200 font-semibold ml-1">${escHtml(first.twist)}</span></div>` : ''}
+        ${specField('Barrel', first.test_firearm)}
+    </div>`;
+
+    // Candidate bullets — grouped from the current rows like every other tab.
+    const bulletKey = r => [r.bullet_weight_gr, r.bullet_model].join('|');
+    const bullets = new Map();
+    for (const r of rows) {
+        if (!bullets.has(bulletKey(r))) bullets.set(bulletKey(r), r);
+    }
+    const candidateRows = [...bullets.values()].map(b => `
+        <tr class="border-b border-gray-800 last:border-b-0">
+            <td class="py-2 px-2 font-semibold text-gray-200">${escHtml(b.bullet_weight_gr ? `${b.bullet_weight_gr}gr ` : '')}${escHtml([b.bullet_brand, b.bullet_model].filter(Boolean).join(' '))}${bulletStockBadge(b.bullet_in_stock, b.bullet_owned_model)}</td>
+            <td class="py-2 px-2 text-gray-300">${rdVal(b.bullet_sd)}</td>
+            <td class="py-2 px-2 text-gray-300">${rdVal(b.bullet_bc)}</td>
+            <td class="py-2 px-2 text-gray-300">${b.coal ? escHtml(b.coal) + '"' : '—'}</td>
+        </tr>`).join('');
+
+    const candidateBox = `<div class="mb-5 border border-gray-700 rounded overflow-hidden">
+        <table class="w-full text-xs text-left">
+            <thead>
+                <tr class="bg-gray-950 text-gray-500 font-semibold">
+                    <th class="py-2 px-2">Bullet</th>
+                    <th class="py-2 px-2">Sectional Density</th>
+                    <th class="py-2 px-2">Ballistic Coefficient</th>
+                    <th class="py-2 px-2">C.O.A.L.</th>
+                </tr>
+            </thead>
+            <tbody>${candidateRows}</tbody>
+        </table>
+    </div>`;
+
+    // Charge table: dedupe across the candidate fan-out (same table repeated once per model when
+    // a block covers more than one, e.g. "TSX FB / TAC-X FB" sharing one propellant table).
+    const seen = new Set();
+    const deduped = [];
+    for (const r of rows) {
+        const key = `${r.powder_brand}|${r.powder_name}|${r.start_charge_gr}|${r.max_charge_gr}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(r);
+    }
+
+    const chargeTable = `<table class="w-full text-xs text-left border border-gray-700 rounded overflow-hidden">
+        <thead>
+            <tr class="bg-gray-800 text-gray-400">
+                <th class="py-1.5 px-2" rowspan="2">Powder</th>
+                <th class="py-1 px-2 text-center border-l border-gray-700 text-emerald-400" colspan="2">Minimum</th>
+                <th class="py-1 px-2 text-center border-l border-gray-700 text-rose-400" colspan="2">Maximum</th>
+            </tr>
+            <tr class="bg-gray-800/60 text-gray-500 text-[10px]">
+                <th class="py-1 px-2 border-l border-gray-700">Charge</th>
+                <th class="py-1 px-2">Velocity</th>
+                <th class="py-1 px-2 border-l border-gray-700">Charge</th>
+                <th class="py-1 px-2">Velocity</th>
+            </tr>
+        </thead>
+        <tbody>
+        ${deduped.map((r, i) => `<tr onclick="openReloadDataDetail(${r.id})" class="border-b border-gray-800 last:border-b-0 cursor-pointer hover:bg-rose-950/30 ${i % 2 ? 'bg-gray-900/40' : ''}">
+            <td class="py-1.5 px-2 text-gray-200">${escHtml([r.powder_brand, r.powder_name].filter(Boolean).join(' ') || '—')}${stockBadgeFor(r.powder_in_stock)}</td>
+            <td class="py-1.5 px-2 text-gray-200 border-l border-gray-800">${rdVal(r.start_charge_gr, r.start_is_compressed ? 'C' : '')}</td>
+            <td class="py-1.5 px-2 text-gray-200">${fmtInt(r.start_velocity_fps)}</td>
+            <td class="py-1.5 px-2 text-gray-200 border-l border-gray-800">${rdVal(r.max_charge_gr, r.max_is_compressed ? 'C' : '')}</td>
+            <td class="py-1.5 px-2 text-gray-200">${fmtInt(r.max_velocity_fps)}</td>
+        </tr>`).join('')}
+        </tbody>
+    </table>
+    <p class="text-[10px] text-gray-600 mt-3">"C" marks a compressed charge — always start at the minimum charge and work up.</p>`;
+
+    results.innerHTML = specBox + candidateBox + chargeTable;
+}
+
+// ── Hornady tab ──────────────────────────────────────────────────────────────
+// No Bullet Brand filter (always Hornady). Data here is hand-transcribed from Kindle
+// screenshots one cartridge at a time (no reliable text layer, OCR proved unsafe on the dense
+// charge tables), not uploaded/auto-parsed like the other 5 tabs — so far only 6.5 Creedmoor.
+// Velocity matrix like Sierra's, but each row's highest charge is the book's own "MAXIMUM
+// LOAD — USE WITH CAUTION" red-highlighted entry (`is_max_load`), shown here the same way.
+
+async function loadHornadyFilters() {
+    try {
+        const res = await fetch(`/reload-data/filters?manufacturer=Hornady`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-hornady-filter-powder-brand', data.powder_brands);
+        fillReloadDataSelect('rd-hornady-filter-powder-name', data.powder_names);
+        fillReloadDataCalibers(data.calibers, 'rd-hornady-caliber-options');
+    } catch (e) {
+        showToast('Failed to load Hornady filters', 'error');
+    }
+}
+registerReloadDataFilterLoader('Hornady', loadHornadyFilters);
+
+async function onHornadyCaliberInput() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(async () => {
+        const caliber = document.getElementById('rd-hornady-filter-caliber')?.value || '';
+        const weightSelect = document.getElementById('rd-hornady-filter-weight');
+        if (caliber) {
+            try {
+                const res = await fetch(`/reload-data/filters?manufacturer=Hornady&caliber=${encodeURIComponent(caliber)}`);
+                const data = await res.json();
+                fillReloadDataSelect('rd-hornady-filter-weight', data.bullet_weights);
+                if (weightSelect && data.bullet_weights.length > 0) {
+                    weightSelect.value = data.bullet_weights[0];
+                }
+            } catch (e) { /* keep existing options on failure */ }
+        } else {
+            fillReloadDataSelect('rd-hornady-filter-weight', []);
+        }
+        _runSearchHornadyData();
+    }, 200);
+}
+
+async function onHornadyPowderBrandChange() {
+    const powderBrand = document.getElementById('rd-hornady-filter-powder-brand')?.value || '';
+    try {
+        const params = new URLSearchParams({ manufacturer: 'Hornady' });
+        if (powderBrand) params.set('powder_brand', powderBrand);
+        const res = await fetch(`/reload-data/filters?${params.toString()}`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-hornady-filter-powder-name', data.powder_names);
+    } catch (e) { /* keep existing options on failure */ }
+    searchHornadyData();
+}
+
+function searchHornadyData() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(_runSearchHornadyData, 200);
+}
+
+async function _runSearchHornadyData() {
+    const results = document.getElementById('rd-hornady-results');
+    const caliber = document.getElementById('rd-hornady-filter-caliber')?.value || '';
+    const weight = document.getElementById('rd-hornady-filter-weight')?.value || '';
+    if (!caliber || !weight) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">Pick a caliber and bullet weight to search.</p>';
+        return;
+    }
+    const params = new URLSearchParams({ caliber, manufacturer: 'Hornady', bullet_weight_gr: weight });
+    const powderBrand = document.getElementById('rd-hornady-filter-powder-brand')?.value;
+    if (powderBrand) params.set('powder_brand', powderBrand);
+    const powderName = document.getElementById('rd-hornady-filter-powder-name')?.value;
+    if (powderName) params.set('powder_name', powderName);
+    if (document.getElementById('rd-hornady-filter-in-stock')?.checked) params.set('in_stock_only', 'true');
+
+    results.innerHTML = '<p class="text-xs text-gray-500 italic">Searching…</p>';
+    try {
+        const res = await fetch(`/reload-data/loads?${params.toString()}`);
+        const rows = res.ok ? await res.json() : [];
+        _reloadDataRows = rows;
+        renderHornadyResults(rows);
+    } catch (e) {
+        results.innerHTML = '<p class="text-xs text-red-400">Search failed — check connection.</p>';
+    }
+}
+
+function renderHornadyResults(rows) {
+    const results = document.getElementById('rd-hornady-results');
+    if (rows.length === 0) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">No matching loads found.</p>';
+        return;
+    }
+    const first = rows[0];
+
+    const specField = (label, value) => value ? `<div><span class="text-gray-500">${escHtml(label)}:</span> <span class="text-gray-200 font-semibold ml-1">${escHtml(value)}</span></div>` : '';
+    const specBox = `<div class="mb-5 bg-gray-900/60 rounded-lg border border-gray-700 p-4 grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+        ${specField('Rifle', first.test_firearm)}
+        ${specField('Barrel', first.twist ? `${first.barrel_length ? escHtml(first.barrel_length) + ', ' : ''}${escHtml(first.twist)}` : first.barrel_length)}
+        ${specField('Case', first.case_brand)}
+        ${specField('Primer', first.primer_display)}
+        ${first.bullet_dia ? `<div><span class="text-gray-500">Bullet Diameter:</span> <span class="text-gray-200 font-semibold ml-1">${escHtml(first.bullet_dia)}"</span></div>` : ''}
+        ${first.max_saami_oal ? `<div><span class="text-gray-500">Maximum COL:</span> <span class="text-gray-200 font-semibold ml-1">${escHtml(first.max_saami_oal)}"</span></div>` : ''}
+        ${specField('Max. Case Length', first.max_case_length)}
+        ${specField('Case Trim Length', first.trim_length)}
+    </div>`;
+
+    // Candidate bullets — grouped from the current rows like every other tab.
+    const bulletKey = r => [r.bullet_weight_gr, r.bullet_model, r.bullet_code].join('|');
+    const bullets = new Map();
+    for (const r of rows) {
+        if (!bullets.has(bulletKey(r))) bullets.set(bulletKey(r), r);
+    }
+    const showG7 = [...bullets.values()].some(b => b.bullet_bc_g7 !== null);
+    const showSd = [...bullets.values()].some(b => b.bullet_sd !== null);
+    const candidateRows = [...bullets.values()].map(b => `
+        <tr class="border-b border-gray-800 last:border-b-0">
+            <td class="py-2 px-2 font-semibold text-gray-200">${escHtml(b.bullet_weight_gr ? `${b.bullet_weight_gr}gr ` : '')}${escHtml([b.bullet_brand, b.bullet_model].filter(Boolean).join(' '))}${bulletStockBadge(b.bullet_in_stock, b.bullet_owned_model)}</td>
+            <td class="py-2 px-2 text-gray-300">${escHtml(b.bullet_code || '—')}</td>
+            <td class="py-2 px-2 text-gray-300">${b.coal ? escHtml(b.coal) + '"' : '—'}</td>
+            <td class="py-2 px-2 text-gray-300">${rdVal(b.bullet_bc)}</td>
+            ${showG7 ? `<td class="py-2 px-2 text-gray-300">${rdVal(b.bullet_bc_g7)}</td>` : ''}
+            ${showSd ? `<td class="py-2 px-2 text-gray-300">${rdVal(b.bullet_sd)}</td>` : ''}
+        </tr>`).join('');
+
+    const candidateBox = `<div class="mb-5 border border-gray-700 rounded overflow-hidden">
+        <table class="w-full text-xs text-left">
+            <thead>
+                <tr class="bg-gray-950 text-gray-500 font-semibold">
+                    <th class="py-2 px-2">Bullet</th>
+                    <th class="py-2 px-2">Item No.</th>
+                    <th class="py-2 px-2">C.O.L.</th>
+                    <th class="py-2 px-2">G1 B.C.</th>
+                    ${showG7 ? '<th class="py-2 px-2">G7 B.C.</th>' : ''}
+                    ${showSd ? '<th class="py-2 px-2">Sectional Density</th>' : ''}
+                </tr>
+            </thead>
+            <tbody>${candidateRows}</tbody>
+        </table>
+    </div>`;
+
+    // Velocity matrix: dedupe across the candidate fan-out, pivot into powder rows × velocity
+    // columns — every row is left-aligned starting at the lowest velocity column (confirmed
+    // against real pages, not assumed), and its highest charge is the book's own red-highlighted
+    // "maximum load" entry (`is_max_load`).
+    _hornadyLastRows = rows;
+    const seen = new Set();
+    const deduped = [];
+    for (const r of rows) {
+        const key = `${r.powder_brand}|${r.powder_name}|${r.start_velocity_fps}|${r.start_charge_gr}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(r);
+    }
+    const velocities = [...new Set(deduped.map(r => r.start_velocity_fps))].sort((a, b) => a - b);
+    const powders = new Map();
+    for (const r of deduped) {
+        const key = `${r.powder_brand || ''}|${r.powder_name || ''}`;
+        if (!powders.has(key)) powders.set(key, { label: [r.powder_brand, r.powder_name].filter(Boolean).join(' ') || '—', inStock: r.powder_in_stock, cells: {} });
+        powders.get(key).cells[r.start_velocity_fps] = r;
+    }
+
+    const matrixTable = `<table class="w-full text-xs text-left border border-gray-700 rounded overflow-hidden">
+        <thead>
+            <tr class="bg-gray-800 text-gray-400">
+                <th class="py-1.5 px-2">Powder</th>
+                ${velocities.map(v => `<th class="py-1.5 px-2 text-center border-l border-gray-700">${fmtInt(v)}</th>`).join('')}
+            </tr>
+        </thead>
+        <tbody>
+        ${[...powders.entries()].map(([key, p], i) => `<tr onclick="openHornadyPowderDetail('${escHtml(key).replace(/'/g, "\\'")}')" class="border-b border-gray-800 last:border-b-0 cursor-pointer hover:bg-rose-950/30 ${i % 2 ? 'bg-gray-900/40' : ''}">
+            <td class="py-1.5 px-2 text-gray-200">${escHtml(p.label)}${stockBadgeFor(p.inStock)}</td>
+            ${velocities.map(v => {
+                const r = p.cells[v];
+                if (!r) return '<td class="py-1.5 px-2 text-center border-l border-gray-800 text-gray-700">—</td>';
+                return `<td class="py-1.5 px-2 text-center border-l border-gray-800 ${r.is_max_load ? 'bg-rose-900/60 text-white font-bold' : 'text-gray-200'}">${rdVal(r.start_charge_gr, r.start_is_compressed ? 'C' : '')}</td>`;
+            }).join('')}
+        </tr>`).join('')}
+        </tbody>
+    </table>
+    <p class="text-[10px] text-gray-600 mt-3">Velocity (ft/sec) across the top — highlighted cells indicate maximum load, use with caution. Click a row to see the whole line.</p>`;
+
+    results.innerHTML = specBox + candidateBox + matrixTable;
+}
+
+let _hornadyLastRows = [];
+
+// Same "click the row, see the whole line" pattern as Sierra's velocity matrix.
+function openHornadyPowderDetail(powderKey) {
+    const matching = _hornadyLastRows.filter(r => `${r.powder_brand || ''}|${r.powder_name || ''}` === powderKey);
+    if (matching.length === 0) return;
+
+    const seenVel = new Set();
+    const pairs = [];
+    for (const r of matching) {
+        if (seenVel.has(r.start_velocity_fps)) continue;
+        seenVel.add(r.start_velocity_fps);
+        pairs.push(r);
+    }
+    pairs.sort((a, b) => (a.start_velocity_fps ?? 0) - (b.start_velocity_fps ?? 0));
+
+    const first = matching[0];
+    const box = document.getElementById('reload-data-detail-content');
+    const stockBadge = (inStock) => inStock
+        ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300 border border-emerald-800/50 ml-2">✓ In stock</span>'
+        : '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 border border-gray-600 ml-2">Not in stock</span>';
+
+    const leftCol = `
+        <div>
+            <h3 class="text-xl font-bold text-white">${escHtml([first.powder_brand, first.powder_name].filter(Boolean).join(' '))}${stockBadge(first.powder_in_stock)}</h3>
+            <p class="text-sm text-gray-400 mt-1">${escHtml(first.bullet_weight_gr ? `${first.bullet_weight_gr}gr ` : '')}${escHtml([first.bullet_brand, first.bullet_model].filter(Boolean).join(' '))}</p>
+            <p class="text-xs text-gray-500 mt-2">
+                <span class="text-rose-400 font-semibold">${escHtml(first.manufacturer || '')}</span> · ${escHtml(first.caliber || '')}${first.twist ? ` · Twist ${escHtml(first.twist)}` : ''}${first.barrel_length ? ` · ${escHtml(first.barrel_length)} barrel` : ''}
+                ${first.source_file_path ? `<a href="${escHtml(first.source_file_path)}" target="_blank" rel="noopener" class="ml-2 text-blue-400 hover:text-blue-300 underline" onclick="event.stopPropagation()">View source PDF ↗</a>` : ''}
+            </p>
+        </div>
+
+        <table class="w-full text-xs text-left border border-gray-700 rounded overflow-hidden mt-5">
+            <thead>
+                <tr class="bg-gray-800 text-gray-400">
+                    <th class="py-1.5 px-2">Velocity (fps)</th>
+                    <th class="py-1.5 px-2">Charge (gr)</th>
+                </tr>
+            </thead>
+            <tbody>
+            ${pairs.map((r, i) => `<tr class="border-b border-gray-800 last:border-b-0 ${r.is_max_load ? 'bg-rose-900/40' : (i % 2 ? 'bg-gray-900/40' : '')}">
+                <td class="py-1.5 px-2 text-gray-200">${fmtInt(r.start_velocity_fps)}</td>
+                <td class="py-1.5 px-2 text-gray-200">${rdVal(r.start_charge_gr, r.start_is_compressed ? 'C' : '')}${r.is_max_load ? ' <span class="text-rose-300 font-bold">MAX</span>' : ''}</td>
+            </tr>`).join('')}
+            </tbody>
+        </table>
+
+        ${(first.coal || first.case_brand || first.primer_display) ? `<div class="grid grid-cols-2 gap-3 text-sm mt-5">
+            ${first.coal ? `<div><span class="text-gray-500">C.O.L.:</span> <span class="text-gray-200 font-semibold">${escHtml(first.coal)}"</span></div>` : ''}
+            ${first.case_brand ? `<div><span class="text-gray-500">Case:</span> <span class="text-gray-200 font-semibold">${escHtml(first.case_brand)}</span></div>` : ''}
+            ${first.primer_display ? `<div class="col-span-2"><span class="text-gray-500">Primer:</span> <span class="text-gray-200 font-semibold">${escHtml(first.primer_display)}</span></div>` : ''}
+        </div>` : ''}
+
+        <p class="text-xs text-amber-400 mt-4">⚠ MAXIMUM LOAD — USE WITH CAUTION.</p>
+        <p class="text-[10px] text-gray-600 mt-4">${first.data_as_of ? `Data current as of ${escHtml(first.data_as_of)}` : ''} — Hornady publishes the charge needed to reach each velocity, up to the maximum shown.</p>`;
+
+    const rightCol = first.case_diagram_path ? `
+        <img src="${escHtml(first.case_diagram_path)}" alt="Case dimension diagram" onclick="openReloadDataImageLightbox('${escHtml(first.case_diagram_path)}')"
+            class="w-full h-auto max-h-[420px] object-contain rounded border border-gray-700 bg-white cursor-zoom-in hover:opacity-90 transition" title="Click to enlarge">` : '';
+
+    box.innerHTML = `
+        <div class="bg-gray-800 p-5 rounded-lg border border-gray-700 shadow-xl flex flex-col lg:flex-row gap-6">
+            <div class="flex-1 min-w-0">${leftCol}</div>
+            ${rightCol ? `<div class="lg:w-[45%] shrink-0 self-start">${rightCol}</div>` : ''}
+        </div>`;
+    document.getElementById(`rd-mfr-pane-${_rdActiveManufacturer}`)?.classList.add('hidden');
+    document.getElementById('reload-data-detail-view')?.classList.remove('hidden');
+}
+
+// ── Lyman tab ────────────────────────────────────────────────────────────────
+// Structurally the same shape as Hodgdon (true starting/maximum range per row, one row per
+// powder, spans every bullet weight/brand in one caliber file) rather than the single-bullet-
+// scoped Nosler/Speer/Sierra/Barnes/Hornady pattern — Lyman's own book mixes bullets from many
+// makers (Speer/Hornady/Sierra/Lapua/Berger/Nosler) for the same caliber, so a Bullet Brand
+// filter is meaningful here too. Reuses the exact same renderReloadDataResults()/
+// openReloadDataDetail() the Hodgdon tab uses (star badge = bold "potentially most accurate"
+// row, "reduced" badge = Lyman's "**" reduced-load marker), just pointed at its own filter bar
+// and results container.
+
+async function loadLymanFilters() {
+    try {
+        const res = await fetch(`/reload-data/filters?manufacturer=Lyman`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-lyman-filter-bullet-brand', data.bullet_brands);
+        fillReloadDataSelect('rd-lyman-filter-powder-brand', data.powder_brands);
+        fillReloadDataSelect('rd-lyman-filter-powder-name', data.powder_names);
+        fillReloadDataCalibers(data.calibers, 'rd-lyman-caliber-options');
+    } catch (e) {
+        showToast('Failed to load reloading data filters', 'error');
+    }
+}
+registerReloadDataFilterLoader('Lyman', loadLymanFilters);
+
+async function onLymanCaliberInput() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(async () => {
+        const caliber = document.getElementById('rd-lyman-filter-caliber')?.value || '';
+        if (caliber) {
+            try {
+                const res = await fetch(`/reload-data/filters?manufacturer=Lyman&caliber=${encodeURIComponent(caliber)}`);
+                const data = await res.json();
+                fillReloadDataSelect('rd-lyman-filter-weight', data.bullet_weights);
+            } catch (e) { /* keep existing options on failure */ }
+        } else {
+            fillReloadDataSelect('rd-lyman-filter-weight', []);
+        }
+        _runSearchLymanData();
+    }, 200);
+}
+
+async function onLymanPowderBrandChange() {
+    const powderBrand = document.getElementById('rd-lyman-filter-powder-brand')?.value || '';
+    try {
+        const params = new URLSearchParams({ manufacturer: 'Lyman' });
+        if (powderBrand) params.set('powder_brand', powderBrand);
+        const res = await fetch(`/reload-data/filters?${params.toString()}`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-lyman-filter-powder-name', data.powder_names);
+    } catch (e) { /* keep existing options on failure */ }
+    searchLymanData();
+}
+
+function searchLymanData() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(_runSearchLymanData, 200);
+}
+
+async function _runSearchLymanData() {
+    const results = document.getElementById('rd-lyman-results');
+    const caliber = document.getElementById('rd-lyman-filter-caliber')?.value || '';
+    if (!caliber) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">Pick a caliber to search.</p>';
+        return;
+    }
+    const params = new URLSearchParams({ caliber, manufacturer: 'Lyman' });
+    const weight = document.getElementById('rd-lyman-filter-weight')?.value;
+    if (weight) params.set('bullet_weight_gr', weight);
+    const bulletBrand = document.getElementById('rd-lyman-filter-bullet-brand')?.value;
+    if (bulletBrand) params.set('bullet_brand', bulletBrand);
+    const powderBrand = document.getElementById('rd-lyman-filter-powder-brand')?.value;
+    if (powderBrand) params.set('powder_brand', powderBrand);
+    const powderName = document.getElementById('rd-lyman-filter-powder-name')?.value;
+    if (powderName) params.set('powder_name', powderName);
+    if (document.getElementById('rd-lyman-filter-in-stock')?.checked) params.set('in_stock_only', 'true');
+
+    results.innerHTML = '<p class="text-xs text-gray-500 italic">Searching…</p>';
+    try {
+        const res = await fetch(`/reload-data/loads?${params.toString()}`);
+        const rows = res.ok ? await res.json() : [];
+        _reloadDataRows = rows;
+        renderReloadDataResults(rows, 'rd-lyman-results');
+    } catch (e) {
+        results.innerHTML = '<p class="text-xs text-red-400">Search failed — check connection.</p>';
+    }
+}
+
+// Comma-formatted whole numbers (velocity/pressure) vs. plain decimals (charge gr) — matches
+// how Hodgdon's own data pages format these fields.
+function fmtInt(v) {
+    return (v === null || v === undefined) ? '—' : Math.round(v).toLocaleString();
+}
+
+function renderReloadDataResults(rows, resultsElId = 'reload-data-results') {
+    const results = document.getElementById(resultsElId);
     if (rows.length === 0) {
         results.innerHTML = '<p class="text-xs text-gray-500 italic">No matching loads found.</p>';
         return;
@@ -5174,99 +6522,91 @@ function renderReloadDataResults(rows) {
         : ownedModel
             ? `<span class="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-900/50 text-amber-300 border border-amber-800/50 ml-1">have: ${escHtml(ownedModel)}</span>`
             : '';
-    results.innerHTML = `<table class="w-full text-xs text-left">
-        <thead><tr class="text-gray-400 border-b border-gray-700">
-            <th class="py-2 pr-3">Bullet</th><th class="py-2 pr-3">Powder</th>
-            <th class="py-2 pr-3">Charge (gr)</th><th class="py-2 pr-3">Velocity (fps)</th>
-            <th class="py-2 pr-3">Pressure</th><th class="py-2 pr-3">Density %</th>
-            <th class="py-2 pr-3">C.O.L.</th>
-        </tr></thead>
-        <tbody>
-        ${rows.map((r, i) => `<tr onclick="openReloadDataDetail(${r.id})" class="border-b border-gray-800 text-gray-200 cursor-pointer hover:bg-rose-950/30 ${i % 2 ? 'bg-gray-900/40' : ''}">
-            <td class="py-2 pr-3">${escHtml(r.bullet_weight_gr ? `${r.bullet_weight_gr}gr ` : '')}${escHtml([r.bullet_brand, r.bullet_model].filter(Boolean).join(' '))}${bulletBadge(r.bullet_in_stock, r.bullet_owned_model)}</td>
-            <td class="py-2 pr-3">${escHtml([r.powder_brand, r.powder_name].filter(Boolean).join(' '))}${stockBadge(r.powder_in_stock)}</td>
-            <td class="py-2 pr-3">${rdVal(r.start_charge_gr, r.start_is_compressed ? 'C' : '')} – ${rdVal(r.max_charge_gr, r.max_is_compressed ? 'C' : '')}</td>
-            <td class="py-2 pr-3">${rdVal(r.start_velocity_fps)} – ${rdVal(r.max_velocity_fps)}</td>
-            <td class="py-2 pr-3">${rdVal(r.start_pressure)}–${rdVal(r.max_pressure)} ${escHtml(r.max_pressure_unit || '')}</td>
-            <td class="py-2 pr-3">${rdVal(r.start_density_pct)}–${rdVal(r.max_density_pct)}</td>
-            <td class="py-2 pr-3">${escHtml(r.coal || '')}</td>
-        </tr>`).join('')}
-        </tbody>
-    </table>`;
-}
 
-function toggleReloadDataUploadPanel() {
-    const panel = document.getElementById('reload-data-upload-panel');
-    const caret = document.getElementById('reload-data-upload-caret');
-    if (!panel) return;
-    panel.classList.toggle('hidden');
-    caret.textContent = panel.classList.contains('hidden') ? '▸' : '▾';
-    if (!panel.classList.contains('hidden')) loadReloadDataSources();
-}
+    // Optional columns only render if at least one row in this result set has data for
+    // them — e.g. Barnes publishes no pressure/density figures, so those columns would
+    // otherwise be entirely empty for a Barnes-only search.
+    const showVelocity = rows.some(r => r.start_velocity_fps !== null || r.max_velocity_fps !== null);
+    const showPressure = rows.some(r => r.start_pressure !== null || r.max_pressure !== null);
+    const showDensity = rows.some(r => r.start_density_pct !== null || r.max_density_pct !== null);
+    const showCoal = rows.some(r => r.coal);
 
-async function uploadReloadDataPdf() {
-    const input = document.getElementById('reload-data-file-input');
-    const file = input?.files?.[0];
-    if (!file) { showToast('Choose a PDF first', 'info'); return; }
-    const btn = document.getElementById('reload-data-upload-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
-    try {
-        const fd = new FormData();
-        fd.append('file', file);
-        const res = await fetch('/reload-data/upload', { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!res.ok) { showToast(data.detail || 'Upload failed', 'error'); return; }
-        showToast(`Imported ${data.rows_imported} loads for ${data.caliber}${data.rows_rejected ? ` (${data.rows_rejected} rows skipped — see console)` : ''}`, 'success');
-        if (data.rejected_sample?.length) {
-            console.warn(`[reload-data] ${data.rows_rejected} row(s) skipped for ${data.caliber}:`, data.rejected_sample);
-        }
-        input.value = '';
-        _reloadDataFiltersLoaded = false;
-        await loadReloadDataFilters();
-        _reloadDataFiltersLoaded = true;
-        loadReloadDataSources();
-    } catch (e) {
-        showToast('Upload failed — check connection', 'error');
-    } finally {
-        if (btn) { btn.disabled = false; btn.textContent = 'Upload'; }
+    // Layout modeled on Hodgdon's own data pages: one header banner per distinct bullet
+    // (weight/brand/model/diameter/case/primer), then a table of every powder choice for
+    // that bullet, split into a "Starting Load" and "Maximum Load" column group rather than
+    // one combined "start – max" cell per field.
+    const groups = new Map();
+    for (const r of rows) {
+        const key = [r.bullet_weight_gr, r.bullet_brand, r.bullet_model, r.bullet_dia, r.case_brand, r.primer_display].join('|');
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(r);
     }
-}
 
-async function loadReloadDataSources() {
-    const box = document.getElementById('reload-data-sources-list');
-    if (!box) return;
-    try {
-        const res = await fetch('/reload-data/sources');
-        const sources = res.ok ? await res.json() : [];
-        if (sources.length === 0) {
-            box.innerHTML = '<p class="text-[11px] text-gray-600 italic">No calibers imported yet.</p>';
-            return;
-        }
-        box.innerHTML = sources.map(s => `<div class="flex items-center justify-between bg-gray-900/60 rounded px-3 py-1.5">
-            <div>
-                <span class="text-xs font-bold text-gray-100">${escHtml(s.caliber)}</span>
-                <span class="text-[10px] text-gray-500 ml-2">${s.row_count} loads${s.data_as_of ? ` · as of ${escHtml(s.data_as_of)}` : ''}</span>
+    const first = rows[0];
+    const summary = `<div class="text-center py-3 border-b border-gray-700 mb-4">
+        <p class="text-sm text-gray-300">Your search returned <span class="font-bold text-white">${rows.length}</span> load${rows.length === 1 ? '' : 's'}</p>
+        ${(first.twist || first.barrel_length || first.trim_length) ? `<div class="flex justify-center flex-wrap gap-x-6 gap-y-1 mt-2 text-xs text-gray-400">
+            ${first.twist ? `<div><span class="font-semibold text-gray-300">Twist:</span> ${escHtml(first.twist)}</div>` : ''}
+            ${first.barrel_length ? `<div><span class="font-semibold text-gray-300">Barrel Length:</span> ${escHtml(first.barrel_length)}"</div>` : ''}
+            ${first.trim_length ? `<div><span class="font-semibold text-gray-300">Trim Length:</span> ${escHtml(first.trim_length)}"</div>` : ''}
+        </div>` : ''}
+    </div>`;
+
+    const groupBlocks = [...groups.values()].map(groupRows => {
+        const g = groupRows[0];
+        return `<div class="mb-5 last:mb-0">
+            <div class="bg-gray-950 border border-gray-700 rounded-t px-4 py-2 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+                <div><span class="text-gray-500">Bullet:</span> <span class="font-bold text-white">${escHtml(g.bullet_weight_gr ? `${g.bullet_weight_gr}gr ` : '')}${escHtml([g.bullet_brand, g.bullet_model].filter(Boolean).join(' '))}</span>${bulletBadge(g.bullet_in_stock, g.bullet_owned_model)}</div>
+                ${g.bullet_dia ? `<div><span class="text-gray-500">Diameter:</span> <span class="font-semibold text-gray-200">${escHtml(g.bullet_dia)}"</span></div>` : ''}
+                ${g.case_brand ? `<div><span class="text-gray-500">Case:</span> <span class="font-semibold text-gray-200">${escHtml(g.case_brand)}</span></div>` : ''}
+                ${g.primer_display ? `<div><span class="text-gray-500">Primer:</span> <span class="font-semibold text-gray-200">${escHtml(g.primer_display)}</span></div>` : ''}
             </div>
-            <button onclick="deleteReloadDataSource(${s.id})" class="text-gray-500 hover:text-red-400 text-xs cursor-pointer">🗑️</button>
-        </div>`).join('');
-    } catch (e) {
-        box.innerHTML = '<p class="text-[11px] text-red-400">Failed to load.</p>';
-    }
+            <table class="w-full text-xs text-left border border-t-0 border-gray-700 rounded-b overflow-hidden">
+                <thead>
+                    <tr class="bg-gray-800 text-gray-400">
+                        <th class="py-1.5 px-2" rowspan="2">Powder Mfr</th>
+                        <th class="py-1.5 px-2" rowspan="2">Powder</th>
+                        ${showCoal ? '<th class="py-1.5 px-2" rowspan="2">C.O.L.</th>' : ''}
+                        <th class="py-1 px-2 text-center border-l border-gray-700 text-emerald-400" colspan="${1 + showVelocity + showPressure + showDensity}">Starting Load</th>
+                        <th class="py-1 px-2 text-center border-l border-gray-700 text-rose-400" colspan="${1 + showVelocity + showPressure + showDensity}">Maximum Load</th>
+                    </tr>
+                    <tr class="bg-gray-800/60 text-gray-500 text-[10px]">
+                        <th class="py-1 px-2 border-l border-gray-700">Grs.</th>
+                        ${showVelocity ? '<th class="py-1 px-2">Vel. (ft/s)</th>' : ''}
+                        ${showPressure ? '<th class="py-1 px-2">Pressure</th>' : ''}
+                        ${showDensity ? '<th class="py-1 px-2">Density %</th>' : ''}
+                        <th class="py-1 px-2 border-l border-gray-700">Grs.</th>
+                        ${showVelocity ? '<th class="py-1 px-2">Vel. (ft/s)</th>' : ''}
+                        ${showPressure ? '<th class="py-1 px-2">Pressure</th>' : ''}
+                        ${showDensity ? '<th class="py-1 px-2">Density %</th>' : ''}
+                    </tr>
+                </thead>
+                <tbody>
+                ${groupRows.map((r, i) => `<tr onclick="openReloadDataDetail(${r.id})" class="border-b border-gray-800 last:border-b-0 text-gray-200 cursor-pointer hover:bg-rose-950/30 ${i % 2 ? 'bg-gray-900/40' : ''} ${r.is_recommended ? 'bg-amber-950/20' : ''}">
+                    <td class="py-2 px-2">${escHtml(r.powder_brand || '—')}</td>
+                    <td class="py-2 px-2">${r.is_recommended ? '<span title="Potentially most accurate load">★</span> ' : ''}${escHtml(r.powder_name || '—')}${stockBadge(r.powder_in_stock)}${r.is_reduced_load ? '<span class="text-[9px] font-bold px-1 py-0.5 rounded bg-sky-900/50 text-sky-300 border border-sky-800/50 ml-1">reduced</span>' : ''}</td>
+                    ${showCoal ? `<td class="py-2 px-2">${r.coal ? escHtml(r.coal) + '"' : '—'}</td>` : ''}
+                    <td class="py-2 px-2 border-l border-gray-800">${rdVal(r.start_charge_gr, r.start_is_compressed ? 'C' : '')}</td>
+                    ${showVelocity ? `<td class="py-2 px-2">${fmtInt(r.start_velocity_fps)}</td>` : ''}
+                    ${showPressure ? `<td class="py-2 px-2">${fmtInt(r.start_pressure)} ${escHtml(r.start_pressure_unit || '')}</td>` : ''}
+                    ${showDensity ? `<td class="py-2 px-2">${rdVal(r.start_density_pct, '%')}</td>` : ''}
+                    <td class="py-2 px-2 border-l border-gray-800">${rdVal(r.max_charge_gr, r.max_is_compressed ? 'C' : '')}</td>
+                    ${showVelocity ? `<td class="py-2 px-2">${fmtInt(r.max_velocity_fps)}</td>` : ''}
+                    ${showPressure ? `<td class="py-2 px-2">${fmtInt(r.max_pressure)} ${escHtml(r.max_pressure_unit || '')}</td>` : ''}
+                    ${showDensity ? `<td class="py-2 px-2">${rdVal(r.max_density_pct, '%')}</td>` : ''}
+                </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>`;
+    }).join('');
+
+    results.innerHTML = summary + groupBlocks;
 }
 
-async function deleteReloadDataSource(id) {
-    if (!confirm('Delete this caliber\'s reloading data?')) return;
-    try {
-        const res = await fetch(`/reload-data/sources/${id}`, { method: 'DELETE' });
-        if (!res.ok) { showToast('Delete failed', 'error'); return; }
-        showToast('Deleted', 'success');
-        loadReloadDataSources();
-        _reloadDataFiltersLoaded = false;
-        loadReloadDataFilters().then(() => { _reloadDataFiltersLoaded = true; });
-    } catch (e) {
-        showToast('Delete failed — check connection', 'error');
-    }
-}
+// Upload/manage moved to the standalone /admin/reload-data page
+// (templates/admin_reload_data.html) — makes no sense as a collapsible panel
+// buried in the browse tab. See uploadReloadDataPdf()/loadReloadDataSources()/
+// deleteReloadDataSource() there instead.
 
 window.onload = () => {
     fetchInitialLookupData(); applyPreferences(); loadLandingStats(); initCustomAC();

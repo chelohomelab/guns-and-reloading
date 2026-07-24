@@ -1,0 +1,3 @@
+[submodule "scripts/reload_data_seeds/data"]
+	path = scripts/reload_data_seeds/data
+	url = git@github.com:chelohomelab/reloading-books.git

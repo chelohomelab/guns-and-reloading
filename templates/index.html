@@ -70,7 +70,7 @@
             <button id="nav-btn-reload-data" onclick="switchTab('reload-data-tab'); closeSidebar()"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">📖</span>
-                <div><div class="text-sm font-bold text-white">Reloading Data</div><div class="text-[10px] text-rose-400/70">Hodgdon lookup</div></div>
+                <div><div class="text-sm font-bold text-white">Reloading Data Center</div><div class="text-[10px] text-rose-400/70">6 manufacturers</div></div>
             </button>
             <button onclick="switchTab('add-tab'); switchFormCategory('cat-platforms'); closeSidebar()"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 border border-amber-800/40 hover:border-amber-500/40 transition cursor-pointer text-left">
@@ -111,6 +111,7 @@
                 <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
                 <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
                 <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
+                <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Reloading Data Center</a>
                 {% endif %}
                 <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
                 <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
@@ -190,10 +191,10 @@
                         </div>
                     </div>
 
-                    <div id="group-metadata" class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-gray-850 p-3 rounded border border-gray-700 hidden">
+                    <div id="group-metadata" class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-gray-850 p-3 rounded border border-gray-700 hidden">
                         <div>
                             <label class="block text-xs text-gray-200 font-semibold mb-1">Firearm Used</label>
-                            <select id="select-gun" class="w-full bg-gray-700 border border-gray-600 rounded p-1 text-xs text-white focus:outline-none">
+                            <select id="select-gun" onchange="onMeasureGunChange()" class="w-full bg-gray-700 border border-gray-600 rounded p-1 text-xs text-white focus:outline-none">
                                 <option value="">-- Select Rifle --</option>
                             </select>
                         </div>
@@ -203,12 +204,23 @@
                                 <option value="">-- Select Load Profile --</option>
                             </select>
                         </div>
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Distance to Target (yd)</label>
+                            <input type="number" id="group-distance-yards" step="1" min="1" value="100" placeholder="e.g., 100" class="w-full bg-gray-700 border border-gray-600 rounded p-1.5 text-xs text-white focus:outline-none">
+                        </div>
                         <div class="flex items-end">
                             <button onclick="saveCurrentGroup()" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-1.5 rounded text-xs transition cursor-pointer">
                                 Confirm & Save Group
                             </button>
                         </div>
-                        <div class="md:col-span-3 pt-1 border-t border-gray-700">
+                        <div class="md:col-span-4 flex gap-2 items-center flex-wrap pt-1 border-t border-gray-700">
+                            <button onclick="startMarkingPoa()" id="mark-poa-btn" class="px-3 py-1.5 bg-cyan-700 hover:bg-cyan-600 text-white font-bold text-xs rounded transition cursor-pointer">
+                                🎯 Mark Point of Aim
+                            </button>
+                            <span id="poa-status" class="text-xs text-gray-400"></span>
+                            <button onclick="clearPoa()" id="clear-poa-btn" class="hidden text-xs text-red-400 hover:text-red-300 underline cursor-pointer">✕ Clear POA</button>
+                        </div>
+                        <div class="md:col-span-4 pt-1 border-t border-gray-700">
                             <button onclick="resetCalibration()" class="w-full bg-gray-700 hover:bg-gray-600 text-blue-400 hover:text-blue-300 font-medium py-1.5 rounded text-xs transition cursor-pointer">
                                 ↺ Re-calibrate — redo the two reference points
                             </button>
@@ -218,10 +230,18 @@
                     <div class="relative overflow-auto border border-gray-700 rounded bg-gray-950 max-h-[650px] flex justify-center items-start">
                         <canvas id="target-canvas" class="max-w-full cursor-crosshair"></canvas>
                     </div>
+                    <p class="text-[11px] text-gray-500">Tap a hole to place a shot · drag a placed marker to fix its position · use "🗑 Remove a Shot" below to delete one</p>
 
-                    <div class="flex justify-between items-center">
-                        <div id="live-result" class="text-sm text-emerald-400 font-mono font-bold hidden">Current Span: 0.000"</div>
-                        <button onclick="resetCanvas()" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded transition cursor-pointer">Clear Workspace</button>
+                    <div class="flex justify-between items-center flex-wrap gap-2">
+                        <div class="space-y-0.5">
+                            <div id="live-result" class="text-sm text-emerald-400 font-mono font-bold hidden">Current Span: 0.000"</div>
+                            <div id="live-atz" class="text-xs text-cyan-400 font-mono hidden"></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="undoLastShot()" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded transition cursor-pointer">↩ Undo Last Shot</button>
+                            <button onclick="toggleDeleteMode()" id="delete-mode-btn" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded transition cursor-pointer">🗑 Remove a Shot</button>
+                            <button onclick="resetCanvas()" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded transition cursor-pointer">Clear Workspace</button>
+                        </div>
                     </div>
                 </div>
 
@@ -407,73 +427,342 @@
         </section>
 
         <section id="reload-data-tab" class="hidden space-y-4">
-            <div class="flex justify-between items-center border-b border-gray-700 pb-2">
-                <h2 class="text-2xl font-bold">Reloading Data</h2>
-                <span class="text-xs text-gray-500">Hodgdon Reloading Data Center</span>
-            </div>
-
-            {% if user.is_admin %}
-            <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl">
-                <button onclick="toggleReloadDataUploadPanel()" class="w-full flex items-center justify-between px-4 py-3 text-xs text-gray-200 font-semibold cursor-pointer">
-                    <span>📤 Upload Reloading Data PDF (admin)</span>
-                    <span id="reload-data-upload-caret">▸</span>
-                </button>
-                <div id="reload-data-upload-panel" class="hidden px-4 pb-4 space-y-3">
-                    <p class="text-[11px] text-gray-500">Upload a Hodgdon "Reloading Data Center" PDF export
-                        (one caliber per file). Re-uploading a caliber fully replaces its existing data.</p>
-                    <div class="flex gap-2">
-                        <input type="file" id="reload-data-file-input" accept=".pdf" class="flex-1 text-xs text-gray-300 bg-gray-900 border border-gray-600 rounded p-2">
-                        <button onclick="uploadReloadDataPdf()" id="reload-data-upload-btn" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded transition cursor-pointer">Upload</button>
-                    </div>
-                    <div id="reload-data-sources-list" class="space-y-1.5 max-h-64 overflow-y-auto">
-                        <p class="text-[11px] text-gray-600 italic">Loading…</p>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
-            <div id="reload-data-list-view" class="space-y-4">
-                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl grid grid-cols-2 md:grid-cols-5 gap-3">
-                    <div>
-                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Caliber</label>
-                        <select id="rd-filter-caliber" onchange="searchReloadData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
-                            <option value="">Any</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Weight (gr)</label>
-                        <input type="number" id="rd-filter-weight" oninput="searchReloadData()" placeholder="Any" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Brand</label>
-                        <select id="rd-filter-bullet-brand" onchange="searchReloadData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
-                            <option value="">Any</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder Brand</label>
-                        <select id="rd-filter-powder-brand" onchange="searchReloadData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
-                            <option value="">Any</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder</label>
-                        <select id="rd-filter-powder-name" onchange="searchReloadData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
-                            <option value="">Any</option>
-                        </select>
-                    </div>
-                    <label class="col-span-2 md:col-span-5 flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
-                        <input type="checkbox" id="rd-filter-in-stock" onchange="searchReloadData()" class="cursor-pointer">
-                        In stock only (bullet or powder matches your inventory)
-                    </label>
-                </div>
-
-                <div id="reload-data-results" class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-4 overflow-x-auto">
-                    <p class="text-xs text-gray-500 italic">Pick a caliber to search.</p>
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-gray-700 pb-3 gap-3">
+                <h2 class="text-2xl font-bold">Reloading Data Center</h2>
+                <div class="flex bg-gray-950 p-0.5 rounded border border-gray-800 text-xs font-bold flex-wrap">
+                    <button id="rd-mfr-tab-btn-Hodgdon" onclick="switchReloadDataManufacturerTab('Hodgdon')" class="px-3 py-1 rounded bg-gray-800 text-rose-400 cursor-pointer">Hodgdon</button>
+                    <button id="rd-mfr-tab-btn-Nosler" onclick="switchReloadDataManufacturerTab('Nosler')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Nosler</button>
+                    <button id="rd-mfr-tab-btn-Speer" onclick="switchReloadDataManufacturerTab('Speer')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Speer</button>
+                    <button id="rd-mfr-tab-btn-Sierra" onclick="switchReloadDataManufacturerTab('Sierra')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Sierra</button>
+                    <button id="rd-mfr-tab-btn-Barnes" onclick="switchReloadDataManufacturerTab('Barnes')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Barnes</button>
+                    <button id="rd-mfr-tab-btn-Hornady" onclick="switchReloadDataManufacturerTab('Hornady')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Hornady</button>
+                    <button id="rd-mfr-tab-btn-Lyman" onclick="switchReloadDataManufacturerTab('Lyman')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Lyman</button>
+                    <button id="rd-mfr-tab-btn-Lee" onclick="switchReloadDataManufacturerTab('Lee')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Lee</button>
                 </div>
             </div>
 
-            <!-- Detail view: one load, laid out for bench reference -->
+            <!-- Hodgdon pane — original design, the only one that's fully built out so far -->
+            <div id="rd-mfr-pane-Hodgdon" class="space-y-4">
+                <div id="reload-data-list-view" class="space-y-4">
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Caliber</label>
+                            <input type="text" id="rd-filter-caliber" list="rd-caliber-options" oninput="onReloadDataCaliberInput()" placeholder="Start typing…" autocomplete="off" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                            <datalist id="rd-caliber-options"></datalist>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Weight (gr)</label>
+                            <select id="rd-filter-weight" onchange="searchReloadData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Brand</label>
+                            <select id="rd-filter-bullet-brand" onchange="searchReloadData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder Brand</label>
+                            <select id="rd-filter-powder-brand" onchange="onReloadDataPowderBrandChange()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder</label>
+                            <select id="rd-filter-powder-name" onchange="searchReloadData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <label class="col-span-2 md:col-span-5 flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                            <input type="checkbox" id="rd-filter-in-stock" onchange="searchReloadData()" class="cursor-pointer">
+                            In stock only (bullet or powder matches your inventory)
+                        </label>
+                    </div>
+
+                    <div id="reload-data-results" class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-4 overflow-x-auto">
+                        <p class="text-xs text-gray-500 italic">Pick a caliber to search.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nosler pane — filter bar has no Bullet Brand (always Nosler); results show the
+                 candidate-bullet spec box from the PDF, then each powder's 3 charge tiers with
+                 the "*" most-accurate-load-tested one highlighted. -->
+            <div id="rd-mfr-pane-Nosler" class="hidden space-y-4">
+                <div id="rd-nosler-list-view" class="space-y-4">
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Caliber</label>
+                            <input type="text" id="rd-nosler-filter-caliber" list="rd-nosler-caliber-options" oninput="onNoslerCaliberInput()" placeholder="Start typing…" autocomplete="off" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                            <datalist id="rd-nosler-caliber-options"></datalist>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Weight (gr)</label>
+                            <select id="rd-nosler-filter-weight" onchange="searchNoslerData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder Brand</label>
+                            <select id="rd-nosler-filter-powder-brand" onchange="onNoslerPowderBrandChange()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder</label>
+                            <select id="rd-nosler-filter-powder-name" onchange="searchNoslerData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <label class="col-span-2 md:col-span-4 flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                            <input type="checkbox" id="rd-nosler-filter-in-stock" onchange="searchNoslerData()" class="cursor-pointer">
+                            In stock only (bullet or powder matches your inventory)
+                        </label>
+                    </div>
+
+                    <div id="rd-nosler-results" class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-4 overflow-x-auto">
+                        <p class="text-xs text-gray-500 italic">Pick a caliber and bullet weight to search.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Speer pane — filter bar has no Bullet Brand (always Speer); results show the
+                 spec box (case/OAL/shell-holder/test-firearm) and candidate-bullet table straight
+                 from the PDF, then the propellant/case/primer/start-max charge table as a flat
+                 list (Speer's own table has no "3 tiers" like Nosler — it's a true range). -->
+            <div id="rd-mfr-pane-Speer" class="hidden space-y-4">
+                <div id="rd-speer-list-view" class="space-y-4">
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Caliber</label>
+                            <input type="text" id="rd-speer-filter-caliber" list="rd-speer-caliber-options" oninput="onSpeerCaliberInput()" placeholder="Start typing…" autocomplete="off" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                            <datalist id="rd-speer-caliber-options"></datalist>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Weight (gr)</label>
+                            <select id="rd-speer-filter-weight" onchange="searchSpeerData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder Brand</label>
+                            <select id="rd-speer-filter-powder-brand" onchange="onSpeerPowderBrandChange()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder</label>
+                            <select id="rd-speer-filter-powder-name" onchange="searchSpeerData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <label class="col-span-2 md:col-span-4 flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                            <input type="checkbox" id="rd-speer-filter-in-stock" onchange="searchSpeerData()" class="cursor-pointer">
+                            In stock only (bullet or powder matches your inventory)
+                        </label>
+                    </div>
+
+                    <div id="rd-speer-results" class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-4 overflow-x-auto">
+                        <p class="text-xs text-gray-500 italic">Pick a caliber and bullet weight to search.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sierra pane — filter bar has no Bullet Brand (always Sierra); results show the
+                 "Test Specifications:"/"Components:" spec box straight from the PDF (striped
+                 rows), the bullet candidates table, then a velocity-matrix table (powder rows ×
+                 velocity columns) matching the PDF's own layout instead of a start/max range. -->
+            <div id="rd-mfr-pane-Sierra" class="hidden space-y-4">
+                <div id="rd-sierra-list-view" class="space-y-4">
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Caliber</label>
+                            <input type="text" id="rd-sierra-filter-caliber" list="rd-sierra-caliber-options" oninput="onSierraCaliberInput()" placeholder="Start typing…" autocomplete="off" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                            <datalist id="rd-sierra-caliber-options"></datalist>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Weight (gr)</label>
+                            <select id="rd-sierra-filter-weight" onchange="searchSierraData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder Brand</label>
+                            <select id="rd-sierra-filter-powder-brand" onchange="onSierraPowderBrandChange()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder</label>
+                            <select id="rd-sierra-filter-powder-name" onchange="searchSierraData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <label class="col-span-2 md:col-span-4 flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                            <input type="checkbox" id="rd-sierra-filter-in-stock" onchange="searchSierraData()" class="cursor-pointer">
+                            In stock only (bullet or powder matches your inventory)
+                        </label>
+                    </div>
+
+                    <div id="rd-sierra-results" class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-4 overflow-x-auto">
+                        <p class="text-xs text-gray-500 italic">Pick a caliber and bullet weight to search.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Barnes pane — filter bar has no Bullet Brand (always Barnes); results show the
+                 spec box (case/primer/dimensions/twist/test barrel), the candidate-bullet table
+                 (weight+model/SD/BC/C.O.A.L.), then a Minimum/Maximum charge table using Barnes'
+                 own column labels straight from the PDF — no per-row Case/Primer or diagram,
+                 since Barnes doesn't publish either. -->
+            <div id="rd-mfr-pane-Barnes" class="hidden space-y-4">
+                <div id="rd-barnes-list-view" class="space-y-4">
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Caliber</label>
+                            <input type="text" id="rd-barnes-filter-caliber" list="rd-barnes-caliber-options" oninput="onBarnesCaliberInput()" placeholder="Start typing…" autocomplete="off" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                            <datalist id="rd-barnes-caliber-options"></datalist>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Weight (gr)</label>
+                            <select id="rd-barnes-filter-weight" onchange="searchBarnesData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder Brand</label>
+                            <select id="rd-barnes-filter-powder-brand" onchange="onBarnesPowderBrandChange()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder</label>
+                            <select id="rd-barnes-filter-powder-name" onchange="searchBarnesData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <label class="col-span-2 md:col-span-4 flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                            <input type="checkbox" id="rd-barnes-filter-in-stock" onchange="searchBarnesData()" class="cursor-pointer">
+                            In stock only (bullet or powder matches your inventory)
+                        </label>
+                    </div>
+
+                    <div id="rd-barnes-results" class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-4 overflow-x-auto">
+                        <p class="text-xs text-gray-500 italic">Pick a caliber and bullet weight to search.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hornady pane — filter bar has no Bullet Brand (always Hornady); results show the
+                 spec box (Rifle/Barrel/Case/Primer/Bullet Diameter/Max COL/Max Case Length/Case
+                 Trim Length), the candidate-bullet table (Item No./C.O.L./G1+G7 B.C.), then a
+                 velocity matrix like Sierra's — each row's highest charge is highlighted the same
+                 way the book highlights it in red ("MAXIMUM LOAD — USE WITH CAUTION"). Data for
+                 this manufacturer is transcribed by hand from Kindle screenshots (no reliable
+                 text layer to parse, OCR proved unsafe on the dense charge tables), one cartridge
+                 at a time — not an automated upload like the other 5 tabs. -->
+            <div id="rd-mfr-pane-Hornady" class="hidden space-y-4">
+                <div id="rd-hornady-list-view" class="space-y-4">
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Caliber</label>
+                            <input type="text" id="rd-hornady-filter-caliber" list="rd-hornady-caliber-options" oninput="onHornadyCaliberInput()" placeholder="Start typing…" autocomplete="off" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                            <datalist id="rd-hornady-caliber-options"></datalist>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Weight (gr)</label>
+                            <select id="rd-hornady-filter-weight" onchange="searchHornadyData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder Brand</label>
+                            <select id="rd-hornady-filter-powder-brand" onchange="onHornadyPowderBrandChange()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder</label>
+                            <select id="rd-hornady-filter-powder-name" onchange="searchHornadyData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <label class="col-span-2 md:col-span-4 flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                            <input type="checkbox" id="rd-hornady-filter-in-stock" onchange="searchHornadyData()" class="cursor-pointer">
+                            In stock only (bullet or powder matches your inventory)
+                        </label>
+                    </div>
+
+                    <div id="rd-hornady-results" class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-4 overflow-x-auto">
+                        <p class="text-xs text-gray-500 italic">Pick a caliber and bullet weight to search.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lyman pane — structurally like Hodgdon's (true starting/maximum range per row,
+                 spanning every bullet weight/brand in one caliber file, so Bullet Brand is a
+                 real filter here too — Lyman's own book mixes bullets from many makers), so it
+                 reuses the same renderReloadDataResults()/openReloadDataDetail() rendering,
+                 just pointed at its own filter bar and results container. Data for this
+                 manufacturer is transcribed by hand from scanned book-page photos (no reliable
+                 text layer, OCR proved unsafe on the dense charge tables), one cartridge at a
+                 time — not an automated upload like the Hodgdon/Nosler/Speer/Sierra/Barnes tabs. -->
+            <div id="rd-mfr-pane-Lyman" class="hidden space-y-4">
+                <div id="rd-lyman-list-view" class="space-y-4">
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Caliber</label>
+                            <input type="text" id="rd-lyman-filter-caliber" list="rd-lyman-caliber-options" oninput="onLymanCaliberInput()" placeholder="Start typing…" autocomplete="off" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                            <datalist id="rd-lyman-caliber-options"></datalist>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Weight (gr)</label>
+                            <select id="rd-lyman-filter-weight" onchange="searchLymanData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Brand</label>
+                            <select id="rd-lyman-filter-bullet-brand" onchange="searchLymanData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder Brand</label>
+                            <select id="rd-lyman-filter-powder-brand" onchange="onLymanPowderBrandChange()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder</label>
+                            <select id="rd-lyman-filter-powder-name" onchange="searchLymanData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <label class="col-span-2 md:col-span-5 flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                            <input type="checkbox" id="rd-lyman-filter-in-stock" onchange="searchLymanData()" class="cursor-pointer">
+                            In stock only (bullet or powder matches your inventory)
+                        </label>
+                    </div>
+
+                    <div id="rd-lyman-results" class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-4 overflow-x-auto">
+                        <p class="text-xs text-gray-500 italic">Pick a caliber to search.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Other manufacturer panes — design pending, one at a time -->
+            {% for mfr in ['Lee'] %}
+            <div id="rd-mfr-pane-{{ mfr }}" class="hidden">
+                <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-10 text-center text-gray-500 text-sm">
+                    🚧 {{ mfr }} tab design coming soon.
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Detail view: one load, laid out for bench reference — shared across every
+                 manufacturer tab, shown over whichever pane is active. -->
             <div id="reload-data-detail-view" class="hidden space-y-4">
                 <button onclick="closeReloadDataDetail()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs font-bold rounded text-white transition cursor-pointer">← Back to results</button>
                 <div id="reload-data-detail-content"></div>
@@ -1435,6 +1724,6 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
-    <script src="/static/app.js?v=88"></script>
+    <script src="/static/app.js?v=125"></script>
 </body>
 </html>

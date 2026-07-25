@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
@@ -34,7 +36,14 @@ async def log_group(
     date: str = Form(...),
     velocities_csv: str = Form(None),
     rounds_fired: int = Form(None),
-    group_size: float = Form(None),
+    group_size: float = Form(None),  # legacy fallback, used only when shots_json isn't sent
+    shots_json: str = Form(None),  # JSON [{"x":px,"y":py,"velocity":fps|null}, ...]
+    poa_x: float = Form(None),
+    poa_y: float = Form(None),
+    pixels_per_inch: float = Form(None),
+    image_width: int = Form(None),
+    image_height: int = Form(None),
+    distance_yards: float = Form(None),
     target_image: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
@@ -49,6 +58,17 @@ async def log_group(
     vel_list = [v for v in (velocities_csv or '').split(',') if v.strip()]
     actual_rounds = rounds_fired if rounds_fired is not None else len(vel_list)
 
+    shots = []
+    if shots_json:
+        try:
+            shots = json.loads(shots_json)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="shots_json is not valid JSON")
+
+    poa = {"x": poa_x, "y": poa_y} if poa_x is not None and poa_y is not None else None
+    geom = math_engine.calculate_group_geometry(shots, poa, pixels_per_inch, distance_yards) \
+        if shots and pixels_per_inch else None
+
     log = models.ShotString(
         barrel_id=barrel_id,
         ammo_id=ammo_id,
@@ -58,8 +78,23 @@ async def log_group(
         avg_velocity=metrics["avg"],
         extreme_spread=metrics["es"],
         standard_deviation=metrics["sd"],
-        group_size_inches=group_size,
         target_image_path=img_path,
+        group_size_inches=geom["extreme_spread_in"] if geom else group_size,
+        group_size_moa=geom["moa"] if geom else None,
+        group_size_mrad=geom["mrad"] if geom else None,
+        group_width_inches=geom["width_in"] if geom else None,
+        group_height_inches=geom["height_in"] if geom else None,
+        elevation_offset_inches=geom["elevation_offset_in"] if geom else None,
+        windage_offset_inches=geom["windage_offset_in"] if geom else None,
+        elevation_offset_moa=geom["elevation_offset_moa"] if geom else None,
+        windage_offset_moa=geom["windage_offset_moa"] if geom else None,
+        shots_json=shots_json,
+        poa_x=poa_x,
+        poa_y=poa_y,
+        pixels_per_inch=pixels_per_inch,
+        image_width=image_width,
+        image_height=image_height,
+        distance_yards=distance_yards,
     )
     db.add(log)
     db.commit()
@@ -70,6 +105,29 @@ async def log_group(
         db.commit()
 
     return log
+
+
+@router.get("/performance-log/{log_id}")
+def get_performance_log_detail(log_id: int, db: Session = Depends(get_db)):
+    log = db.query(models.ShotString).filter(models.ShotString.id == log_id).first()
+    if not log:
+        raise HTTPException(status_code=404, detail="Log entry not found")
+    return {
+        "id": log.id, "barrel_id": log.barrel_id, "ammo_id": log.ammo_id, "date": log.date_shot,
+        "velocities": log.velocities, "rounds_fired": log.rounds_fired,
+        "avg_velocity": log.avg_velocity, "extreme_spread": log.extreme_spread,
+        "standard_deviation": log.standard_deviation, "target_image_path": log.target_image_path,
+        "group_size_inches": log.group_size_inches, "group_size_moa": log.group_size_moa,
+        "group_size_mrad": log.group_size_mrad,
+        "group_width_inches": log.group_width_inches, "group_height_inches": log.group_height_inches,
+        "elevation_offset_inches": log.elevation_offset_inches,
+        "windage_offset_inches": log.windage_offset_inches,
+        "elevation_offset_moa": log.elevation_offset_moa, "windage_offset_moa": log.windage_offset_moa,
+        "shots_json": log.shots_json, "poa_x": log.poa_x, "poa_y": log.poa_y,
+        "pixels_per_inch": log.pixels_per_inch,
+        "image_width": log.image_width, "image_height": log.image_height,
+        "distance_yards": log.distance_yards,
+    }
 
 
 @router.delete("/performance-log/{log_id}")
@@ -104,6 +162,12 @@ def get_logs_for_ammo(ammo_id: int, db: Session = Depends(get_db)):
             "shots": s.rounds_fired or len(vel_list),
             "avg_velocity": s.avg_velocity,
             "group_size_inches": s.group_size_inches,
+            "group_size_moa": s.group_size_moa, "group_size_mrad": s.group_size_mrad,
+            "group_width_inches": s.group_width_inches, "group_height_inches": s.group_height_inches,
+            "distance_yards": s.distance_yards,
+            "elevation_offset_inches": s.elevation_offset_inches,
+            "windage_offset_inches": s.windage_offset_inches,
+            "elevation_offset_moa": s.elevation_offset_moa, "windage_offset_moa": s.windage_offset_moa,
             "target_image_path": s.target_image_path,
         })
     return result
@@ -133,6 +197,12 @@ def get_logs_for_tc_barrel(barrel_id: int, db: Session = Depends(get_db)):
             "extreme_spread": s.extreme_spread,
             "standard_deviation": s.standard_deviation,
             "group_size_inches": s.group_size_inches,
+            "group_size_moa": s.group_size_moa, "group_size_mrad": s.group_size_mrad,
+            "group_width_inches": s.group_width_inches, "group_height_inches": s.group_height_inches,
+            "distance_yards": s.distance_yards,
+            "elevation_offset_inches": s.elevation_offset_inches,
+            "windage_offset_inches": s.windage_offset_inches,
+            "elevation_offset_moa": s.elevation_offset_moa, "windage_offset_moa": s.windage_offset_moa,
             "target_image_path": s.target_image_path,
         })
     return result
@@ -166,6 +236,12 @@ def get_logs_for_firearm(firearm_id: int, db: Session = Depends(get_db)):
             "extreme_spread": s.extreme_spread,
             "standard_deviation": s.standard_deviation,
             "group_size_inches": s.group_size_inches,
+            "group_size_moa": s.group_size_moa, "group_size_mrad": s.group_size_mrad,
+            "group_width_inches": s.group_width_inches, "group_height_inches": s.group_height_inches,
+            "distance_yards": s.distance_yards,
+            "elevation_offset_inches": s.elevation_offset_inches,
+            "windage_offset_inches": s.windage_offset_inches,
+            "elevation_offset_moa": s.elevation_offset_moa, "windage_offset_moa": s.windage_offset_moa,
             "target_image_path": s.target_image_path,
         })
     return result

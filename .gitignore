@@ -5,8 +5,17 @@ static/uploads/*
 # Backup archives — private data, never commit
 backups/
 
-# Runtime data — private data, never commit
-data/
+# Runtime data — private data, never commit (anchored to repo root — don't match
+# scripts/reload_data_seeds/data, the private submodule)
+/data/
+
+# Source reloading-data PDFs (Hodgdon/Nosler/Speer/Sierra/Barnes/etc.) — copyrighted manufacturer
+# manuals, never commit
+static/reloading_data/
+
+# Hand-transcribed reload-data (manufacturer-specific numbers derived from copyrighted manuals)
+# lives in a private submodule at scripts/reload_data_seeds/data — see .gitmodules. The reusable
+# importer helper (_common.py) stays here, public, since it contains no manufacturer data.
 
 # SQLite database
 *.db

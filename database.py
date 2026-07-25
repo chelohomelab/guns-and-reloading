@@ -221,13 +221,24 @@ class ReloadDataSource(Base):
     # is exact brand+name only, never a fuzzy/weight-only guess.
     __tablename__ = "reload_data_sources"
     id = Column(Integer, primary_key=True, index=True)
+    manufacturer = Column(String, nullable=False, default="Hodgdon")  # Hodgdon/Nosler/Speer/Sierra/Barnes/Hornady
     caliber = Column(String, nullable=False, index=True)   # normalized via routers.barcode.normalize_caliber
+    # Nosler/Speer files are scoped to one bullet weight (and Speer to one specific bullet model) —
+    # part of the replace-on-reupload key so re-uploading one weight doesn't wipe out others for the
+    # same caliber. Null for Hodgdon/Sierra/Barnes/Hornady, whose files/chapters span many weights.
+    scope_bullet_weight_gr = Column(Float, nullable=True)
+    scope_bullet_model = Column(String, nullable=True)
     twist = Column(String, nullable=True)
     barrel_length = Column(String, nullable=True)
     trim_length = Column(String, nullable=True)
+    max_saami_oal = Column(String, nullable=True)  # Nosler "MAXIMUM SAAMI O.A.C.L." / Speer "Max Cart. OAL"
+    max_case_length = Column(String, nullable=True)  # Speer's "Max Case Length"
+    rcbs_shell_holder = Column(String, nullable=True)  # Speer's "RCBS Shell Holder"
+    test_firearm = Column(String, nullable=True)  # Speer's "Test Firearm"
     data_as_of = Column(String, nullable=True)
     original_filename = Column(String, nullable=True)
     source_file_path = Column(String, nullable=True)
+    case_diagram_path = Column(String, nullable=True)  # cropped/extracted case-dimension diagram image
     uploaded_at = Column(String, nullable=True)
 
     loads = relationship("ReloadDataLoad", back_populates="source", cascade="all, delete-orphan")
@@ -240,12 +251,28 @@ class ReloadDataLoad(Base):
     bullet_weight_gr = Column(Float, nullable=True)
     bullet_brand = Column(String, nullable=True)
     bullet_model = Column(String, nullable=True)
+    bullet_code = Column(String, nullable=True)  # Nosler's short model code, e.g. "AB", "CC", "RDF"
+    bullet_style = Column(String, nullable=True)  # bullet profile, e.g. "HPBT", "Spitzer", "FB Tipped"
     bullet_dia = Column(String, nullable=True)
+    bullet_bc = Column(Float, nullable=True)  # G1 ballistic coefficient
+    bullet_bc_g7 = Column(Float, nullable=True)  # G7 ballistic coefficient (Hornady's long-range bullets only)
+    bullet_sd = Column(Float, nullable=True)  # sectional density
     case_brand = Column(String, nullable=True)
     primer_display = Column(String, nullable=True)
+    # Row-level overrides for Sierra, whose single caliber file can contain more than one
+    # "Test Specifications" section (different case brass tested at a different twist, etc.) —
+    # null for every other manufacturer, which falls back to the source-level column of the
+    # same name (see _load_dict).
+    twist = Column(String, nullable=True)
+    barrel_length = Column(String, nullable=True)
+    trim_length = Column(String, nullable=True)
+    test_firearm = Column(String, nullable=True)
     powder_brand = Column(String, nullable=True)
     powder_name = Column(String, nullable=True)
     coal = Column(String, nullable=True)
+    is_recommended = Column(Boolean, nullable=True)  # Nosler "*" / Lyman bold row = most accurate load tested
+    is_max_load = Column(Boolean, nullable=True)  # Hornady's red highlight = maximum load, use with caution
+    is_reduced_load = Column(Boolean, nullable=True)  # Lyman's "**" powder-name prefix = reduced load
     start_charge_gr = Column(Float, nullable=True)
     start_velocity_fps = Column(Integer, nullable=True)
     start_pressure = Column(Integer, nullable=True)
@@ -374,7 +401,28 @@ class ShotString(Base):
     target_image_path = Column(String, nullable=True)
     group_size_inches = Column(Float, nullable=True)
     group_size_moa = Column(Float, nullable=True)
-    
+
+    # Raw shot geometry — persisted so a session's group math can be recomputed/reopened later,
+    # not just archived as a flattened picture. Coordinates live in the ORIGINAL upload canvas's
+    # own pixel space (image_width/image_height), never the possibly-thumbnailed stored image's
+    # space (see dependencies.save_uploaded_file's 1200x1200 thumbnail) and never crop-relative.
+    shots_json = Column(String, nullable=True)  # JSON [{"x":px,"y":py,"velocity":fps|null}, ...]
+    poa_x = Column(Float, nullable=True)  # Point of Aim, same pixel space; null if not marked
+    poa_y = Column(Float, nullable=True)
+    pixels_per_inch = Column(Float, nullable=True)  # calibration scale locked at save time
+    image_width = Column(Integer, nullable=True)
+    image_height = Column(Integer, nullable=True)
+    distance_yards = Column(Float, nullable=True)
+
+    # Computed geometry stats (mirrors avg_velocity/extreme_spread/standard_deviation above)
+    group_width_inches = Column(Float, nullable=True)
+    group_height_inches = Column(Float, nullable=True)
+    group_size_mrad = Column(Float, nullable=True)
+    elevation_offset_inches = Column(Float, nullable=True)  # + = group center HIGH of POA (dial DOWN)
+    windage_offset_inches = Column(Float, nullable=True)  # + = group center RIGHT of POA (dial LEFT)
+    elevation_offset_moa = Column(Float, nullable=True)
+    windage_offset_moa = Column(Float, nullable=True)
+
     barrel = relationship("Barrel", back_populates="shot_strings")
     ammo = relationship("Ammo", back_populates="shot_strings")
 

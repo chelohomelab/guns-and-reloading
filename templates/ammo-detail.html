@@ -333,11 +333,13 @@
                             <th class="p-3.5 text-right">Shots</th>
                             <th class="p-3.5 text-right">Avg Vel (FPS)</th>
                             <th class="p-3.5 text-right">Group (in)</th>
+                            <th class="p-3.5 text-right">MOA</th>
+                            <th class="p-3.5 text-right">Distance</th>
                             <th class="p-3.5 text-center">Target</th>
                         </tr>
                     </thead>
                     <tbody id="sessions-tbody" class="divide-y divide-gray-750 text-gray-300">
-                        <tr><td colspan="7" class="p-6 text-center text-gray-500 italic">Loading sessions...</td></tr>
+                        <tr><td colspan="9" class="p-6 text-center text-gray-500 italic">Loading sessions...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1014,13 +1016,19 @@
                 badge.innerText = `${sessions.length} Session${sessions.length !== 1 ? 's' : ''}`;
 
                 if (sessions.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-gray-500 italic">No range sessions recorded with this load yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-gray-500 italic">No range sessions recorded with this load yet.</td></tr>`;
                     return;
                 }
 
                 tbody.innerHTML = sessions.map(s => {
                     const grpDisplay = s.group_size_inches
                         ? `<span class="text-amber-400 font-bold">${parseFloat(s.group_size_inches).toFixed(3)}&quot;</span>`
+                        : `<span class="text-gray-600">—</span>`;
+                    const moaDisplay = s.group_size_moa
+                        ? `<span class="font-mono text-gray-300">${parseFloat(s.group_size_moa).toFixed(2)}</span>`
+                        : `<span class="text-gray-600">—</span>`;
+                    const distDisplay = s.distance_yards
+                        ? `<span class="font-mono text-gray-400">${s.distance_yards} yd</span>`
                         : `<span class="text-gray-600">—</span>`;
                     const velDisplay = s.avg_velocity
                         ? `<span class="font-mono">${Math.round(s.avg_velocity)}</span>`
@@ -1041,11 +1049,13 @@
                         <td class="p-3.5 text-right text-gray-400">${s.shots || '—'}</td>
                         <td class="p-3.5 text-right">${velDisplay}</td>
                         <td class="p-3.5 text-right">${grpDisplay}</td>
+                        <td class="p-3.5 text-right">${moaDisplay}</td>
+                        <td class="p-3.5 text-right">${distDisplay}</td>
                         <td class="p-3.5 text-center">${targetCell}</td>
                     </tr>`;
                 }).join('');
             } catch(err) {
-                tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-red-400 italic">Failed to load sessions.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-red-400 italic">Failed to load sessions.</td></tr>`;
             }
         }
     </script>

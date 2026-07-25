@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reloading Data Center — Guns & Reloading</title>
+    <link rel="icon" type="image/png" href="/static/images/app-icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0f0f0f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      body { background-image: url('/static/images/phone-background.png'); background-size: cover; background-position: center; background-color: #0f0f0f; }
+      @media (min-width: 1024px) { body { background-image: url('/static/images/background.png'); } }
+    </style>
+</head>
+<body class="text-gray-100 font-sans antialiased">
+
+<div id="toast-container" class="fixed top-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
+
+<nav class="bg-gray-800 border-b border-gray-700 p-4 sticky top-0 z-50">
+    <div class="container mx-auto flex justify-between items-center">
+        <div class="flex items-center gap-4">
+            <a href="/" class="text-amber-500 font-bold text-xl tracking-wide">🎯 Guns & Reloading</a>
+            <span class="text-gray-600">›</span>
+            <span class="text-sm text-gray-300 font-semibold">Reloading Data Center</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="/?tab=reload-data-tab" class="text-xs text-gray-400 hover:text-gray-200 transition">Browse Loads</a>
+            <span class="text-gray-600">|</span>
+            <a href="/admin/users" class="text-xs text-gray-400 hover:text-gray-200 transition">Users</a>
+            <span class="text-gray-600">|</span>
+            <span class="text-xs text-gray-400 font-mono">{{ user.username }}</span>
+            <a href="/logout" class="px-2.5 py-1.5 rounded bg-gray-700 hover:bg-red-900 hover:text-red-300 font-medium text-xs text-gray-400 transition">Sign out</a>
+        </div>
+    </div>
+</nav>
+
+<main class="container mx-auto p-4 max-w-3xl space-y-6">
+
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-bold text-rose-400">📖 Reloading Data Center — Import</h1>
+        <p class="text-sm text-gray-400 mt-1">Upload manufacturer reloading-data PDFs to make them browsable and searchable. Each manufacturer's data is kept separate — re-uploading a file only replaces that same manufacturer/caliber/weight combination, never another manufacturer's data.</p>
+    </div>
+
+    <!-- Upload -->
+    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-3">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-rose-400">📤 Upload PDFs</h2>
+        <p class="text-[11px] text-gray-500">Select as many files as you like at once — each is parsed and imported independently. Manufacturer is auto-detected per file; only override it if a file fails to auto-detect (Barnes PDFs always need this — there's no reliable brand text in the file to detect from).</p>
+        <div class="flex gap-3 items-center flex-wrap">
+            <input type="file" id="reload-data-file-input" accept=".pdf" multiple class="flex-1 min-w-[200px] text-xs text-gray-300 bg-gray-900 border border-gray-600 rounded p-2">
+            <select id="reload-data-manufacturer-select" class="bg-gray-900 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                <option value="auto">Auto-detect</option>
+                <option value="Hodgdon">Hodgdon</option>
+                <option value="Nosler">Nosler</option>
+                <option value="Speer">Speer</option>
+                <option value="Sierra">Sierra</option>
+                <option value="Barnes">Barnes</option>
+            </select>
+            <button onclick="uploadReloadDataPdf()" id="reload-data-upload-btn" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded transition cursor-pointer">Upload</button>
+        </div>
+        <div id="reload-data-upload-results" class="space-y-1"></div>
+    </div>
+
+    <!-- Imported sources -->
+    <div class="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-700 flex justify-between items-center gap-3">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-rose-400 shrink-0">📚 Imported Sources</h2>
+            <input type="text" id="reload-data-sources-filter" oninput="renderReloadDataSources()" placeholder="Filter by caliber…"
+                class="flex-1 max-w-[220px] bg-gray-900 border border-gray-600 rounded p-1.5 text-xs text-white focus:outline-none focus:border-rose-500">
+            <button onclick="loadReloadDataSources()" class="text-xs text-gray-400 hover:text-gray-200 transition shrink-0">↻ Refresh</button>
+        </div>
+        <div id="reload-data-sources-list" class="divide-y divide-gray-700 text-sm">
+            <div class="px-5 py-4 text-gray-500 italic text-xs">Loading…</div>
+        </div>
+    </div>
+
+</main>
+
+<script>
+    function showToast(msg, type = 'success') {
+        const c = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = `pointer-events-auto px-4 py-3 rounded-lg shadow-xl text-sm font-semibold border ${
+            type === 'error' ? 'bg-red-900 border-red-700 text-red-200' : 'bg-gray-800 border-gray-600 text-gray-100'
+        }`;
+        t.textContent = msg;
+        c.appendChild(t);
+        setTimeout(() => t.remove(), 4000);
+    }
+
+    function escHtml(v) {
+        const d = document.createElement('div');
+        d.textContent = v ?? '';
+        return d.innerHTML;
+    }
+
+    async function uploadReloadDataPdf() {
+        const input = document.getElementById('reload-data-file-input');
+        const files = input?.files;
+        if (!files || files.length === 0) { showToast('Choose at least one PDF first', 'error'); return; }
+        const manufacturer = document.getElementById('reload-data-manufacturer-select').value;
+        const resultsBox = document.getElementById('reload-data-upload-results');
+        const btn = document.getElementById('reload-data-upload-btn');
+        if (btn) { btn.disabled = true; btn.textContent = `Uploading ${files.length} file(s)…`; }
+        resultsBox.innerHTML = '';
+        try {
+            const fd = new FormData();
+            for (const f of files) fd.append('files', f);
+            fd.append('manufacturer', manufacturer);
+            const res = await fetch('/reload-data/upload', { method: 'POST', body: fd });
+            const results = await res.json();
+            if (!res.ok) { showToast(results.detail || 'Upload failed', 'error'); return; }
+            resultsBox.innerHTML = results.map(r => {
+                if (r.error) {
+                    return `<div class="text-[11px] px-2 py-1.5 rounded bg-red-950/40 border border-red-800/40 text-red-300">
+                        <span class="font-bold">${escHtml(r.filename)}</span> — ${escHtml(r.error)}</div>`;
+                }
+                return `<div class="text-[11px] px-2 py-1.5 rounded bg-emerald-950/40 border border-emerald-800/40 text-emerald-300">
+                    <span class="font-bold">${escHtml(r.filename)}</span> — ${escHtml(r.manufacturer)} ${escHtml(r.caliber)}:
+                    ${r.rows_imported} loads imported${r.rows_rejected ? `, ${r.rows_rejected} skipped (see console)` : ''}</div>`;
+            }).join('');
+            const okCount = results.filter(r => !r.error).length;
+            showToast(`${okCount}/${results.length} file(s) imported`, okCount === results.length ? 'success' : 'error');
+            for (const r of results) {
+                if (r.rejected_sample?.length) {
+                    console.warn(`[reload-data] ${r.rows_rejected} row(s) skipped for ${r.manufacturer} ${r.caliber}:`, r.rejected_sample);
+                }
+            }
+            input.value = '';
+            loadReloadDataSources();
+        } catch (e) {
+            showToast('Upload failed — check connection', 'error');
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = 'Upload'; }
+        }
+    }
+
+    let _reloadDataSources = [];
+
+    async function loadReloadDataSources() {
+        const box = document.getElementById('reload-data-sources-list');
+        try {
+            const res = await fetch('/reload-data/sources');
+            _reloadDataSources = res.ok ? await res.json() : [];
+            renderReloadDataSources();
+        } catch (e) {
+            box.innerHTML = '<div class="px-5 py-4 text-red-400 text-xs">Failed to load.</div>';
+        }
+    }
+
+    // Grouped by manufacturer and collapsed by default (<details>) — a flat list gets
+    // unusably long once a manufacturer has more than a handful of calibers imported.
+    function renderReloadDataSources() {
+        const box = document.getElementById('reload-data-sources-list');
+        const filter = (document.getElementById('reload-data-sources-filter')?.value || '').trim().toLowerCase();
+        const sources = filter
+            ? _reloadDataSources.filter(s => `${s.caliber} ${s.manufacturer}`.toLowerCase().includes(filter))
+            : _reloadDataSources;
+        if (_reloadDataSources.length === 0) {
+            box.innerHTML = '<div class="px-5 py-4 text-gray-500 italic text-xs">No calibers imported yet.</div>';
+            return;
+        }
+        if (sources.length === 0) {
+            box.innerHTML = '<div class="px-5 py-4 text-gray-500 italic text-xs">No sources match that filter.</div>';
+            return;
+        }
+        const groups = {};
+        for (const s of sources) (groups[s.manufacturer] ??= []).push(s);
+
+        box.innerHTML = Object.keys(groups).sort().map(mfr => {
+            const items = groups[mfr];
+            return `<details class="group" ${filter ? 'open' : ''}>
+                <summary class="px-5 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-gray-700/30 select-none">
+                    <span class="text-sm font-bold text-gray-100">${escHtml(mfr)}</span>
+                    <span class="text-[11px] text-gray-500">${items.length} caliber${items.length === 1 ? '' : 's'}</span>
+                </summary>
+                <div class="divide-y divide-gray-700/60 border-t border-gray-700/60">
+                    ${items.map(s => `
+                        <div class="px-5 py-2.5 pl-8 flex items-center justify-between gap-3 hover:bg-gray-700/30">
+                            <div class="min-w-0">
+                                <p class="text-sm font-bold text-gray-100 truncate">
+                                    ${escHtml(s.caliber)}${s.scope_bullet_weight_gr ? ` · ${s.scope_bullet_weight_gr}gr` : ''}${s.scope_bullet_model ? ` ${escHtml(s.scope_bullet_model)}` : ''}
+                                </p>
+                                <p class="text-[11px] text-gray-500">${s.row_count} loads${s.data_as_of ? ` · as of ${escHtml(s.data_as_of)}` : ''}${s.original_filename ? ` · ${escHtml(s.original_filename)}` : ''}</p>
+                            </div>
+                            <button onclick="deleteReloadDataSource(${s.id})"
+                                class="px-2.5 py-1 bg-red-900/40 hover:bg-red-800 border border-red-700/60 text-red-400 text-[11px] font-bold rounded transition cursor-pointer shrink-0">
+                                Delete
+                            </button>
+                        </div>`).join('')}
+                </div>
+            </details>`;
+        }).join('');
+    }
+
+    async function deleteReloadDataSource(id) {
+        if (!confirm("Delete this caliber's reloading data?")) return;
+        try {
+            const res = await fetch(`/reload-data/sources/${id}`, { method: 'DELETE' });
+            if (!res.ok) { showToast('Delete failed', 'error'); return; }
+            showToast('Deleted', 'success');
+            loadReloadDataSources();
+        } catch (e) {
+            showToast('Delete failed — check connection', 'error');
+        }
+    }
+
+    loadReloadDataSources();
+</script>
+
+</body>
+</html>

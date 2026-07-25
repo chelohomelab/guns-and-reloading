@@ -14,6 +14,27 @@ cd inventory-and-reloading
 
 ---
 
+## 1a. Optional: Personal Reloading-Data Submodule
+
+`scripts/reload_data_seeds/data` is a private git submodule (`chelohomelab/reloading-books`)
+holding hand-transcribed manufacturer reloading data (e.g. Hornady cartridge pages read directly
+from photos — see project memory for why this isn't OCR'd or shipped in the public repo). It's
+kept private and separate on purpose: the public app never redistributes any manufacturer's
+compiled reloading data, only the general-purpose tool.
+
+If you have access to that private repo, pull it in and run each seed script once:
+
+```bash
+git submodule update --init --recursive
+venv/bin/python scripts/reload_data_seeds/data/*.py
+```
+
+Skip this step entirely if you don't have access — the app works fully without it, just without
+that pre-loaded data (Hodgdon/Nosler/Speer/Sierra/Barnes still work normally via the regular
+`/admin/reload-data` PDF upload).
+
+---
+
 ## 2. Create a Virtual Environment and Install Dependencies
 
 ```bash
@@ -71,6 +92,7 @@ Create the first admin account. After submitting you are redirected to the login
 ```bash
 cd /opt/inventory-and-reloading
 git pull
+git submodule update --init --recursive  # only does anything if you set up 1a
 venv/bin/pip install --no-cache-dir -r requirements.txt
 systemctl restart inventory
 ```

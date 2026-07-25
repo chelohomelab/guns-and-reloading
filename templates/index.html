@@ -191,10 +191,10 @@
                         </div>
                     </div>
 
-                    <div id="group-metadata" class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-gray-850 p-3 rounded border border-gray-700 hidden">
+                    <div id="group-metadata" class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-gray-850 p-3 rounded border border-gray-700 hidden">
                         <div>
                             <label class="block text-xs text-gray-200 font-semibold mb-1">Firearm Used</label>
-                            <select id="select-gun" class="w-full bg-gray-700 border border-gray-600 rounded p-1 text-xs text-white focus:outline-none">
+                            <select id="select-gun" onchange="onMeasureGunChange()" class="w-full bg-gray-700 border border-gray-600 rounded p-1 text-xs text-white focus:outline-none">
                                 <option value="">-- Select Rifle --</option>
                             </select>
                         </div>
@@ -204,12 +204,23 @@
                                 <option value="">-- Select Load Profile --</option>
                             </select>
                         </div>
+                        <div>
+                            <label class="block text-xs text-gray-200 font-semibold mb-1">Distance to Target (yd)</label>
+                            <input type="number" id="group-distance-yards" step="1" min="1" value="100" placeholder="e.g., 100" class="w-full bg-gray-700 border border-gray-600 rounded p-1.5 text-xs text-white focus:outline-none">
+                        </div>
                         <div class="flex items-end">
                             <button onclick="saveCurrentGroup()" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-1.5 rounded text-xs transition cursor-pointer">
                                 Confirm & Save Group
                             </button>
                         </div>
-                        <div class="md:col-span-3 pt-1 border-t border-gray-700">
+                        <div class="md:col-span-4 flex gap-2 items-center flex-wrap pt-1 border-t border-gray-700">
+                            <button onclick="startMarkingPoa()" id="mark-poa-btn" class="px-3 py-1.5 bg-cyan-700 hover:bg-cyan-600 text-white font-bold text-xs rounded transition cursor-pointer">
+                                🎯 Mark Point of Aim
+                            </button>
+                            <span id="poa-status" class="text-xs text-gray-400"></span>
+                            <button onclick="clearPoa()" id="clear-poa-btn" class="hidden text-xs text-red-400 hover:text-red-300 underline cursor-pointer">✕ Clear POA</button>
+                        </div>
+                        <div class="md:col-span-4 pt-1 border-t border-gray-700">
                             <button onclick="resetCalibration()" class="w-full bg-gray-700 hover:bg-gray-600 text-blue-400 hover:text-blue-300 font-medium py-1.5 rounded text-xs transition cursor-pointer">
                                 ↺ Re-calibrate — redo the two reference points
                             </button>
@@ -219,10 +230,18 @@
                     <div class="relative overflow-auto border border-gray-700 rounded bg-gray-950 max-h-[650px] flex justify-center items-start">
                         <canvas id="target-canvas" class="max-w-full cursor-crosshair"></canvas>
                     </div>
+                    <p class="text-[11px] text-gray-500">Tap a hole to place a shot · drag a placed marker to fix its position · use "🗑 Remove a Shot" below to delete one</p>
 
-                    <div class="flex justify-between items-center">
-                        <div id="live-result" class="text-sm text-emerald-400 font-mono font-bold hidden">Current Span: 0.000"</div>
-                        <button onclick="resetCanvas()" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded transition cursor-pointer">Clear Workspace</button>
+                    <div class="flex justify-between items-center flex-wrap gap-2">
+                        <div class="space-y-0.5">
+                            <div id="live-result" class="text-sm text-emerald-400 font-mono font-bold hidden">Current Span: 0.000"</div>
+                            <div id="live-atz" class="text-xs text-cyan-400 font-mono hidden"></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="undoLastShot()" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded transition cursor-pointer">↩ Undo Last Shot</button>
+                            <button onclick="toggleDeleteMode()" id="delete-mode-btn" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded transition cursor-pointer">🗑 Remove a Shot</button>
+                            <button onclick="resetCanvas()" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded transition cursor-pointer">Clear Workspace</button>
+                        </div>
                     </div>
                 </div>
 
@@ -1705,6 +1724,6 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
-    <script src="/static/app.js?v=109"></script>
+    <script src="/static/app.js?v=125"></script>
 </body>
 </html>

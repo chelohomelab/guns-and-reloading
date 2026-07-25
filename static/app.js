@@ -25,11 +25,28 @@ const canvas = document.getElementById('target-canvas');
 const ctx = canvas ? canvas.getContext('2d') : null;
 let imgElement = new Image();
 
-let groups = []; 
-let currentGroupShots = []; 
-let state = "idle"; 
+let groups = [];
+let currentGroupShots = [];
+let state = "idle";
 let calibrationPoints = [];
 let pixelsPerInch = null;
+let currentPoa = null;                 // {x,y} Point of Aim in canvas-pixel space, shared per uploaded photo
+
+// Deleting a placed shot marker is a toggleable mode (see toggleDeleteMode/deleteModeActive)
+// rather than any gesture on the marker itself — both a long-press-to-delete and a small "x"
+// badge drawn on the ring were tried and rejected: a hold was indistinguishable from the start of
+// a slow drag, and a badge big enough to actually hit on a touchscreen covered so much of the
+// marker that it made the marker underneath hard to grab and drag. A dedicated mode has no such
+// overlap: while it's on, tapping a marker deletes it and tapping anything else cancels — normal
+// tap-to-add/drag-to-move behavior is fully disabled for the duration, so there's no ambiguity.
+let deleteModeActive = false;
+let pendingDragIdx = null;     // marker whose body was pressed, awaiting enough movement to count as a drag
+let pendingStartClientPos = null; // client-space press origin for the jitter check above — unlike
+                                   // touchStartClientPos (touch-only), this is set for mouse too
+const DRAG_JITTER = 12;        // px of client-space movement before a press counts as "moved"
+// Actively being dragged (armed once pendingDragIdx moves past DRAG_JITTER) — repositions the
+// marker live under the pointer/finger; see handleMove/handleEnd.
+let draggingShotIdx = null;
 
 let liveBoxDims = { w: 300, h: 150 };
 
@@ -2512,22 +2529,217 @@ async function setupMeasureDropdowns() {
         const [gunsRes, tcRes, ammoRes] = await Promise.all([
             fetch('/catalog/'), fetch('/tc-barrels/'), fetch('/ammo/')
         ]);
-        const items    = gunsRes.ok ? await gunsRes.json() : [];
-        const tcBarrels = tcRes.ok  ? await tcRes.json()   : [];
-        const ammoItems = ammoRes.ok ? await ammoRes.json() : [];
+        _measureGuns      = gunsRes.ok ? await gunsRes.json() : [];
+        _measureTcBarrels = tcRes.ok   ? await tcRes.json()   : [];
+        _measureAmmoItems = ammoRes.ok ? await ammoRes.json() : [];
 
-        gunSelect.innerHTML = _buildGunOptionsHTML(items, tcBarrels, '-- Select Platform --');
-
-        if (ammoItems.length > 0) {
-            const _ammoLabel = a => {
-                const isSg = a.ammo_category === 'shotgun' || a.ammo_category === 'shotgun_slug';
-                if (isSg) return `${a.brand}${a.caliber ? ' ' + a.caliber : ''}${a.shell_size ? ' ' + a.shell_size + '"' : ''} (Shotgun)`;
-                return `${a.brand}${a.bullet_weight ? ' (' + a.bullet_weight + 'gr)' : ''}`;
-            };
-            ammoSelect.innerHTML = `<option value="">-- Select Load Profile --</option>` +
-                ammoItems.map(a => `<option value="${a.id}">${_ammoLabel(a)}</option>`).join('');
-        }
+        gunSelect.innerHTML = _buildGunOptionsHTML(_measureGuns, _measureTcBarrels, '-- Select Platform --');
+        ammoSelect.innerHTML = _buildAmmoOptionsHTML(_measureAmmoItems);
     } catch(e) {}
+}
+
+let _measureGuns = [], _measureTcBarrels = [], _measureAmmoItems = [];
+
+function _ammoOptionLabel(a) {
+    const isSg = a.ammo_category === 'shotgun' || a.ammo_category === 'shotgun_slug';
+    if (isSg) return `${a.brand}${a.caliber ? ' ' + a.caliber : ''}${a.shell_size ? ' ' + a.shell_size + '"' : ''} (Shotgun)`;
+    return `${a.brand}${a.bullet_weight ? ' (' + a.bullet_weight + 'gr)' : ''}`;
+}
+
+// cartridgeCaliber optional — when given, restricts to ammo chambered for that caliber (same
+// tolerant _calibersMatch() used by _buildGunOptionsHTML), falling back to showing everything if
+// the filter would leave zero options.
+function _buildAmmoOptionsHTML(ammoItems, cartridgeCaliber) {
+    let items = ammoItems;
+    if (cartridgeCaliber) {
+        const filtered = ammoItems.filter(a => _calibersMatch(a.caliber, cartridgeCaliber));
+        if (filtered.length) items = filtered;
+    }
+    return `<option value="">-- Select Load Profile --</option>` +
+        items.map(a => `<option value="${a.id}">${_ammoOptionLabel(a)}</option>`).join('');
+}
+
+// Firearm/TC-barrel caliber isn't on the <option> itself, so look it up from the cached lists
+// fetched in setupMeasureDropdowns() rather than another round-trip.
+function onMeasureGunChange() {
+    const gunSelect = document.getElementById('select-gun');
+    const ammoSelect = document.getElementById('select-ammo');
+    if (!gunSelect || !ammoSelect) return;
+    const opt = gunSelect.options[gunSelect.selectedIndex];
+    let cal = null;
+    if (opt && gunSelect.value) {
+        if (opt.dataset.type === 'tc') {
+            const b = _measureTcBarrels.find(x => String(x.id) === gunSelect.value);
+            cal = b ? b.caliber : null;
+        } else {
+            const g = _measureGuns.find(x => String(x.id) === gunSelect.value);
+            cal = g ? g.caliber : null;
+        }
+    }
+    const prevValue = ammoSelect.value;
+    ammoSelect.innerHTML = _buildAmmoOptionsHTML(_measureAmmoItems, cal);
+    // Keep the previous ammo selection if it still exists in the filtered list.
+    if (prevValue && [...ammoSelect.options].some(o => o.value === prevValue)) ammoSelect.value = prevValue;
+}
+
+// Known SAAMI/CIP bullet diameter (inches) per cartridge — used to size a shot's ring to the
+// bullet's real, exact diameter instead of trying to visually detect the hole's size, which
+// proved unreliable on real torn paper (ragged edges, grid lines, tight groups). This is standard
+// public ballistics data, not something detected or guessed per-photo. Keys are normalized via
+// _normalizeCaliberText(); a few common short/alternate spellings are included since real
+// inventory data varies (confirmed real DB values include e.g. both "7mm-08 Remington" and
+// "7MM-08").
+const CALIBER_BULLET_DIA_IN = {
+    '22 lr': 0.223, '22 long rifle': 0.223, '22 wmr': 0.224, '17 hmr': 0.172,
+    '221 fireball': 0.224, '222 remington': 0.224, '223 remington': 0.224, '5.56 nato': 0.224,
+    '5.56x45mm': 0.224, '224 valkyrie': 0.224, '22-250 remington': 0.224, '220 swift': 0.224,
+    '243 winchester': 0.243, '6mm creedmoor': 0.243, '6mm remington': 0.243,
+    '25-06 remington': 0.257, '257 roberts': 0.257, '257 weatherby magnum': 0.257,
+    '6.5 creedmoor': 0.264, '6.5-284 norma': 0.264, '6.5x55mm': 0.264, '6.5x55': 0.264,
+    '6.5 grendel': 0.264, '6.5 prc': 0.264, '260 remington': 0.264, '6.5-06': 0.264,
+    '270 winchester': 0.277, '270 win': 0.277, '270 wsm': 0.277,
+    '7mm-08 remington': 0.284, '7mm-08': 0.284, '7mm remington magnum': 0.284, '7mm rem mag': 0.284,
+    '280 remington': 0.284, '280 ackley improved': 0.284, '7mm prc': 0.284, '7mm wsm': 0.284,
+    '7x57mm mauser': 0.284, '7x57': 0.284,
+    '30 carbine': 0.308, '300 blackout': 0.308, '300 aac blackout': 0.308,
+    '308 winchester': 0.308, '7.62x51mm': 0.308, '7.62x51': 0.308, '30-06 springfield': 0.308,
+    '30-06': 0.308, '30-30 winchester': 0.308, '30-30': 0.308, '300 winchester magnum': 0.308,
+    '300 win mag': 0.308, '300 wsm': 0.308, '300 prc': 0.308, '300 remington ultra magnum': 0.308,
+    '300 h&h magnum': 0.308, '7.62x39mm': 0.312, '7.62x39': 0.312, '303 british': 0.312,
+    '8mm mauser': 0.323, '8x57mm': 0.323,
+    '338 winchester magnum': 0.338, '338 win mag': 0.338, '338 lapua magnum': 0.338,
+    '338 federal': 0.338, '325 wsm': 0.338,
+    '35 whelen': 0.358, '35 remington': 0.358,
+    '350 legend': 0.357, '357 magnum': 0.357, '357 mag': 0.357, '38 special': 0.357,
+    '9mm': 0.355, '9mm luger': 0.355, '9x19mm': 0.355, '9x19': 0.355, '380 acp': 0.355,
+    '40 s&w': 0.400, '10mm auto': 0.400, '10mm': 0.400,
+    '44 magnum': 0.429, '44 mag': 0.429, '44 special': 0.429,
+    '45 acp': 0.451, '45 auto': 0.451, '45 colt': 0.452, '45-70 government': 0.458, '45-70': 0.458,
+    '458 socom': 0.458, '450 bushmaster': 0.452, '50 ae': 0.500,
+};
+
+function bulletDiaInForCaliber(caliberText) {
+    return CALIBER_BULLET_DIA_IN[_normalizeCaliberText(caliberText)] || null;
+}
+
+// The exact real bullet diameter for whatever's selected in the Ammo/Load Profile dropdown right
+// now, or null if that ammo's caliber isn't in the table above (in which case shot markers fall
+// back to whatever detectHoleCenter() found, or the plain default).
+function currentBulletDiaIn() {
+    const ammoSelect = document.getElementById('select-ammo');
+    if (!ammoSelect || !ammoSelect.value) return null;
+    const ammo = _measureAmmoItems.find(a => String(a.id) === ammoSelect.value);
+    return ammo ? bulletDiaInForCaliber(ammo.caliber) : null;
+}
+
+// Prefers the known, exact bullet diameter (real physics, not a visual guess) for sizing a shot's
+// ring; only falls back to whatever detectHoleCenter() estimated from the photo when the
+// selected ammo's caliber isn't in CALIBER_BULLET_DIA_IN.
+function shotRadiusPx(detectedR) {
+    const dia = currentBulletDiaIn();
+    if (dia && pixelsPerInch) return (dia / 2) * pixelsPerInch;
+    return detectedR;
+}
+
+// Auto-calibration: most of these targets already print a 1" grid, so there's no need to make
+// the user click two reference points every single time — detect the grid's own spacing instead
+// and only fall back to the manual click-two-points flow when no grid is found (a plain bullseye
+// target, no printed grid) or the user explicitly asks to redo it via "Re-calibrate" below.
+//
+// Approach: scan several rows and columns for periodic bright (grid-line) peaks, and take a
+// robust consensus of the spacing between them — multiple independent scanlines make this immune
+// to any single line being occluded by a hole, and the two-stage plausible/consistent filtering
+// rejects photos that don't actually have a real periodic grid (e.g. a red/white bullseye's
+// concentric rings look vaguely periodic along one scanline through the center, but nowhere near
+// consistent across many independent lines) rather than returning a confident-looking wrong
+// answer. Verified against synthetic grids with holes occluding lines and up to 12° of camera
+// tilt (real photos are rarely perfectly square to the grid) — well under 1% error at realistic
+// tilt angles, and correctly returns null on a non-grid target.
+// Returns { ppi, reason, ... } instead of just a number-or-null so a failure can be surfaced in
+// the UI (and the browser console) with an actual explanation, rather than a silent fallback to
+// manual calibration that gives no signal about *why* it didn't work on a given real photo —
+// synthetic test photos are far cleaner than real ones (JPEG compression, uneven lighting, motion
+// blur, off-axis camera angle), so real-world failures need to be diagnosable, not guessed at.
+function detectGridPixelsPerInch() {
+    const fail = (reason, extra) => { const r = { ppi: null, reason, ...extra }; console.log('[grid-detect]', r); return r; };
+    if (!imgElement.src || !imgElement.naturalWidth) return fail('no-image');
+    const w = canvas.width, h = canvas.height;
+    const off = document.createElement('canvas');
+    off.width = w; off.height = h;
+    const octx = off.getContext('2d');
+    if (!octx) return fail('no-2d-context');
+    octx.drawImage(imgElement, 0, 0, w, h);
+    let data;
+    try {
+        data = octx.getImageData(0, 0, w, h).data;
+    } catch (e) {
+        return fail('tainted-canvas', { error: String(e) });
+    }
+    const lum = (x, y) => {
+        const i = (y * w + x) * 4;
+        return 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    };
+
+    // Peak threshold is relative to each scanline's own spread (max-min), not a fixed luminance
+    // delta — a fixed delta was tuned against clean synthetic images and may be too strict for a
+    // real photo with lower contrast (dim lighting, a washed-out or faded grid print).
+    function scanlineSpacings(getLum, length) {
+        const lums = [];
+        for (let i = 0; i < length; i++) lums.push(getLum(i));
+        const sorted = [...lums].sort((a, b) => a - b);
+        const bg = sorted[Math.floor(sorted.length * 0.5)];
+        const spread = sorted[sorted.length - 1] - sorted[0];
+        const peakThresh = bg + Math.max(20, spread * 0.25);
+        const positions = [];
+        let runStart = -1;
+        for (let i = 0; i < length; i++) {
+            if (lums[i] > peakThresh) {
+                if (runStart === -1) runStart = i;
+            } else if (runStart !== -1) {
+                positions.push((runStart + i - 1) / 2);
+                runStart = -1;
+            }
+        }
+        if (runStart !== -1) positions.push((runStart + length - 1) / 2);
+        const spacings = [];
+        for (let i = 1; i < positions.length; i++) spacings.push(positions[i] - positions[i - 1]);
+        return spacings;
+    }
+
+    const allSpacings = [];
+    const numLines = 9;
+    for (let k = 1; k <= numLines; k++) {
+        const y = Math.round(h * k / (numLines + 1));
+        allSpacings.push(...scanlineSpacings((x) => lum(x, y), w));
+    }
+    for (let k = 1; k <= numLines; k++) {
+        const x = Math.round(w * k / (numLines + 1));
+        allSpacings.push(...scanlineSpacings((y) => lum(x, y), h));
+    }
+    if (allSpacings.length < 4) return fail('too-few-lines-found', { n: allSpacings.length });
+
+    // These consistency thresholds are the actual safety mechanism (not just the peak-detection
+    // sensitivity above) — a non-grid target with its own periodic-ish pattern (e.g. a bullseye's
+    // concentric rings) can still produce a cluster of statistically "consistent" spacings if this
+    // is too forgiving. Confirmed by testing: loosening these specific ratios (as opposed to the
+    // peak-sensitivity tweaks above, which are safe to loosen) let a synthetic bullseye target
+    // through with a confident, WRONG calibration — reverted to the original tight values, which
+    // correctly reject it, after finding that regression.
+    allSpacings.sort((a, b) => a - b);
+    const rough = allSpacings[Math.floor(allSpacings.length / 2)];
+    const plausible = allSpacings.filter(s => s > rough * 0.6 && s < rough * 1.4);
+    if (plausible.length < allSpacings.length * 0.4) {
+        return fail('too-inconsistent', { n: allSpacings.length, plausibleN: plausible.length, rough });
+    }
+    plausible.sort((a, b) => a - b);
+    const median = plausible[Math.floor(plausible.length / 2)];
+    const consistent = plausible.filter(s => Math.abs(s - median) < median * 0.15);
+    if (consistent.length < plausible.length * 0.7) {
+        return fail('too-inconsistent', { n: allSpacings.length, plausibleN: plausible.length, consistentN: consistent.length, median });
+    }
+    const result = { ppi: median, reason: 'ok', n: allSpacings.length, plausibleN: plausible.length, consistentN: consistent.length };
+    console.log('[grid-detect]', result);
+    return result;
 }
 
 const targetUpload = document.getElementById('target-upload');
@@ -2538,27 +2750,49 @@ if (targetUpload) {
         reader.onload = function(event) {
             imgElement.onload = function() {
                 canvas.width = imgElement.naturalWidth; canvas.height = imgElement.naturalHeight;
-                state = "calibrating"; calibrationPoints = []; currentGroupShots = []; groups = []; pixelsPerInch = null; resetDragState();
-                
+                calibrationPoints = []; currentGroupShots = []; groups = []; pixelsPerInch = null;
+                currentPoa = null; cancelPendingGesture(); exitDeleteMode(); draggingShotIdx = null; resetDragState();
+
                 const banner = document.getElementById('status-banner');
                 const calBox = document.getElementById('calibration-box');
                 const envBox = document.getElementById('session-environment');
                 const metaBox = document.getElementById('group-metadata');
                 const liveRes = document.getElementById('live-result');
+                const liveAtz = document.getElementById('live-atz');
                 const dlBtn = document.getElementById('download-btn');
                 const saveBtn = document.getElementById('db-save-session-btn');
-                
-                if (banner) {
-                    banner.classList.remove('hidden');
-                    banner.innerText = "Step 1: Click TWO points on target grid matching reference scale line intersection.";
+                const poaStatus = document.getElementById('poa-status');
+                const clearPoaBtn = document.getElementById('clear-poa-btn');
+                const markPoaBtn = document.getElementById('mark-poa-btn');
+
+                const gridResult = detectGridPixelsPerInch();
+                if (gridResult.ppi) {
+                    pixelsPerInch = gridResult.ppi;
+                    state = "measuring";
+                    if (banner) {
+                        banner.classList.remove('hidden');
+                        banner.innerText = `Auto-calibrated from the target's 1" grid (${Math.round(gridResult.ppi)} px/inch). Use "Re-calibrate" below if that looks wrong.`;
+                    }
+                    if (calBox) calBox.classList.add('hidden');
+                    if (metaBox) metaBox.classList.remove('hidden');
+                } else {
+                    state = "calibrating";
+                    if (banner) {
+                        banner.classList.remove('hidden');
+                        banner.innerText = `No 1" grid detected (${gridResult.reason}) — Step 1: Click TWO points on target grid matching reference scale line intersection.`;
+                    }
+                    if (calBox) calBox.classList.add('hidden');
+                    if (metaBox) metaBox.classList.add('hidden');
                 }
-                if (calBox) calBox.classList.add('hidden');
                 if (envBox) envBox.classList.remove('hidden');
-                if (metaBox) metaBox.classList.add('hidden');
                 if (liveRes) liveRes.classList.add('hidden');
+                if (liveAtz) liveAtz.classList.add('hidden');
                 if (dlBtn) dlBtn.classList.add('hidden');
                 if (saveBtn) saveBtn.classList.add('hidden');
-                
+                if (poaStatus) poaStatus.innerText = "";
+                if (clearPoaBtn) clearPoaBtn.classList.add('hidden');
+                if (markPoaBtn) markPoaBtn.innerText = "🎯 Mark Point of Aim";
+
                 updateSidebarList(); redrawCanvas();
             };
             imgElement.src = event.target.result;
@@ -2594,7 +2828,7 @@ if (canvas) {
 
 function handleStart(e) {
     if (state === "idle") return;
-    if (e.touches && e.touches.length > 1) { isMultiTouch = true; return; }
+    if (e.touches && e.touches.length > 1) { isMultiTouch = true; cancelPendingGesture(); draggingShotIdx = null; return; }
     if (e.touches) {
         // New touch gesture starting — clear the flag so touch path runs fresh.
         touchHandled = false;
@@ -2605,17 +2839,71 @@ function handleStart(e) {
     isMultiTouch = false;
     touchStartClientPos = e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
     const coords = getCanvasCoords(e);
+    if (state === "measuring" && deleteModeActive) {
+        // Delete mode disables every other canvas interaction — nothing to arm here, the actual
+        // hit test happens on release (see handleEnd) so there's no drag/box logic to fight.
+        e.preventDefault();
+        return;
+    }
     if (state === "measuring") {
-        if (coords.x >= liveBoxPos.x && coords.x <= liveBoxPos.x + liveBoxDims.w && coords.y >= liveBoxPos.y && coords.y <= liveBoxPos.y + liveBoxDims.h) {
+        if (coords.x >= liveBoxPos.x && coords.x <= liveBoxPos.x + liveBoxDims.w && coords.y >= liveBoxPos.y && coords.y <= liveBoxPos.y + liveBoxDims.h
+            && pixelsPerInch && currentGroupShots.length >= 2) {
+            // The extra "box is actually visible" guard above matters: liveBoxPos/liveBoxDims
+            // default to (0,0)/300x150 before the box has ever been drawn, and this hit-test used
+            // to apply unconditionally — silently swallowing every tap in the target photo's
+            // top-left corner as "start dragging the box" even though no box was on screen yet.
+            e.preventDefault();
             isDraggingBox = true; dragOffset.x = coords.x - liveBoxPos.x; dragOffset.y = coords.y - liveBoxPos.y; return;
+        }
+        // Landing on the marker's body arms a drag candidate — moving past DRAG_JITTER promotes
+        // it to an actual drag (handleMove); releasing without moving falls through to the normal
+        // tap-adds-a-new-shot behavior below, same as tapping empty space. This is deliberately
+        // NOT "tap to delete": two shots landing on nearly the same hole is common in a tight
+        // group, and a simple tap-to-delete made adding the second one delete the first instead
+        // (confirmed against a real photo where exactly that happened). Deleting is a separate
+        // toggleable mode entirely (see deleteModeActive above) so it never competes with this.
+        const hitIdx = findShotIndexAt(coords);
+        if (hitIdx !== -1) {
+            // Same reasoning as the stats-box case above: claim the gesture immediately so the
+            // browser never gets to start a native scroll for it, whichever of tap/drag this
+            // turns out to be.
+            e.preventDefault();
+            pendingDragIdx = hitIdx;
+            pendingStartClientPos = touchStartClientPos || { x: e.clientX, y: e.clientY };
         }
     }
 }
 function handleMove(e) {
     if (state === "idle") return;
-    if (e.touches && e.touches.length > 1) { isMultiTouch = true; }
+    if (e.touches && e.touches.length > 1) { isMultiTouch = true; cancelPendingGesture(); }
     const coords = getCanvasCoords(e);
     if (isDraggingBox) { e.preventDefault(); liveBoxPos.x = coords.x - dragOffset.x; liveBoxPos.y = coords.y - dragOffset.y; liveBoxPos.customized = true; redrawCanvas(); }
+    if (draggingShotIdx !== null) {
+        e.preventDefault();
+        currentGroupShots[draggingShotIdx].x = coords.x;
+        currentGroupShots[draggingShotIdx].y = coords.y;
+        redrawCanvas();
+        return;
+    }
+    if (pendingDragIdx !== null && pendingStartClientPos) {
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const dx = clientX - pendingStartClientPos.x, dy = clientY - pendingStartClientPos.y;
+        if (Math.sqrt(dx * dx + dy * dy) > DRAG_JITTER) {
+            // Moved enough to mean "drag" — pick the marker up and start moving it live.
+            // preventDefault() here too (not just in the draggingShotIdx branch above) so the
+            // very touchmove event that crosses the jitter threshold doesn't let the canvas
+            // wrapper's native scroll sneak in before drag mode takes over on the next one —
+            // mouse has no scroll to fight, so this only shows up on a real touchscreen.
+            e.preventDefault();
+            const idx = pendingDragIdx;
+            pendingDragIdx = null;
+            draggingShotIdx = idx;
+            currentGroupShots[idx].x = coords.x;
+            currentGroupShots[idx].y = coords.y;
+            redrawCanvas();
+        }
+    }
 }
 function handleEnd(e) {
     if (state === "idle") return;
@@ -2629,8 +2917,40 @@ function handleEnd(e) {
     }
     const wasMultiTouch = isMultiTouch;
     if (e.touches && e.touches.length === 0) { isMultiTouch = false; }
-    if (wasMultiTouch) { isDraggingBox = false; touchStartClientPos = null; return; }
+    if (wasMultiTouch) { isDraggingBox = false; touchStartClientPos = null; cancelPendingGesture(); draggingShotIdx = null; return; }
+
+    if (state === "measuring" && deleteModeActive) {
+        // Any release in delete mode either removes the tapped shot or, if it didn't land on one,
+        // just cancels the mode — either way exactly one action per activation, then back to normal.
+        const coords = getCanvasCoords(e);
+        const idx = findShotIndexAt(coords);
+        touchStartClientPos = null;
+        exitDeleteMode();
+        if (idx !== -1 && window.confirm(`Remove shot #${idx + 1}?`)) {
+            currentGroupShots.splice(idx, 1);
+            updateLiveResultsOrHide();
+        }
+        redrawCanvas();
+        return;
+    }
+
     if (isDraggingBox) { isDraggingBox = false; return; }
+
+    if (draggingShotIdx !== null) {
+        // Drop the marker exactly where the user dragged it — no re-detection, since that was
+        // overriding a deliberate manual correction by snapping back to the auto-detected spot.
+        draggingShotIdx = null;
+        updateLiveResultsOrHide();
+        redrawCanvas();
+        touchStartClientPos = null;
+        return;
+    }
+
+    // A press on a marker's body that never turned into a drag is just a normal tap — falls
+    // through below to add a new shot, same as tapping anywhere else on the target.
+    pendingDragIdx = null;
+    pendingStartClientPos = null;
+
     if (touchStartClientPos && e.changedTouches) {
         const dx = e.changedTouches[0].clientX - touchStartClientPos.x;
         const dy = e.changedTouches[0].clientY - touchStartClientPos.y;
@@ -2638,24 +2958,288 @@ function handleEnd(e) {
         if (Math.sqrt(dx * dx + dy * dy) > 10) return;
     }
     touchStartClientPos = null;
-    const coords = getCanvasCoords(e);
-    if (state === "calibrating") {
-        if (calibrationPoints.length < 2) calibrationPoints.push({ x: coords.x, y: coords.y });
-        redrawCanvas();
-        if (calibrationPoints.length === 2) {
-            const calBox = document.getElementById('calibration-box');
-            const banner = document.getElementById('status-banner');
-            if (calBox) calBox.classList.remove('hidden');
-            if (banner) banner.innerText = "Input exact physical scale dimension width (Inches) and click Lock Calibration.";
-        }
-    } else if (state === "measuring") {
-        const sNum = currentGroupShots.length + 1;
-        const vIn = prompt(`Enter Velocity (fps) for Shot #${sNum} (Optional):`);
-        let velocity = vIn && !isNaN(parseFloat(vIn)) ? parseFloat(vIn) : null;
-        currentGroupShots.push({ x: coords.x, y: coords.y, velocity: velocity });
-        if (currentGroupShots.length >= 2) updateLiveResults();
-        redrawCanvas();
+    if (state !== "calibrating" && state !== "measuring" && state !== "marking-poa") return;
+    finalizePlacement(getCanvasCoords(e));
+}
+function cancelPendingGesture() {
+    pendingDragIdx = null;
+    pendingStartClientPos = null;
+}
+function toggleDeleteMode() {
+    if (deleteModeActive) { exitDeleteMode(); return; }
+    deleteModeActive = true;
+    cancelPendingGesture();
+    isDraggingBox = false;
+    draggingShotIdx = null;
+    const btn = document.getElementById('delete-mode-btn');
+    if (btn) { btn.textContent = '❌ Tap a Shot to Remove (or tap here to cancel)'; btn.classList.add('bg-red-700', 'hover:bg-red-600'); btn.classList.remove('bg-gray-700', 'hover:bg-gray-600'); }
+}
+function exitDeleteMode() {
+    deleteModeActive = false;
+    const btn = document.getElementById('delete-mode-btn');
+    if (btn) { btn.textContent = '🗑 Remove a Shot'; btn.classList.remove('bg-red-700', 'hover:bg-red-600'); btn.classList.add('bg-gray-700', 'hover:bg-gray-600'); }
+}
+// Hit radius matches what's actually drawn (canvasScale()-adjusted) — a previous mismatch, where
+// this ignored canvasScale() while drawShotMarkers used it, made real high-resolution photos
+// register clicks inconsistently: the visible ring could be up to canvasScale()x bigger than the
+// area that actually registered a tap.
+function findShotIndexAt(pos) {
+    const s = canvasScale();
+    for (let i = currentGroupShots.length - 1; i >= 0; i--) {
+        const shot = currentGroupShots[i];
+        const hitR = Math.max(14, Math.max(10, Math.min(40, shot.r || 13)) * s);
+        if (Math.hypot(pos.x - shot.x, pos.y - shot.y) <= hitR) return i;
     }
+    return -1;
+}
+
+// Routes a tap/click into whichever of calibration / shot-marking / Point-of-Aim-marking the
+// current `state` is. Shot placement runs detectHoleCenter() to snap onto the actual bullet
+// hole under the tap instead of trusting the raw tap position — see that function for why (a
+// finger/mouse click can land anywhere within a ragged hole, visibly skewing group size).
+function finalizePlacement(pos) {
+    if (!pos) return;
+    try {
+        if (state === "calibrating") {
+            if (calibrationPoints.length < 2) calibrationPoints.push({ x: pos.x, y: pos.y });
+            if (calibrationPoints.length === 2) {
+                const calBox = document.getElementById('calibration-box');
+                const banner = document.getElementById('status-banner');
+                if (calBox) calBox.classList.remove('hidden');
+                if (banner) banner.innerText = "Input exact physical scale dimension width (Inches) and click Lock Calibration.";
+            }
+        } else if (state === "measuring") {
+            // A quick tap always places a new shot — even one that lands on top of an existing
+            // marker, since two shots landing on nearly the same hole is common in a tight group.
+            // Removing a marker is a long-press instead (armed in handleStart/handleEnd above); by
+            // the time a plain tap reaches here, any long-press on this same gesture has already
+            // been handled and short-circuited before this function is even called.
+            const sNum = currentGroupShots.length + 1;
+            const vIn = prompt(`Enter Velocity (fps) for Shot #${sNum} (Optional):`);
+            const velocity = vIn && !isNaN(parseFloat(vIn)) ? parseFloat(vIn) : null;
+            const detected = detectHoleCenter(pos.x, pos.y);
+            const shot = detected
+                ? { x: detected.cx, y: detected.cy, velocity, r: shotRadiusPx(detected.r) }
+                : { x: pos.x, y: pos.y, velocity, r: shotRadiusPx(undefined) };
+            currentGroupShots.push(shot);
+            updateLiveResultsOrHide();
+        } else if (state === "marking-poa") {
+            currentPoa = { x: pos.x, y: pos.y };
+            state = "measuring";
+            const statusEl = document.getElementById('poa-status');
+            const clearBtn = document.getElementById('clear-poa-btn');
+            const markBtn = document.getElementById('mark-poa-btn');
+            if (statusEl) statusEl.innerText = "POA set ✓";
+            if (clearBtn) clearBtn.classList.remove('hidden');
+            if (markBtn) markBtn.innerText = "🎯 Re-mark Point of Aim";
+            updateLiveResults();
+        }
+    } catch (err) {
+        console.error('[tap-debug] finalizePlacement threw', err);
+        alert('Tap did not register — please screenshot this and send it over:\n' + (err && err.stack || err));
+        return;
+    }
+    redrawCanvas();
+}
+function startMarkingPoa() {
+    if (state !== "measuring") return;
+    state = "marking-poa";
+    const statusEl = document.getElementById('poa-status');
+    if (statusEl) statusEl.innerText = "Tap the target to mark where you aimed…";
+}
+function clearPoa() {
+    currentPoa = null;
+    const statusEl = document.getElementById('poa-status');
+    const clearBtn = document.getElementById('clear-poa-btn');
+    const markBtn = document.getElementById('mark-poa-btn');
+    if (statusEl) statusEl.innerText = "";
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (markBtn) markBtn.innerText = "🎯 Mark Point of Aim";
+    updateLiveResults();
+    redrawCanvas();
+}
+
+function undoLastShot() {
+    if (currentGroupShots.length === 0) return;
+    currentGroupShots.pop();
+    updateLiveResultsOrHide();
+    redrawCanvas();
+}
+
+// updateLiveResults() only ever shows/updates the readouts — it has no path back to hiding them
+// once a shot is removed and the count drops back under 2, so callers that can shrink
+// currentGroupShots (remove-by-tap, undo) go through this instead.
+function updateLiveResultsOrHide() {
+    if (currentGroupShots.length >= 2) {
+        updateLiveResults();
+        return;
+    }
+    const liveRes = document.getElementById('live-result');
+    const liveAtz = document.getElementById('live-atz');
+    if (liveRes) liveRes.classList.add('hidden');
+    if (liveAtz) liveAtz.classList.add('hidden');
+}
+
+// Auto-centers a tapped shot onto the actual bullet hole nearby, instead of trusting the raw
+// tap/click position — a finger or mouse click can land anywhere within a ragged, irregular
+// hole, which visibly skews group-size math (confirmed against a real photo where the same
+// group measured differently depending on exactly where within each hole was tapped).
+//
+// Approach: sample a square window around the tap from the source image, estimate the
+// surrounding paper/target's brightness from the window's own border, then flood-fill outward
+// from the tap point to find the connected blob of pixels that contrast with that background —
+// in EITHER direction (darker or lighter), not just one, since a real torn hole is often
+// multi-toned (a bright torn-paper rim around a differently-toned interior); splitting into a
+// darker-only / lighter-only pass fragmented those into two separate, too-small blobs (confirmed
+// against a real photo). Returns the blob's bounding-box center (a circle centered there
+// naturally "touches" the hole's edges) and radius, or null if no plausible hole is found near
+// the tap (falls back to the raw tap position — never blocks placement).
+//
+// Retries with progressively larger search windows when the first attempt's blob touches the
+// window's edge: on a highly zoomed-in/high-resolution photo, a hole (plus its frayed tearout)
+// can be close to or bigger than a small window's *entire* extent, including its border — which
+// corrupts the background estimate itself (confirmed with a synthetic test: a 120px window
+// around a 140px-radius hole measured the background as 204 instead of the true 30, because the
+// border itself was mostly hole) and silently produced a tiny, wrong result rather than an
+// error. A bigger retry window restores real background pixels along its border. Growth is kept
+// conservative (not too large a jump) because these targets print bright grid lines that run
+// right through/next to almost every hole — a grid line is nearly as different from the black
+// background as torn paper is, so an overly large window gives the flood fill more room to leak
+// along the line and merge with whatever else it touches (confirmed as the cause of a huge,
+// off-screen "ring" on a real photo where the hole sat on a grid intersection).
+function detectHoleCenter(tapX, tapY) {
+    if (!imgElement.src || !imgElement.naturalWidth) return null;
+    const baseR = pixelsPerInch ? pixelsPerInch * 0.45 : 45;
+    for (const mult of [0.85, 1.3, 1.8]) {
+        const R = Math.max(25, Math.min(200, baseR * mult));
+        const result = _tryDetectHoleInWindow(tapX, tapY, R);
+        if (result) return result;
+    }
+    return null;
+}
+
+function _tryDetectHoleInWindow(tapX, tapY, R) {
+    const x0 = Math.max(0, Math.round(tapX - R)), y0 = Math.max(0, Math.round(tapY - R));
+    const x1 = Math.min(canvas.width, Math.round(tapX + R)), y1 = Math.min(canvas.height, Math.round(tapY + R));
+    const w = x1 - x0, h = y1 - y0;
+    if (w < 6 || h < 6) return null;
+
+    const off = document.createElement('canvas');
+    off.width = w; off.height = h;
+    const octx = off.getContext('2d');
+    if (!octx) return null;
+    octx.drawImage(imgElement, x0, y0, w, h, 0, 0, w, h);
+    let data;
+    try {
+        data = octx.getImageData(0, 0, w, h).data;
+    } catch (e) {
+        return null; // e.g. a tainted canvas — fall back to the raw tap position
+    }
+    const lum = (idx) => 0.299 * data[idx * 4] + 0.587 * data[idx * 4 + 1] + 0.114 * data[idx * 4 + 2];
+
+    // Background estimate: the most common (modal) luminance bucket along the window's border,
+    // not a plain median — in a tight group, a neighboring hole's halo can intrude into this
+    // shot's search window border; the true background is still the single most common bucket
+    // even when a neighboring hole occupies a minority share of the border, whereas a plain
+    // median can get pulled further off by that contamination.
+    const borderLum = [];
+    for (let px = 0; px < w; px++) { borderLum.push(lum(px), lum((h - 1) * w + px)); }
+    for (let py = 0; py < h; py++) { borderLum.push(lum(py * w), lum(py * w + (w - 1))); }
+    const buckets = new Map();
+    for (const l of borderLum) {
+        const b = Math.round(l / 12);
+        buckets.set(b, (buckets.get(b) || 0) + 1);
+    }
+    let bestBucket = 0, bestCount = -1;
+    for (const [b, c] of buckets) { if (c > bestCount) { bestCount = c; bestBucket = b; } }
+    const bg = bestBucket * 12;
+    const isHoleColor = (px, py) => Math.abs(lum(py * w + px) - bg) > 25;
+
+    // A hole INTERIOR pixel has hole-colored neighbors in most directions (it's a filled 2D
+    // area); a thin grid-line pixel only has hole-colored neighbors along the line's own
+    // direction. Requiring a minimum local density — not just the single pixel's own color —
+    // before accepting a pixel lets the fill spread through an entire hole while refusing to
+    // follow a line out of it (confirmed against a real-shaped synthetic test: without this, a
+    // hole sitting on a grid line — true of nearly every hole in these photos — either leaked
+    // along the line into a huge blob or got rejected outright by the size cap below and fell
+    // back to the raw tap). The check window has to be comfortably wider than the line is thick
+    // or the line itself reads as "locally dense" too — 29x29, sampled every other pixel to keep
+    // the cost down, worked against a 9px-thick synthetic line.
+    const DENSITY_HALF = 14, DENSITY_STRIDE = 2, DENSITY_MIN = 0.42;
+    function localDensityOk(px, py) {
+        let holeCount = 0, total = 0;
+        for (let oy = -DENSITY_HALF; oy <= DENSITY_HALF; oy += DENSITY_STRIDE) {
+            const ny = py + oy;
+            if (ny < 0 || ny >= h) continue;
+            for (let ox = -DENSITY_HALF; ox <= DENSITY_HALF; ox += DENSITY_STRIDE) {
+                const nx = px + ox;
+                if (nx < 0 || nx >= w) continue;
+                total++;
+                if (isHoleColor(nx, ny)) holeCount++;
+            }
+        }
+        return total > 0 && (holeCount / total) >= DENSITY_MIN;
+    }
+    const isHole = (px, py) => {
+        if (px < 0 || py < 0 || px >= w || py >= h) return false;
+        return isHoleColor(px, py) && localDensityOk(px, py);
+    };
+
+    let sx = Math.round(tapX - x0), sy = Math.round(tapY - y0);
+    if (!isHole(sx, sy)) {
+        // Tap itself didn't land on a qualifying pixel — spiral outward for a starting point.
+        let found = false;
+        for (let rr = 1; rr <= 20 && !found; rr++) {
+            for (let dy = -rr; dy <= rr && !found; dy++) {
+                for (let dx = -rr; dx <= rr && !found; dx++) {
+                    const nx = sx + dx, ny = sy + dy;
+                    if (isHole(nx, ny)) { sx = nx; sy = ny; found = true; }
+                }
+            }
+        }
+        if (!found) return null;
+    }
+
+    // No real bullet hole, with generous tearout, should exceed this in any dimension — anything
+    // bigger almost certainly means the fill leaked along a grid line or merged with a
+    // neighboring hole, not that it found one real, very large hole. Checked *during* the fill
+    // (not just after) so a runaway leak is abandoned quickly rather than continuing to wander
+    // around the search window.
+    const maxSpanPx = pixelsPerInch ? pixelsPerInch * 0.9 : Infinity;
+
+    const visited = new Uint8Array(w * h);
+    const stack = [[sx, sy]];
+    let minX = sx, maxX = sx, minY = sy, maxY = sy, count = 0;
+    while (stack.length) {
+        const [cx, cy] = stack.pop();
+        if (cx < 0 || cy < 0 || cx >= w || cy >= h) continue;
+        const idx = cy * w + cx;
+        if (visited[idx]) continue;
+        if (!isHole(cx, cy)) continue;
+        visited[idx] = 1;
+        count++;
+        if (cx < minX) minX = cx; if (cx > maxX) maxX = cx;
+        if (cy < minY) minY = cy; if (cy > maxY) maxY = cy;
+        if (maxX - minX + 1 > maxSpanPx || maxY - minY + 1 > maxSpanPx) return null;
+        // 8-connected so a thin anti-aliased/noisy gap between differently-toned parts of the
+        // same hole (or a diagonal-only connection) doesn't split them into separate blobs.
+        stack.push(
+            [cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1],
+            [cx + 1, cy + 1], [cx - 1, cy - 1], [cx + 1, cy - 1], [cx - 1, cy + 1]
+        );
+    }
+    const bboxW = maxX - minX + 1, bboxH = maxY - minY + 1;
+    const fillRatio = count / (bboxW * bboxH);
+    // Reject implausible blobs: touching the search window's edge (the window was too small for
+    // this hole — caller retries with a bigger one), too sparse to trust, so large it basically
+    // consumed the whole window (background estimate likely got corrupted), or an elongated
+    // "dumbbell" shape (aspect ratio) — a real hole is roughly round; a shape that lopsided means
+    // the fill followed a line or bridged into a second nearby hole rather than staying within one.
+    if (minX <= 0 || minY <= 0 || maxX >= w - 1 || maxY >= h - 1) return null;
+    if (fillRatio < 0.12) return null;
+    if (bboxW * bboxH > w * h * 0.75) return null;
+    if (Math.max(bboxW, bboxH) / Math.min(bboxW, bboxH) > 2.2) return null;
+    return { cx: x0 + (minX + maxX) / 2, cy: y0 + (minY + maxY) / 2, r: Math.max(bboxW, bboxH) / 2 };
 }
 
 function lockCalibration() {
@@ -2665,47 +3249,104 @@ function lockCalibration() {
     if (calibrationPoints.length < 2 || isNaN(inches) || inches <= 0) return;
     pixelsPerInch = Math.sqrt(Math.pow(calibrationPoints[1].x - calibrationPoints[0].x, 2) + Math.pow(calibrationPoints[1].y - calibrationPoints[0].y, 2)) / inches;
     state = "measuring";
-    
+    calibrationPoints = [];
+
     const calBox = document.getElementById('calibration-box');
     const metaBox = document.getElementById('group-metadata');
     if (calBox) calBox.classList.add('hidden');
     if (metaBox) metaBox.classList.remove('hidden');
+    redrawCanvas();
 }
 
 function resetCalibration() {
     calibrationPoints = [];
     pixelsPerInch = null;
     currentGroupShots = [];
+    currentPoa = null;
+    cancelPendingGesture();
+    exitDeleteMode();
+    draggingShotIdx = null;
     state = "calibrating";
     const calBox = document.getElementById('calibration-box');
     const metaBox = document.getElementById('group-metadata');
     const banner = document.getElementById('status-banner');
     const liveRes = document.getElementById('live-result');
+    const liveAtz = document.getElementById('live-atz');
+    const poaStatus = document.getElementById('poa-status');
+    const clearPoaBtn = document.getElementById('clear-poa-btn');
+    const markPoaBtn = document.getElementById('mark-poa-btn');
     if (calBox) calBox.classList.add('hidden');
     if (metaBox) metaBox.classList.add('hidden');
     if (liveRes) liveRes.classList.add('hidden');
+    if (liveAtz) liveAtz.classList.add('hidden');
+    if (poaStatus) poaStatus.innerText = "";
+    if (clearPoaBtn) clearPoaBtn.classList.add('hidden');
+    if (markPoaBtn) markPoaBtn.innerText = "🎯 Mark Point of Aim";
     if (banner) banner.innerText = "Step 1: Click TWO points on target grid matching reference scale line intersection.";
     redrawCanvas();
 }
 
+// JS mirror of math_engine.calculate_group_geometry() — same duplication pattern drawStatsBox
+// already uses for AVG/ES/SD, needed for instant live feedback before any server round-trip.
+const MOA_INCHES_AT_100YD = 1.047, MRAD_INCHES_AT_100YD = 3.6;
+function computeGroupGeometry(shots, poa, ppi, distanceYards) {
+    if (!shots || shots.length < 2 || !ppi) return null;
+    let maxDist = 0, maxPair = [0, 1];
+    for (let i = 0; i < shots.length; i++) {
+        for (let j = i + 1; j < shots.length; j++) {
+            const d = Math.hypot(shots[j].x - shots[i].x, shots[j].y - shots[i].y);
+            if (d > maxDist) { maxDist = d; maxPair = [i, j]; }
+        }
+    }
+    const xs = shots.map(s => s.x), ys = shots.map(s => s.y);
+    const widthIn = (Math.max(...xs) - Math.min(...xs)) / ppi;
+    const heightIn = (Math.max(...ys) - Math.min(...ys)) / ppi;
+    const extremeSpreadIn = maxDist / ppi;
+    const cx = xs.reduce((a, b) => a + b, 0) / xs.length;
+    const cy = ys.reduce((a, b) => a + b, 0) / ys.length;
+    const inToMoa = inches => (inches == null || !distanceYards) ? null : inches / (MOA_INCHES_AT_100YD * distanceYards / 100);
+    const inToMrad = inches => (inches == null || !distanceYards) ? null : inches / (MRAD_INCHES_AT_100YD * distanceYards / 100);
+    let elevOffsetIn = null, windOffsetIn = null, elevOffsetMoa = null, windOffsetMoa = null;
+    if (poa) {
+        elevOffsetIn = (poa.y - cy) / ppi;  // + = group HIGH of POA (dial DOWN)
+        windOffsetIn = (cx - poa.x) / ppi;  // + = group RIGHT of POA (dial LEFT)
+        elevOffsetMoa = inToMoa(elevOffsetIn);
+        windOffsetMoa = inToMoa(windOffsetIn);
+    }
+    return {
+        extremeSpreadIn, widthIn, heightIn, maxPair, center: { x: cx, y: cy },
+        moa: inToMoa(extremeSpreadIn), mrad: inToMrad(extremeSpreadIn),
+        elevOffsetIn, windOffsetIn, elevOffsetMoa, windOffsetMoa,
+    };
+}
+
+function currentDistanceYards() {
+    const v = parseFloat(document.getElementById('group-distance-yards')?.value);
+    return isNaN(v) || v <= 0 ? null : v;
+}
+
 function updateLiveResults() {
     if (currentGroupShots.length < 2 || !pixelsPerInch) return;
+    const geom = computeGroupGeometry(currentGroupShots, currentPoa, pixelsPerInch, currentDistanceYards());
+    if (!geom) return;
     const liveRes = document.getElementById('live-result');
     if (liveRes) {
         liveRes.classList.remove('hidden');
-        liveRes.innerText = `Current Span: ${(findMaxDistance(currentGroupShots) / pixelsPerInch).toFixed(3)}"`;
+        let txt = `Span: ${geom.extremeSpreadIn.toFixed(3)}"  •  W×H: ${geom.widthIn.toFixed(2)}"×${geom.heightIn.toFixed(2)}"`;
+        if (geom.moa != null) txt += `  •  ${geom.moa.toFixed(2)} MOA`;
+        liveRes.innerText = txt;
     }
-}
-
-function findMaxDistance(pts) {
-    let maxDist = 0;
-    for (let i = 0; i < pts.length; i++) {
-        for (let j = i + 1; j < pts.length; j++) {
-            const d = Math.sqrt(Math.pow(pts[j].x - pts[i].x, 2) + Math.pow(pts[j].y - pts[i].y, 2));
-            if (d > maxDist) maxDist = d;
+    const atz = document.getElementById('live-atz');
+    if (atz) {
+        if (currentPoa && geom.elevOffsetMoa != null) {
+            const eDir = geom.elevOffsetIn >= 0 ? 'DOWN' : 'UP';
+            const wDir = geom.windOffsetIn >= 0 ? 'LEFT' : 'RIGHT';
+            atz.classList.remove('hidden');
+            atz.innerText = `ATZ: ${eDir} ${Math.abs(geom.elevOffsetIn).toFixed(2)}" (${Math.abs(geom.elevOffsetMoa).toFixed(2)} MOA) • ${wDir} ${Math.abs(geom.windOffsetIn).toFixed(2)}" (${Math.abs(geom.windOffsetMoa).toFixed(2)} MOA)`;
+        } else {
+            atz.classList.add('hidden');
         }
     }
-    return maxDist;
 }
 
 function saveCurrentGroup() {
@@ -2724,10 +3365,17 @@ function saveCurrentGroup() {
         return;
     }
 
-    const size = (findMaxDistance(currentGroupShots) / pixelsPerInch).toFixed(3);
+    const distanceYards = currentDistanceYards();
+    const geom = computeGroupGeometry(currentGroupShots, currentPoa, pixelsPerInch, distanceYards);
     const groupData = {
         shots: [...currentGroupShots],
-        size,
+        poa: currentPoa ? { ...currentPoa } : null,
+        pixelsPerInch,
+        imageWidth: canvas.width,
+        imageHeight: canvas.height,
+        distanceYards,
+        geom,
+        size: geom.extremeSpreadIn.toFixed(3),
         gunText: gunSelect.options[gunSelect.selectedIndex].text,
         ammoText: ammoSelect.options[ammoSelect.selectedIndex].text,
         boxX: liveBoxPos.x,
@@ -2939,22 +3587,24 @@ function redrawCanvas() {
 
     // Draw saved groups with their overlay boxes
     groups.forEach(g => {
-        drawConnections(g.shots, '#ef4444', 6);
-        drawStatsBox(g.shots, g.size, g.boxX, g.boxY, g.ammoText, g.gunText);
+        drawShotMarkers(g.shots, '#ef4444', g.geom?.maxPair);
+        if (g.poa) drawPoaMarker(g.poa);
+        drawStatsBox(g.shots, g.geom, g.boxX, g.boxY, g.ammoText, g.gunText, g.poa);
     });
 
     // Draw current in-progress shots
     if (currentGroupShots.length > 0) {
-        drawConnections(currentGroupShots, '#3b82f6', 6);
-        if (currentGroupShots.length >= 2 && pixelsPerInch) {
-            const size = (findMaxDistance(currentGroupShots) / pixelsPerInch).toFixed(3);
+        const geom = pixelsPerInch ? computeGroupGeometry(currentGroupShots, currentPoa, pixelsPerInch, currentDistanceYards()) : null;
+        drawShotMarkers(currentGroupShots, '#3b82f6', geom?.maxPair, ctx, canvas, true);
+        if (geom && currentGroupShots.length >= 2) {
             const gunSel  = document.getElementById('select-gun');
             const ammoSel = document.getElementById('select-ammo');
             const livePlatform = gunSel?.selectedIndex  > 0 ? gunSel.options[gunSel.selectedIndex].text   : '';
             const liveLoad     = ammoSel?.selectedIndex > 0 ? ammoSel.options[ammoSel.selectedIndex].text : '';
-            drawStatsBox(currentGroupShots, size, liveBoxPos.x, liveBoxPos.y, liveLoad, livePlatform);
+            drawStatsBox(currentGroupShots, geom, liveBoxPos.x, liveBoxPos.y, liveLoad, livePlatform, currentPoa);
         }
     }
+    if (currentPoa) drawPoaMarker(currentPoa);
 
     // Draw calibration points as blue dots with a line between them
     if (calibrationPoints.length > 0) {
@@ -2978,8 +3628,8 @@ function redrawCanvas() {
     }
 }
 
-function drawStatsBox(shots, sizeInches, boxX, boxY, loadLabel, platformLabel) {
-    if (!shots || shots.length < 2) return;
+function drawStatsBox(shots, geom, boxX, boxY, loadLabel, platformLabel, poa) {
+    if (!shots || shots.length < 2 || !geom) return;
 
     const velocities = shots.map(s => s.velocity).filter(v => v !== null);
     const hasChrono = velocities.length > 0;
@@ -2991,13 +3641,23 @@ function drawStatsBox(shots, sizeInches, boxX, boxY, loadLabel, platformLabel) {
     const s = canvasScale();
     const fs = (n) => `${Math.round(n * s)}px`;
 
-    // Build lines: [text, font, color, lineAdvance]
+    // Build lines: [text, font, color, lineAdvance] — sized down from an earlier pass that made
+    // this box visually dominate the whole target photo (confirmed against a real photo where it
+    // covered roughly a third of the frame).
     const lines = [
-        [`GROUP: ${sizeInches}"`, `bold ${fs(24)} monospace`, '#f59e0b', 32 * s],
+        [`GROUP: ${geom.extremeSpreadIn.toFixed(3)}"`, `bold ${fs(15)} monospace`, '#f59e0b', 21 * s],
     ];
-    if (loadStr) lines.push([loadStr, `bold ${fs(17)} monospace`, '#a3e635', 23 * s]);
-    if (platStr) lines.push([platStr, `${fs(16)} monospace`,      '#60a5fa', 22 * s]);
-    lines.push([`${shots.length} shots`, `${fs(17)} monospace`, '#9ca3af', 23 * s]);
+    if (loadStr) lines.push([loadStr, `bold ${fs(11)} monospace`, '#a3e635', 15 * s]);
+    if (platStr) lines.push([platStr, `${fs(10)} monospace`,      '#60a5fa', 14 * s]);
+    lines.push([`${shots.length} shots`, `${fs(11)} monospace`, '#9ca3af', 15 * s]);
+    lines.push([`W×H: ${geom.widthIn.toFixed(2)}"×${geom.heightIn.toFixed(2)}"`, `${fs(10)} monospace`, '#e5e7eb', 14 * s]);
+    if (geom.moa != null) lines.push([`${geom.moa.toFixed(2)} MOA`, `${fs(10)} monospace`, '#a3a3a3', 14 * s]);
+    if (poa && geom.elevOffsetMoa != null) {
+        const eDir = geom.elevOffsetIn >= 0 ? 'DOWN' : 'UP';
+        const wDir = geom.windOffsetIn >= 0 ? 'LEFT' : 'RIGHT';
+        lines.push([`ATZ: ${eDir} ${Math.abs(geom.elevOffsetMoa).toFixed(2)} / ${wDir} ${Math.abs(geom.windOffsetMoa).toFixed(2)} MOA`,
+                     `bold ${fs(10)} monospace`, '#22d3ee', 14 * s]);
+    }
 
     if (hasChrono) {
         const avg = Math.round(velocities.reduce((a, b) => a + b, 0) / velocities.length);
@@ -3005,12 +3665,12 @@ function drawStatsBox(shots, sizeInches, boxX, boxY, loadLabel, platformLabel) {
         const sd  = velocities.length > 1
             ? Math.sqrt(velocities.reduce((a, v) => a + Math.pow(v - avg, 2), 0) / (velocities.length - 1)).toFixed(1)
             : 0;
-        lines.push([`AVG: ${avg} fps`,             `bold ${fs(20)} monospace`, '#60a5fa', 28 * s]);
-        lines.push([`ES: ${es}  SD: ${sd}`,         `${fs(17)} monospace`,     '#9ca3af', 23 * s]);
+        lines.push([`AVG: ${avg} fps`,             `bold ${fs(13)} monospace`, '#60a5fa', 18 * s]);
+        lines.push([`ES: ${es}  SD: ${sd}`,         `${fs(11)} monospace`,     '#9ca3af', 15 * s]);
     }
 
     // Measure widest line to set box width
-    const HPAD = 20 * s, VTOP = 16 * s, VBOT = 14 * s;
+    const HPAD = 13 * s, VTOP = 10 * s, VBOT = 9 * s;
     let maxW = 0;
     lines.forEach(([text, font]) => {
         ctx.font = font;
@@ -3055,18 +3715,77 @@ function drawStatsBox(shots, sizeInches, boxX, boxY, loadLabel, platformLabel) {
     });
 }
 
-function canvasScale() { return Math.max(1, canvas.width / 800); }
+function canvasScale(c = canvas) { return Math.max(1, c.width / 800); }
 
-function drawConnections(shots, color, width) {
-    if (!ctx) return;
-    const s = canvasScale();
-    ctx.strokeStyle = color; ctx.lineWidth = width * s;
-    for (let i = 0; i < shots.length; i++) {
-        for (let j = i + 1; j < shots.length; j++) {
-            ctx.beginPath(); ctx.moveTo(shots[i].x, shots[i].y); ctx.lineTo(shots[j].x, shots[j].y); ctx.stroke();
-        }
+// Numbered shot markers matching each hole, plus a single dashed line between just the two
+// shots that define the max-spread (not every pair — that all-pairs "triangle" was the visually
+// noisy, imprecise-looking output the old drawConnections() produced). targetCtx/targetCanvas
+// let this be reused against an offscreen export canvas (see downloadAnnotatedTarget), not just
+// the live one.
+function drawShotMarkers(shots, color, maxPair, targetCtx = ctx, targetCanvas = canvas, interactive = false) {
+    if (!targetCtx || !shots) return;
+    // In delete mode every marker in the in-progress group turns warning-red instead of getting a
+    // badge drawn on top of it — a badge big enough to actually hit on a touchscreen ended up
+    // covering most of the marker, making the marker underneath hard to grab and drag normally.
+    if (interactive && deleteModeActive) color = '#dc2626';
+    const s = canvasScale(targetCanvas);
+    if (maxPair && shots.length >= 2) {
+        targetCtx.save();
+        targetCtx.strokeStyle = color;
+        targetCtx.lineWidth = 2.5 * s;
+        targetCtx.setLineDash([8 * s, 6 * s]);
+        targetCtx.beginPath();
+        targetCtx.moveTo(shots[maxPair[0]].x, shots[maxPair[0]].y);
+        targetCtx.lineTo(shots[maxPair[1]].x, shots[maxPair[1]].y);
+        targetCtx.stroke();
+        targetCtx.restore();
     }
-    shots.forEach(p => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(p.x, p.y, 8 * s, 0, Math.PI * 2); ctx.fill(); });
+    shots.forEach((p, idx) => {
+        // Outline circle sized to the auto-detected hole (touches its edges) when available,
+        // otherwise a fixed default — with a large number filling most of it (white fill + dark
+        // outline stroke, so it stays legible against any background/ring color) rather than a
+        // small badge that shrinks the number down regardless of how big the hole actually is.
+        const r = Math.max(10, Math.min(40, p.r || 13)) * s;
+        targetCtx.beginPath();
+        targetCtx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        targetCtx.strokeStyle = color;
+        targetCtx.lineWidth = 3 * s;
+        targetCtx.stroke();
+
+        const fontSize = Math.max(14 * s, r * 1.2);
+        const label = String(idx + 1);
+        targetCtx.font = `bold ${Math.round(fontSize)}px monospace`;
+        targetCtx.textAlign = 'center';
+        targetCtx.textBaseline = 'middle';
+        targetCtx.lineJoin = 'round';
+        targetCtx.miterLimit = 2;
+        targetCtx.lineWidth = Math.max(2.5 * s, fontSize * 0.16);
+        targetCtx.strokeStyle = 'rgba(0,0,0,0.85)';
+        targetCtx.strokeText(label, p.x, p.y + 1 * s);
+        targetCtx.fillStyle = '#fff';
+        targetCtx.fillText(label, p.x, p.y + 1 * s);
+    });
+    targetCtx.textAlign = 'left';
+    targetCtx.textBaseline = 'alphabetic';
+}
+
+// Distinct cyan crosshair-in-circle marking the Point of Aim, separate from numbered shot markers.
+function drawPoaMarker(poa, targetCtx = ctx, targetCanvas = canvas) {
+    if (!targetCtx || !poa) return;
+    const s = canvasScale(targetCanvas);
+    targetCtx.save();
+    targetCtx.strokeStyle = '#22d3ee';
+    targetCtx.lineWidth = 2.5 * s;
+    targetCtx.beginPath();
+    targetCtx.arc(poa.x, poa.y, 14 * s, 0, Math.PI * 2);
+    targetCtx.stroke();
+    targetCtx.beginPath();
+    targetCtx.moveTo(poa.x - 20 * s, poa.y);
+    targetCtx.lineTo(poa.x + 20 * s, poa.y);
+    targetCtx.moveTo(poa.x, poa.y - 20 * s);
+    targetCtx.lineTo(poa.x, poa.y + 20 * s);
+    targetCtx.stroke();
+    targetCtx.restore();
 }
 
 function deleteGroup(idx) {
@@ -3109,9 +3828,10 @@ function updateSidebarList() {
             <p class="text-xs font-bold text-white truncate">${g.gunText}</p>
             <p class="text-[11px] text-gray-400 truncate">${g.ammoText}</p>
             <div class="flex justify-between items-center pt-1 border-t border-gray-750">
-                <span class="text-emerald-400 font-mono font-bold text-sm">${g.size}&quot;</span>
+                <span class="text-emerald-400 font-mono font-bold text-sm">${g.size}&quot;${g.geom?.moa != null ? ` <span class="text-gray-500 font-normal">(${g.geom.moa.toFixed(2)} MOA)</span>` : ''}</span>
                 <span class="text-[11px]">${velLine}</span>
             </div>
+            ${g.poa && g.geom?.elevOffsetMoa != null ? `<p class="text-[10px] text-cyan-400 font-mono">ATZ: ${g.geom.elevOffsetIn >= 0 ? 'DOWN' : 'UP'} ${Math.abs(g.geom.elevOffsetMoa).toFixed(2)} / ${g.geom.windOffsetIn >= 0 ? 'LEFT' : 'RIGHT'} ${Math.abs(g.geom.windOffsetMoa).toFixed(2)} MOA</p>` : ''}
         </div>`;
     }).join('');
 
@@ -3178,24 +3898,10 @@ function downloadAnnotatedTarget() {
     // 1. Draw the base image
     octx.drawImage(imgElement, 0, 0);
 
-    // 2. Re-draw all saved group lines & dots
+    // 2. Re-draw all saved groups with numbered markers (matches the live canvas's own style)
     groups.forEach(g => {
-        octx.strokeStyle = '#ef4444';
-        octx.lineWidth = 6;
-        for (let i = 0; i < g.shots.length; i++) {
-            for (let j = i + 1; j < g.shots.length; j++) {
-                octx.beginPath();
-                octx.moveTo(g.shots[i].x, g.shots[i].y);
-                octx.lineTo(g.shots[j].x, g.shots[j].y);
-                octx.stroke();
-            }
-        }
-        g.shots.forEach(p => {
-            octx.fillStyle = '#ef4444';
-            octx.beginPath();
-            octx.arc(p.x, p.y, 8, 0, Math.PI * 2);
-            octx.fill();
-        });
+        drawShotMarkers(g.shots, '#ef4444', g.geom?.maxPair, octx, offscreen);
+        if (g.poa) drawPoaMarker(g.poa, octx, offscreen);
     });
 
     // 3. Draw a stats legend box in the top-left corner
@@ -3206,7 +3912,8 @@ function downloadAnnotatedTarget() {
             ? Math.round(velocities.reduce((a, b) => a + b, 0) / velocities.length)
             : null;
         const velStr = avgVel !== null ? `  ${avgVel} fps avg` : '';
-        return `G${idx + 1}: ${g.size}"  ·  ${g.gunText}${velStr}`;
+        const moaStr = g.geom?.moa != null ? `  (${g.geom.moa.toFixed(2)} MOA)` : '';
+        return `G${idx + 1}: ${g.size}"${moaStr}  ·  ${g.gunText}${velStr}`;
     });
 
     const BOX_H = PAD * 2 + LINE * (labelLines.length + 1);
@@ -3294,7 +4001,13 @@ async function commitSessionToDatabase() {
         formData.append('date', sessionDate);
         formData.append('velocities_csv', velocitiesCsv);
         formData.append('rounds_fired', String(g.shots.length));
-        formData.append('group_size', g.size);
+        formData.append('group_size', g.size);  // legacy fallback, harmless to keep sending
+        formData.append('shots_json', JSON.stringify(g.shots.map(s => ({ x: s.x, y: s.y, velocity: s.velocity }))));
+        if (g.pixelsPerInch) formData.append('pixels_per_inch', g.pixelsPerInch);
+        if (g.imageWidth) formData.append('image_width', g.imageWidth);
+        if (g.imageHeight) formData.append('image_height', g.imageHeight);
+        if (g.distanceYards) formData.append('distance_yards', g.distanceYards);
+        if (g.poa) { formData.append('poa_x', g.poa.x); formData.append('poa_y', g.poa.y); }
         if (groupBlob) formData.append('target_image', groupBlob, 'target.jpg');
 
         try {
@@ -3314,7 +4027,18 @@ async function commitSessionToDatabase() {
         showToast(`${successCount} saved, ${failCount} failed. Check console for details.`, "error");
     }
 }
-function resetCanvas() { calibrationPoints = []; currentGroupShots = []; groups = []; pixelsPerInch = null; state = imgElement.src ? "calibrating" : "idle"; redrawCanvas(); }
+function resetCanvas() {
+    calibrationPoints = []; currentGroupShots = []; groups = []; pixelsPerInch = null;
+    currentPoa = null; cancelPendingGesture(); exitDeleteMode(); draggingShotIdx = null;
+    state = imgElement.src ? "calibrating" : "idle";
+    const poaStatus = document.getElementById('poa-status');
+    const clearPoaBtn = document.getElementById('clear-poa-btn');
+    const markPoaBtn = document.getElementById('mark-poa-btn');
+    if (poaStatus) poaStatus.innerText = "";
+    if (clearPoaBtn) clearPoaBtn.classList.add('hidden');
+    if (markPoaBtn) markPoaBtn.innerText = "🎯 Mark Point of Aim";
+    redrawCanvas();
+}
 
 async function loadCatalog(frameType = currentFrameType()) {
     const container = document.getElementById('catalog-container');

@@ -401,7 +401,28 @@ class ShotString(Base):
     target_image_path = Column(String, nullable=True)
     group_size_inches = Column(Float, nullable=True)
     group_size_moa = Column(Float, nullable=True)
-    
+
+    # Raw shot geometry — persisted so a session's group math can be recomputed/reopened later,
+    # not just archived as a flattened picture. Coordinates live in the ORIGINAL upload canvas's
+    # own pixel space (image_width/image_height), never the possibly-thumbnailed stored image's
+    # space (see dependencies.save_uploaded_file's 1200x1200 thumbnail) and never crop-relative.
+    shots_json = Column(String, nullable=True)  # JSON [{"x":px,"y":py,"velocity":fps|null}, ...]
+    poa_x = Column(Float, nullable=True)  # Point of Aim, same pixel space; null if not marked
+    poa_y = Column(Float, nullable=True)
+    pixels_per_inch = Column(Float, nullable=True)  # calibration scale locked at save time
+    image_width = Column(Integer, nullable=True)
+    image_height = Column(Integer, nullable=True)
+    distance_yards = Column(Float, nullable=True)
+
+    # Computed geometry stats (mirrors avg_velocity/extreme_spread/standard_deviation above)
+    group_width_inches = Column(Float, nullable=True)
+    group_height_inches = Column(Float, nullable=True)
+    group_size_mrad = Column(Float, nullable=True)
+    elevation_offset_inches = Column(Float, nullable=True)  # + = group center HIGH of POA (dial DOWN)
+    windage_offset_inches = Column(Float, nullable=True)  # + = group center RIGHT of POA (dial LEFT)
+    elevation_offset_moa = Column(Float, nullable=True)
+    windage_offset_moa = Column(Float, nullable=True)
+
     barrel = relationship("Barrel", back_populates="shot_strings")
     ammo = relationship("Ammo", back_populates="shot_strings")
 

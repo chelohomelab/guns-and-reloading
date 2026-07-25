@@ -701,6 +701,18 @@ async function populateScopeSelect() {
     } catch(_) {}
 }
 
+// Sidebar nav links are real <a href="..."> so ctrl/middle-click correctly opens them in a new
+// tab — but a plain left-click should still use the fast in-page switch instead of a full page
+// reload. This runs the fast path only for a plain left-click; any modifier (ctrl/cmd/shift) or
+// non-primary button (middle-click) falls through to the browser's native new-tab/new-window
+// handling of the href, untouched.
+function navClick(e, fn) {
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    fn();
+    closeSidebar();
+}
+
 function switchTab(tabId) {
     if (tabId === 'catalog-tab') { window.location.href = '/inventory'; return; }
     ['landing-tab', 'measure-tab', 'add-tab', 'ladder-tab', 'reload-data-tab'].forEach(id => {

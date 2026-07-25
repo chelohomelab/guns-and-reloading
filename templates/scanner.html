@@ -301,11 +301,11 @@
 
 <!-- Left Sidebar -->
 <aside id="sidebar" class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 z-50 fixed lg:relative inset-y-0 left-0 -translate-x-full lg:translate-x-0 transition-transform duration-300">
-  <div class="p-4 border-b border-gray-800 text-center cursor-pointer hover:bg-gray-800/40 transition" onclick="window.location.href='/'">
+  <a href="/" class="block p-4 border-b border-gray-800 text-center cursor-pointer hover:bg-gray-800/40 transition">
     <img src="/static/images/logo.png" alt="G&R" class="h-10 w-auto mx-auto mb-1.5 drop-shadow-lg">
     <h1 class="text-lg font-black text-amber-500 tracking-wide leading-tight">Guns &amp; Reloading</h1>
     <p class="text-[10px] text-gray-500 mt-0.5 tracking-widest uppercase">Vault</p>
-  </div>
+  </a>
   <nav class="p-2.5 space-y-1 border-b border-gray-800 overflow-y-auto flex-1">
     <a href="/inventory" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/60 hover:bg-amber-600/20 border border-gray-700/40 hover:border-amber-500/40 transition text-sm font-bold text-gray-200">
       <span>📦</span> Inventory
@@ -345,6 +345,9 @@
       </a>
       <a href="/admin/backup" class="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg bg-green-950/50 hover:bg-green-900/50 border border-green-700/40 transition text-sm font-bold text-green-300">
         <span>💾</span> Backup
+      </a>
+      <a href="/admin/upgrade" class="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg bg-cyan-950/50 hover:bg-cyan-900/50 border border-cyan-700/40 transition text-sm font-bold text-cyan-300">
+        <span>🚀</span> Upgrade
       </a>
       <a href="/admin/reload-data" class="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg bg-rose-950/50 hover:bg-rose-900/50 border border-rose-700/40 transition text-sm font-bold text-rose-300">
         <span>📖</span> Reloading Data Center
@@ -672,7 +675,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=125"></script>
+<script src="/static/app.js?v=126"></script>
 <script>
 // ============================================================
 // STATE

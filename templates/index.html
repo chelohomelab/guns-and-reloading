@@ -41,11 +41,11 @@
     <aside id="sidebar" class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 z-40 hidden lg:flex lg:relative">
 
         <!-- Logo + title -->
-        <div class="p-4 border-b border-gray-800 text-center cursor-pointer hover:bg-gray-800/40 transition" onclick="switchTab('landing-tab'); closeSidebar()">
+        <a href="/" class="block p-4 border-b border-gray-800 text-center cursor-pointer hover:bg-gray-800/40 transition" onclick="navClick(event, () => switchTab('landing-tab'))">
             <img src="/static/images/logo.png" alt="G&R" class="h-10 w-auto mx-auto mb-1.5 drop-shadow-lg">
             <h1 class="text-lg font-black text-amber-500 tracking-wide leading-tight">Guns &amp; Reloading</h1>
             <p class="text-[10px] text-gray-500 mt-0.5 tracking-widest uppercase">Vault</p>
-        </div>
+        </a>
 
         <!-- Scrollable middle: nav + stats -->
         <div class="flex-1 overflow-y-auto">
@@ -57,36 +57,36 @@
                 <span class="text-lg">📦</span>
                 <div><div class="text-sm font-bold text-white">Inventory</div><div class="text-[10px] text-gray-500">Browse your vault</div></div>
             </a>
-            <button id="nav-btn-measure" onclick="switchTab('measure-tab'); closeSidebar()"
+            <a id="nav-btn-measure" href="/?tab=measure-tab" onclick="navClick(event, () => switchTab('measure-tab'))"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">🎯</span>
                 <div><div class="text-sm font-bold text-white">Range Session</div><div class="text-[10px] text-blue-400/70">Log a shot string</div></div>
-            </button>
-            <button id="nav-btn-ladder" onclick="switchTab('ladder-tab'); closeSidebar()"
+            </a>
+            <a id="nav-btn-ladder" href="/?tab=ladder-tab" onclick="navClick(event, () => switchTab('ladder-tab'))"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 hover:border-purple-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">🪜</span>
                 <div><div class="text-sm font-bold text-white">Ladder Test</div><div class="text-[10px] text-purple-400/70">Find the node</div></div>
-            </button>
-            <button id="nav-btn-reload-data" onclick="switchTab('reload-data-tab'); closeSidebar()"
+            </a>
+            <a id="nav-btn-reload-data" href="/?tab=reload-data-tab" onclick="navClick(event, () => switchTab('reload-data-tab'))"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">📖</span>
                 <div><div class="text-sm font-bold text-white">Reloading Data Center</div><div class="text-[10px] text-rose-400/70">6 manufacturers</div></div>
-            </button>
-            <button onclick="switchTab('add-tab'); switchFormCategory('cat-platforms'); closeSidebar()"
+            </a>
+            <a href="/?tab=add-tab&cat=platforms" onclick="navClick(event, () => { switchTab('add-tab'); switchFormCategory('cat-platforms'); })"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 border border-amber-800/40 hover:border-amber-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">⚙️</span>
                 <div><div class="text-sm font-bold text-white">Add Inventory</div><div class="text-[10px] text-amber-500/70">Firearms &amp; gear</div></div>
-            </button>
-            <button onclick="switchTab('add-tab'); switchFormCategory('cat-ammunition'); closeSidebar()"
+            </a>
+            <a href="/?tab=add-tab&cat=ammunition" onclick="navClick(event, () => { switchTab('add-tab'); switchFormCategory('cat-ammunition'); })"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-sky-950/60 hover:bg-sky-900/60 border border-sky-800/40 hover:border-sky-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">🧪</span>
                 <div><div class="text-sm font-bold text-white">Add Ammunition</div><div class="text-[10px] text-sky-400/70">Factory &amp; handloads</div></div>
-            </button>
-            <button onclick="switchTab('add-tab'); switchFormCategory('cat-components'); closeSidebar()"
+            </a>
+            <a href="/?tab=add-tab&cat=components" onclick="navClick(event, () => { switchTab('add-tab'); switchFormCategory('cat-components'); })"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/40 hover:border-emerald-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">🔩</span>
                 <div><div class="text-sm font-bold text-white">Add Components</div><div class="text-[10px] text-emerald-500/70">Powder, primers, bullets</div></div>
-            </button>
+            </a>
         </nav>
 
         <!-- Inventory stats -->
@@ -111,6 +111,7 @@
                 <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
                 <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
                 <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
+                <a href="/admin/upgrade" class="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-900/30 transition">🚀 Upgrade</a>
                 <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Reloading Data Center</a>
                 {% endif %}
                 <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
@@ -1724,6 +1725,6 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
-    <script src="/static/app.js?v=125"></script>
+    <script src="/static/app.js?v=126"></script>
 </body>
 </html>

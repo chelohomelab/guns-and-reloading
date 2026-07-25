@@ -86,6 +86,68 @@ def _rotate_backups(backup_dir: Path, keep: int):
         old.unlink(missing_ok=True)
 
 
+def restore_zip_bytes(data: bytes) -> dict:
+    """Restore the DB + uploads from backup ZIP bytes. Shared by the upload-restore,
+    restore-by-server-filename, and upgrade-rollback endpoints so all three agree on
+    exactly what "restore" means instead of drifting apart over time."""
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile:
+        raise HTTPException(400, "Invalid ZIP file")
+
+    names = zf.namelist()
+    if "reloading.db" not in names:
+        raise HTTPException(400, "ZIP does not contain reloading.db — not a valid backup")
+
+    # Restore DB via sqlite3 backup API (safe while service is running)
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        tmp.write(zf.read("reloading.db"))
+        tmp_path = tmp.name
+
+    try:
+        src = sqlite3.connect(tmp_path)
+        dst = sqlite3.connect(str(DB_PATH))
+        src.backup(dst)
+        src.close()
+        dst.close()
+    finally:
+        os.unlink(tmp_path)
+
+    # Restore uploads
+    uploads_dir = Path(UPLOAD_DIR)
+    restored_photos = 0
+    for name in names:
+        if name.startswith("uploads/") and not name.endswith("/"):
+            dest = uploads_dir / Path(name).name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(zf.read(name))
+            restored_photos += 1
+
+    meta = {}
+    if "backup_meta.json" in names:
+        try:
+            meta = json.loads(zf.read("backup_meta.json"))
+        except Exception:
+            pass
+
+    return {"ok": True, "photos_restored": restored_photos, "backup_created_at": meta.get("created_at")}
+
+
+def save_backup_zip(cfg: dict) -> Path:
+    """Build a fresh backup ZIP and save it into the configured local backup folder,
+    rotating old ones per keep_count. Shared by the manual Save-to-Server/Push-to-Cloud
+    actions and the automatic pre-upgrade backup."""
+    backup_dir = Path(cfg["local_path"])
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    out = backup_dir / f"reloading_backup_{ts}.zip"
+    buf = io.BytesIO()
+    _build_zip(buf)
+    out.write_bytes(buf.getvalue())
+    _rotate_backups(backup_dir, cfg["keep_count"])
+    return out
+
+
 # ── Pages ────────────────────────────────────────────────────────────────────
 
 @router.get("/admin/backup", response_class=HTMLResponse)
@@ -124,17 +186,7 @@ def backup_download(request: Request):
 def backup_save(request: Request):
     _require_admin(request)
     cfg = _load_config()
-    backup_dir = Path(cfg["local_path"])
-    backup_dir.mkdir(parents=True, exist_ok=True)
-
-    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    out = backup_dir / f"reloading_backup_{ts}.zip"
-
-    buf = io.BytesIO()
-    _build_zip(buf)
-    out.write_bytes(buf.getvalue())
-    _rotate_backups(backup_dir, cfg["keep_count"])
-
+    out = save_backup_zip(cfg)
     return {"ok": True, "file": str(out), "size_bytes": out.stat().st_size}
 
 
@@ -185,14 +237,7 @@ def backup_push_cloud(request: Request):
         raise HTTPException(400, "rclone remote not configured")
 
     # Save a fresh backup locally first
-    backup_dir = Path(cfg["local_path"])
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    out = backup_dir / f"reloading_backup_{ts}.zip"
-    buf = io.BytesIO()
-    _build_zip(buf)
-    out.write_bytes(buf.getvalue())
-    _rotate_backups(backup_dir, cfg["keep_count"])
+    out = save_backup_zip(cfg)
 
     remote_dest = f"{cfg['rclone_remote']}:{cfg['rclone_path']}"
     result = subprocess.run(
@@ -211,53 +256,8 @@ async def backup_restore(request: Request, file: UploadFile = File(...)):
     _require_admin(request)
     if not file.filename.endswith(".zip"):
         raise HTTPException(400, "Must be a .zip backup file")
-
     data = await file.read()
-    try:
-        zf = zipfile.ZipFile(io.BytesIO(data))
-    except zipfile.BadZipFile:
-        raise HTTPException(400, "Invalid ZIP file")
-
-    names = zf.namelist()
-    if "reloading.db" not in names:
-        raise HTTPException(400, "ZIP does not contain reloading.db — not a valid backup")
-
-    # Restore DB via sqlite3 backup API (safe while service is running)
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-        tmp.write(zf.read("reloading.db"))
-        tmp_path = tmp.name
-
-    try:
-        src = sqlite3.connect(tmp_path)
-        dst = sqlite3.connect(str(DB_PATH))
-        src.backup(dst)
-        src.close()
-        dst.close()
-    finally:
-        os.unlink(tmp_path)
-
-    # Restore uploads
-    uploads_dir = Path(UPLOAD_DIR)
-    restored_photos = 0
-    for name in names:
-        if name.startswith("uploads/") and not name.endswith("/"):
-            dest = uploads_dir / Path(name).name
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(zf.read(name))
-            restored_photos += 1
-
-    meta = {}
-    if "backup_meta.json" in names:
-        try:
-            meta = json.loads(zf.read("backup_meta.json"))
-        except Exception:
-            pass
-
-    return {
-        "ok": True,
-        "photos_restored": restored_photos,
-        "backup_created_at": meta.get("created_at"),
-    }
+    return restore_zip_bytes(data)
 
 
 # ── Restore from local server file ───────────────────────────────────────────
@@ -273,47 +273,7 @@ async def backup_restore_local(request: Request):
     path = Path(cfg["local_path"]) / filename
     if not path.exists():
         raise HTTPException(404, "Backup file not found")
-
-    data = path.read_bytes()
-    try:
-        zf = zipfile.ZipFile(io.BytesIO(data))
-    except zipfile.BadZipFile:
-        raise HTTPException(400, "Invalid ZIP file")
-
-    names = zf.namelist()
-    if "reloading.db" not in names:
-        raise HTTPException(400, "ZIP does not contain reloading.db")
-
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-        tmp.write(zf.read("reloading.db"))
-        tmp_path = tmp.name
-
-    try:
-        src = sqlite3.connect(tmp_path)
-        dst = sqlite3.connect(str(DB_PATH))
-        src.backup(dst)
-        src.close()
-        dst.close()
-    finally:
-        os.unlink(tmp_path)
-
-    uploads_dir = Path(UPLOAD_DIR)
-    restored_photos = 0
-    for name in names:
-        if name.startswith("uploads/") and not name.endswith("/"):
-            dest = uploads_dir / Path(name).name
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(zf.read(name))
-            restored_photos += 1
-
-    meta = {}
-    if "backup_meta.json" in names:
-        try:
-            meta = json.loads(zf.read("backup_meta.json"))
-        except Exception:
-            pass
-
-    return {"ok": True, "photos_restored": restored_photos, "backup_created_at": meta.get("created_at")}
+    return restore_zip_bytes(path.read_bytes())
 
 
 # ── Config update ─────────────────────────────────────────────────────────────

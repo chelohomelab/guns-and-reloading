@@ -89,6 +89,15 @@ Create the first admin account. After submitting you are redirected to the login
 
 ## 6. Updating the Application
 
+**From the UI (recommended):** sign in as an admin and go to `⚙️ → 🚀 Upgrade`. It shows whether
+you're behind `main`, takes an automatic backup before touching anything, pulls, reinstalls
+dependencies, and restarts itself — no SSH needed. A "Roll Back" button restores the code and the
+database/photos to exactly how they were right before the last upgrade, in case something goes
+wrong. It relies on `inventory.service`'s `Restart=on-failure` to come back up, so it only works
+when the app is actually running under that systemd unit (not `--reload` dev mode).
+
+**From the shell (manual/scripted):**
+
 ```bash
 cd /opt/inventory-and-reloading
 git pull
@@ -97,7 +106,7 @@ venv/bin/pip install --no-cache-dir -r requirements.txt
 systemctl restart inventory
 ```
 
-The database and uploads are untouched. The app is typically back online in seconds.
+The database and uploads are untouched either way. The app is typically back online in seconds.
 
 ---
 

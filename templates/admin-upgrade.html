@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upgrade — Guns & Reloading</title>
+    <link rel="icon" type="image/png" href="/static/images/app-icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0f0f0f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      body { background-image: url('/static/images/phone-background.png'); background-size: cover; background-position: center; background-color: #0f0f0f; }
+      @media (min-width: 1024px) { body { background-image: url('/static/images/background.png'); } }
+    </style>
+</head>
+<body class="text-gray-100 font-sans antialiased">
+
+<div id="toast-container" class="fixed top-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
+
+<nav class="bg-gray-800 border-b border-gray-700 p-4 sticky top-0 z-50">
+    <div class="container mx-auto flex justify-between items-center">
+        <div class="flex items-center gap-4">
+            <a href="/" class="text-amber-500 font-bold text-xl tracking-wide">🎯 Guns & Reloading</a>
+            <span class="text-gray-600">›</span>
+            <span class="text-sm text-gray-300 font-semibold">Upgrade</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="/admin/backup" class="text-xs text-gray-400 hover:text-gray-200 transition">Backup</a>
+            <span class="text-gray-600">|</span>
+            <span class="text-xs text-gray-400 font-mono">{{ user.username }}</span>
+            <a href="/logout" class="px-2.5 py-1.5 rounded bg-gray-700 hover:bg-red-900 hover:text-red-300 font-medium text-xs text-gray-400 transition">Sign out</a>
+        </div>
+    </div>
+</nav>
+
+<main class="container mx-auto p-4 max-w-3xl space-y-6">
+
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-bold text-amber-400">🚀 Upgrade</h1>
+        <p class="text-sm text-gray-400 mt-1">Pull the latest release from git and restart the app. A backup is taken automatically first, so you can roll back if something goes wrong.</p>
+    </div>
+
+    <!-- Current version -->
+    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-3">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-amber-400">Current Version</h2>
+        <div id="current-version" class="text-sm text-gray-300">
+            <div class="text-gray-500 italic text-xs">Loading…</div>
+        </div>
+    </div>
+
+    <!-- Update status / action -->
+    <div id="update-panel" class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
+        <div class="flex justify-between items-center">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-blue-400">Check for Updates</h2>
+            <button onclick="checkForUpdates()" class="text-xs text-gray-400 hover:text-gray-200 transition">↻ Refresh</button>
+        </div>
+        <div id="update-status" class="text-sm text-gray-400 italic">Checking…</div>
+        <div id="commits-behind" class="hidden bg-gray-900 rounded-lg p-3 text-xs font-mono text-gray-400 space-y-1 max-h-48 overflow-y-auto"></div>
+        <button id="upgrade-btn" onclick="runUpgrade()" class="hidden px-4 py-2 bg-amber-700 hover:bg-amber-600 text-white text-sm font-bold rounded-lg transition cursor-pointer">
+            ⬆️ Backup &amp; Upgrade Now
+        </button>
+        <div id="upgrade-progress" class="hidden text-xs text-yellow-400 font-mono animate-pulse">Working… this can take a minute, don't close this tab.</div>
+        <div id="upgrade-log" class="hidden bg-gray-900 rounded-lg p-3 text-[11px] font-mono text-gray-400 space-y-1 max-h-64 overflow-y-auto"></div>
+    </div>
+
+    <!-- Rollback -->
+    <div id="rollback-panel" class="hidden bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-3">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-red-400">⚠️ Roll Back Last Upgrade</h2>
+        <div id="rollback-info" class="text-xs text-gray-400"></div>
+        <button id="rollback-btn" onclick="runRollback()" class="px-4 py-2 bg-red-900/60 hover:bg-red-800 border border-red-700 text-red-300 text-sm font-bold rounded-lg transition cursor-pointer">
+            ↩ Roll Back to Previous Version
+        </button>
+        <p class="text-[11px] text-gray-500">Reverts the code AND restores the database/photos to exactly how they were right before the last upgrade — anything entered since then will be lost.</p>
+    </div>
+
+</main>
+
+<script>
+    function showToast(msg, type = 'success') {
+        const c = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = `pointer-events-auto px-4 py-3 rounded-lg shadow-xl text-sm font-semibold border ${
+            type === 'error' ? 'bg-red-900 border-red-700 text-red-200' : 'bg-gray-800 border-gray-600 text-gray-100'
+        }`;
+        t.textContent = msg;
+        c.appendChild(t);
+        setTimeout(() => t.remove(), 5000);
+    }
+
+    function fmtCommit(c) {
+        if (!c) return '<span class="text-gray-500">unknown</span>';
+        const tag = c.tag ? `<span class="text-amber-400 font-bold">${c.tag}</span> · ` : '';
+        return `${tag}<span class="font-mono text-gray-300">${c.hash}</span> — ${c.subject} <span class="text-gray-500">(${new Date(c.date).toLocaleDateString()})</span>`;
+    }
+
+    function renderLog(container, log) {
+        container.classList.remove('hidden');
+        container.innerHTML = log.map(step => `
+            <div class="${step.ok ? 'text-gray-400' : 'text-red-400'}">
+                <span class="${step.ok ? 'text-green-500' : 'text-red-500'}">${step.ok ? '✓' : '✗'}</span> ${step.cmd}
+                ${step.stderr ? `<div class="pl-4 text-red-400/80">${step.stderr}</div>` : ''}
+            </div>
+        `).join('');
+    }
+
+    async function checkForUpdates() {
+        const statusEl = document.getElementById('update-status');
+        const behindEl = document.getElementById('commits-behind');
+        const btnEl = document.getElementById('upgrade-btn');
+        statusEl.textContent = 'Checking…';
+        statusEl.className = 'text-sm text-gray-400 italic';
+        behindEl.classList.add('hidden');
+        btnEl.classList.add('hidden');
+
+        try {
+            const res = await fetch('/admin/upgrade/check');
+            const d = await res.json();
+
+            document.getElementById('current-version').innerHTML = fmtCommit(d.current) + (d.dirty ? '<div class="text-yellow-400 text-xs mt-1">⚠ Local changes present on this server — upgrade/rollback are blocked until resolved.</div>' : '');
+
+            if (!d.ok) {
+                statusEl.textContent = d.error || 'Could not check for updates.';
+                statusEl.className = 'text-sm text-red-400';
+            } else if (d.up_to_date) {
+                statusEl.textContent = '✓ Up to date.';
+                statusEl.className = 'text-sm text-green-400';
+            } else {
+                statusEl.innerHTML = `${d.commits_behind.length} commit(s) behind — latest: ${fmtCommit(d.latest)}`;
+                statusEl.className = 'text-sm text-amber-400';
+                if (d.commits_behind.length) {
+                    behindEl.classList.remove('hidden');
+                    behindEl.innerHTML = d.commits_behind.map(c => `<div>${c}</div>`).join('');
+                }
+                if (!d.dirty) btnEl.classList.remove('hidden');
+            }
+
+            const rbPanel = document.getElementById('rollback-panel');
+            if (d.rollback && d.rollback.available) {
+                rbPanel.classList.remove('hidden');
+                document.getElementById('rollback-info').innerHTML =
+                    `Last upgrade: <span class="font-mono">${d.rollback.previous_commit}</span> → <span class="font-mono">${d.rollback.new_commit}</span><br>` +
+                    `at ${new Date(d.rollback.timestamp).toLocaleString()}`;
+                document.getElementById('rollback-btn').disabled = d.dirty;
+            } else {
+                rbPanel.classList.add('hidden');
+            }
+        } catch {
+            statusEl.textContent = 'Error checking for updates.';
+            statusEl.className = 'text-sm text-red-400';
+        }
+    }
+
+    async function pollUntilBackUp() {
+        // /login needs no auth and does no git/subprocess work — a plain liveness probe,
+        // not the real /admin/upgrade/check (which would fire a slow git fetch on every poll).
+        for (let i = 0; i < 30; i++) {
+            await new Promise(r => setTimeout(r, 2000));
+            try {
+                const res = await fetch('/login', { cache: 'no-store' });
+                if (res.ok) return true;
+            } catch {}
+        }
+        return false;
+    }
+
+    async function runUpgrade() {
+        if (!confirm('This will back up the database/photos, pull the latest code, install any new dependencies, and restart the app (typically back online within ~10 seconds). Continue?')) return;
+
+        document.getElementById('upgrade-btn').classList.add('hidden');
+        document.getElementById('upgrade-progress').classList.remove('hidden');
+        document.getElementById('upgrade-log').classList.add('hidden');
+
+        try {
+            const res = await fetch('/admin/upgrade/run', { method: 'POST' });
+            const d = await res.json();
+            if (!res.ok) {
+                showToast(d.detail || 'Upgrade failed', 'error');
+                document.getElementById('upgrade-progress').classList.add('hidden');
+                if (d.detail) renderLog(document.getElementById('upgrade-log'), [{ cmd: 'error', ok: false, stderr: d.detail }]);
+                return;
+            }
+            if (d.log) renderLog(document.getElementById('upgrade-log'), d.log);
+            if (d.up_to_date) {
+                showToast('Already up to date — nothing to do.');
+                document.getElementById('upgrade-progress').classList.add('hidden');
+                return;
+            }
+            const modeMsg = d.restart_mode === 'dev-reload' ? 'Upgraded — dev server reloading…' : 'Upgraded — restarting…';
+            showToast(modeMsg);
+            document.getElementById('upgrade-progress').textContent = (d.restart_mode === 'dev-reload' ? 'Reloading (dev mode)…' : 'Restarting…') + ' waiting for the app to come back online.';
+            const backUp = await pollUntilBackUp();
+            document.getElementById('upgrade-progress').classList.add('hidden');
+            if (backUp) {
+                showToast('✓ Upgrade complete, app is back online.');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('App did not come back online — check the server.', 'error');
+            }
+        } catch {
+            document.getElementById('upgrade-progress').textContent = 'Restarting… waiting for the app to come back online.';
+            const backUp = await pollUntilBackUp();
+            document.getElementById('upgrade-progress').classList.add('hidden');
+            if (backUp) {
+                showToast('✓ Upgrade complete, app is back online.');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('Lost connection during upgrade — check the server.', 'error');
+            }
+        }
+    }
+
+    async function runRollback() {
+        if (!confirm('This reverts the code AND restores the database/photos to exactly how they were right before the last upgrade. Anything entered since then will be LOST. Are you sure?')) return;
+        if (!confirm('Really sure? This cannot be undone.')) return;
+
+        document.getElementById('rollback-btn').disabled = true;
+        document.getElementById('upgrade-progress').classList.remove('hidden');
+        document.getElementById('upgrade-progress').textContent = 'Rolling back… don\'t close this tab.';
+
+        try {
+            const res = await fetch('/admin/upgrade/rollback', { method: 'POST' });
+            const d = await res.json();
+            if (!res.ok) {
+                showToast(d.detail || 'Rollback failed', 'error');
+                document.getElementById('upgrade-progress').classList.add('hidden');
+                document.getElementById('rollback-btn').disabled = false;
+                if (d.detail) renderLog(document.getElementById('upgrade-log'), [{ cmd: 'error', ok: false, stderr: d.detail }]);
+                return;
+            }
+            if (d.log) renderLog(document.getElementById('upgrade-log'), d.log);
+            showToast(d.restart_mode === 'dev-reload' ? 'Rolled back — dev server reloading…' : 'Rolled back — restarting…');
+            const backUp = await pollUntilBackUp();
+            document.getElementById('upgrade-progress').classList.add('hidden');
+            if (backUp) {
+                showToast('✓ Rollback complete, app is back online.');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('App did not come back online — check the server.', 'error');
+            }
+        } catch {
+            const backUp = await pollUntilBackUp();
+            document.getElementById('upgrade-progress').classList.add('hidden');
+            if (backUp) {
+                showToast('✓ Rollback complete, app is back online.');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('Lost connection during rollback — check the server.', 'error');
+            }
+        }
+    }
+
+    checkForUpdates();
+</script>
+
+</body>
+</html>

@@ -659,7 +659,34 @@ def init_db():
         _add_col('shot_strings', 'windage_offset_moa', 'windage_offset_moa FLOAT')
 
     if 'reload_data_sources' in inspector.get_table_names():
-        _add_col('reload_data_sources', 'data_note', 'data_note VARCHAR')
+        # These predate the multi-manufacturer expansion (v1.14-v1.17) and were missing from
+        # this auto-migration list on any DB whose reload_data_sources table was created before
+        # that work landed — same bug class as the shot_strings gap above. A hand-patch covering
+        # everything except data_note had been applied directly on prod as a stopgap; this
+        # folds that fix back into the repo so it's no longer server-specific.
+        _add_col('reload_data_sources', 'manufacturer',           "manufacturer VARCHAR NOT NULL DEFAULT 'Hodgdon'")
+        _add_col('reload_data_sources', 'scope_bullet_weight_gr', 'scope_bullet_weight_gr FLOAT')
+        _add_col('reload_data_sources', 'scope_bullet_model',     'scope_bullet_model VARCHAR')
+        _add_col('reload_data_sources', 'max_saami_oal',          'max_saami_oal VARCHAR')
+        _add_col('reload_data_sources', 'max_case_length',        'max_case_length VARCHAR')
+        _add_col('reload_data_sources', 'rcbs_shell_holder',      'rcbs_shell_holder VARCHAR')
+        _add_col('reload_data_sources', 'test_firearm',           'test_firearm VARCHAR')
+        _add_col('reload_data_sources', 'case_diagram_path',      'case_diagram_path VARCHAR')
+        _add_col('reload_data_sources', 'data_note',              'data_note VARCHAR')
+
+    if 'reload_data_loads' in inspector.get_table_names():
+        _add_col('reload_data_loads', 'bullet_code',     'bullet_code VARCHAR')
+        _add_col('reload_data_loads', 'bullet_style',    'bullet_style VARCHAR')
+        _add_col('reload_data_loads', 'bullet_bc',       'bullet_bc FLOAT')
+        _add_col('reload_data_loads', 'bullet_bc_g7',    'bullet_bc_g7 FLOAT')
+        _add_col('reload_data_loads', 'bullet_sd',       'bullet_sd FLOAT')
+        _add_col('reload_data_loads', 'is_recommended',  'is_recommended BOOLEAN')
+        _add_col('reload_data_loads', 'is_max_load',     'is_max_load BOOLEAN')
+        _add_col('reload_data_loads', 'is_reduced_load', 'is_reduced_load BOOLEAN')
+        _add_col('reload_data_loads', 'twist',           'twist VARCHAR')
+        _add_col('reload_data_loads', 'barrel_length',   'barrel_length VARCHAR')
+        _add_col('reload_data_loads', 'trim_length',     'trim_length VARCHAR')
+        _add_col('reload_data_loads', 'test_firearm',    'test_firearm VARCHAR')
 
     if 'scopes' in inspector.get_table_names():
         _add_col('scopes', 'magnification', 'magnification VARCHAR')

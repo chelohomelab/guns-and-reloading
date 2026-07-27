@@ -632,6 +632,26 @@ def init_db():
 
     if 'shot_strings' in inspector.get_table_names():
         _add_col('shot_strings', 'rounds_fired', 'rounds_fired INTEGER')
+        # v1.17 Range Session overhaul (persisted shot geometry, POA/ATZ) — these were added to
+        # the ShotString model but this migration list was never updated to match, so on any
+        # database that already had a shot_strings table (i.e. anything but a brand new install,
+        # where create_all() alone would've covered it), every query against this table started
+        # failing with "no such column" the moment the v1.17 code shipped — Range Session data
+        # wasn't actually lost, it just became unreadable until these columns exist.
+        _add_col('shot_strings', 'shots_json', 'shots_json VARCHAR')
+        _add_col('shot_strings', 'poa_x', 'poa_x FLOAT')
+        _add_col('shot_strings', 'poa_y', 'poa_y FLOAT')
+        _add_col('shot_strings', 'pixels_per_inch', 'pixels_per_inch FLOAT')
+        _add_col('shot_strings', 'image_width', 'image_width INTEGER')
+        _add_col('shot_strings', 'image_height', 'image_height INTEGER')
+        _add_col('shot_strings', 'distance_yards', 'distance_yards FLOAT')
+        _add_col('shot_strings', 'group_width_inches', 'group_width_inches FLOAT')
+        _add_col('shot_strings', 'group_height_inches', 'group_height_inches FLOAT')
+        _add_col('shot_strings', 'group_size_mrad', 'group_size_mrad FLOAT')
+        _add_col('shot_strings', 'elevation_offset_inches', 'elevation_offset_inches FLOAT')
+        _add_col('shot_strings', 'windage_offset_inches', 'windage_offset_inches FLOAT')
+        _add_col('shot_strings', 'elevation_offset_moa', 'elevation_offset_moa FLOAT')
+        _add_col('shot_strings', 'windage_offset_moa', 'windage_offset_moa FLOAT')
 
     if 'scopes' in inspector.get_table_names():
         _add_col('scopes', 'magnification', 'magnification VARCHAR')

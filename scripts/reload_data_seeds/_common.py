@@ -34,10 +34,26 @@ from routers.barcode import normalize_caliber  # noqa: E402
 UPLOAD_DIR = "static/uploads"
 
 
+def _resolve_source_pdf(path: str | None) -> str | None:
+    """Prefer the flat, server-side convention (static/reloading_data/<mfr>/<file>) a script
+    declares — the completed/ subfolder is a purely local dev-side habit (tracking which source
+    scans have already been transcribed, so they're out of the way of ones still in progress) and
+    has no meaning on a server that was never given that in-progress/done distinction. Falls back
+    to the completed/ variant automatically so a script's declared path doesn't need to change the
+    moment its source file gets moved into completed/ in dev.
+    """
+    if not path or os.path.exists(path):
+        return path
+    p = Path(path)
+    fallback = p.parent / "completed" / p.name
+    return str(fallback) if fallback.exists() else path
+
+
 def _replace_existing_and_create_source(
     db, *, manufacturer, caliber_norm, spec, source_pdf_path, diagram_crop_box,
-    diagram_source_page, diagram_resolution, original_filename,
+    diagram_source_page, diagram_resolution, original_filename, data_note=None,
 ):
+    source_pdf_path = _resolve_source_pdf(source_pdf_path)
     existing = db.query(models.ReloadDataSource).filter(
         models.ReloadDataSource.manufacturer == manufacturer,
         models.ReloadDataSource.caliber == caliber_norm,
@@ -81,6 +97,7 @@ def _replace_existing_and_create_source(
         data_as_of=None, original_filename=original_filename,
         source_file_path=source_file_path, case_diagram_path=case_diagram_path,
         uploaded_at=datetime.now(timezone.utc).isoformat(),
+        data_note=data_note,
     )
     db.add(source)
     db.flush()
@@ -99,8 +116,13 @@ def import_hand_transcribed(
     diagram_source_page: int = 0,
     diagram_resolution: int = 200,
     original_filename: str | None = None,
+    data_note: str | None = None,
 ) -> int:
     """Inserts one ReloadDataSource + its ReloadDataLoad rows from transcribed data.
+
+    `data_note`: flags a real discrepancy in the manufacturer's own published data (not a
+    transcription concern) — surfaced prominently in the UI, e.g. so it can be raised with the
+    manufacturer later. Leave None for normal imports.
 
     For manufacturers whose tables are a **velocity matrix** (one row = powder + a single-point
     charge per target-velocity column, e.g. Hornady). For manufacturers that print a real
@@ -122,7 +144,7 @@ def import_hand_transcribed(
         db, manufacturer=manufacturer, caliber_norm=caliber_norm, spec=spec,
         source_pdf_path=source_pdf_path, diagram_crop_box=diagram_crop_box,
         diagram_source_page=diagram_source_page, diagram_resolution=diagram_resolution,
-        original_filename=original_filename,
+        original_filename=original_filename, data_note=data_note,
     )
 
     load_rows = []
@@ -167,6 +189,7 @@ def import_hand_transcribed_range(
     diagram_source_page: int = 0,
     diagram_resolution: int = 200,
     original_filename: str | None = None,
+    data_note: str | None = None,
 ) -> int:
     """Inserts one ReloadDataSource + its ReloadDataLoad rows from transcribed RANGE-style data
     (Lyman-shaped: each row prints an explicit starting AND maximum charge/velocity/pressure, not
@@ -189,7 +212,7 @@ def import_hand_transcribed_range(
         db, manufacturer=manufacturer, caliber_norm=caliber_norm, spec=spec,
         source_pdf_path=source_pdf_path, diagram_crop_box=diagram_crop_box,
         diagram_source_page=diagram_source_page, diagram_resolution=diagram_resolution,
-        original_filename=original_filename,
+        original_filename=original_filename, data_note=data_note,
     )
 
     load_rows = []

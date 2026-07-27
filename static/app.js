@@ -7003,6 +7003,10 @@ function renderHornadyResults(rows) {
         ${specField('Max. Case Length', first.max_case_length)}
         ${specField('Case Trim Length', first.trim_length)}
     </div>`;
+    const dataNoteBox = first.data_note ? `<div class="mb-5 bg-amber-950/40 border border-amber-700/60 rounded-lg p-3 flex gap-2 text-xs text-amber-200">
+        <span class="text-base leading-none">⚠</span>
+        <div><span class="font-bold uppercase tracking-wide text-amber-300">Possible data issue</span> — ${escHtml(first.data_note)}</div>
+    </div>` : '';
 
     // Candidate bullets — grouped from the current rows like every other tab.
     const bulletKey = r => [r.bullet_weight_gr, r.bullet_model, r.bullet_code].join('|');
@@ -7079,7 +7083,7 @@ function renderHornadyResults(rows) {
     </table>
     <p class="text-[10px] text-gray-600 mt-3">Velocity (ft/sec) across the top — highlighted cells indicate maximum load, use with caution. Click a row to see the whole line.</p>`;
 
-    results.innerHTML = specBox + candidateBox + matrixTable;
+    results.innerHTML = dataNoteBox + specBox + candidateBox + matrixTable;
 }
 
 let _hornadyLastRows = [];
@@ -7136,6 +7140,10 @@ function openHornadyPowderDetail(powderKey) {
         </div>` : ''}
 
         <p class="text-xs text-amber-400 mt-4">⚠ MAXIMUM LOAD — USE WITH CAUTION.</p>
+        ${first.data_note ? `<div class="mt-3 bg-amber-950/40 border border-amber-700/60 rounded-lg p-3 flex gap-2 text-xs text-amber-200">
+            <span class="text-base leading-none">⚠</span>
+            <div><span class="font-bold uppercase tracking-wide text-amber-300">Possible data issue</span> — ${escHtml(first.data_note)}</div>
+        </div>` : ''}
         <p class="text-[10px] text-gray-600 mt-4">${first.data_as_of ? `Data current as of ${escHtml(first.data_as_of)}` : ''} — Hornady publishes the charge needed to reach each velocity, up to the maximum shown.</p>`;
 
     const rightCol = first.case_diagram_path ? `

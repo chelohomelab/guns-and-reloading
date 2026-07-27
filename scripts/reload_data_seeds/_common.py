@@ -34,10 +34,26 @@ from routers.barcode import normalize_caliber  # noqa: E402
 UPLOAD_DIR = "static/uploads"
 
 
+def _resolve_source_pdf(path: str | None) -> str | None:
+    """Prefer the flat, server-side convention (static/reloading_data/<mfr>/<file>) a script
+    declares — the completed/ subfolder is a purely local dev-side habit (tracking which source
+    scans have already been transcribed, so they're out of the way of ones still in progress) and
+    has no meaning on a server that was never given that in-progress/done distinction. Falls back
+    to the completed/ variant automatically so a script's declared path doesn't need to change the
+    moment its source file gets moved into completed/ in dev.
+    """
+    if not path or os.path.exists(path):
+        return path
+    p = Path(path)
+    fallback = p.parent / "completed" / p.name
+    return str(fallback) if fallback.exists() else path
+
+
 def _replace_existing_and_create_source(
     db, *, manufacturer, caliber_norm, spec, source_pdf_path, diagram_crop_box,
     diagram_source_page, diagram_resolution, original_filename,
 ):
+    source_pdf_path = _resolve_source_pdf(source_pdf_path)
     existing = db.query(models.ReloadDataSource).filter(
         models.ReloadDataSource.manufacturer == manufacturer,
         models.ReloadDataSource.caliber == caliber_norm,

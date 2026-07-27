@@ -1797,6 +1797,7 @@ def _load_dict(l: "models.ReloadDataLoad", in_stock_powders: set, in_stock_bulle
         "data_as_of": l.source.data_as_of if l.source else None,
         "source_file_path": l.source.source_file_path if l.source else None,
         "case_diagram_path": l.source.case_diagram_path if l.source else None,
+        "data_note": l.source.data_note if l.source else None,
     }
 
 

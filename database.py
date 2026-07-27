@@ -240,6 +240,11 @@ class ReloadDataSource(Base):
     source_file_path = Column(String, nullable=True)
     case_diagram_path = Column(String, nullable=True)  # cropped/extracted case-dimension diagram image
     uploaded_at = Column(String, nullable=True)
+    # Flags a real discrepancy/anomaly in the manufacturer's own published data (as opposed to a
+    # transcription-side concern) — e.g. a duplicate row the book itself prints twice with
+    # different numbers. Surfaced prominently in the UI so it isn't missed, and exists so the user
+    # has something to point to when following up with the manufacturer.
+    data_note = Column(String, nullable=True)
 
     loads = relationship("ReloadDataLoad", back_populates="source", cascade="all, delete-orphan")
 
@@ -652,6 +657,9 @@ def init_db():
         _add_col('shot_strings', 'windage_offset_inches', 'windage_offset_inches FLOAT')
         _add_col('shot_strings', 'elevation_offset_moa', 'elevation_offset_moa FLOAT')
         _add_col('shot_strings', 'windage_offset_moa', 'windage_offset_moa FLOAT')
+
+    if 'reload_data_sources' in inspector.get_table_names():
+        _add_col('reload_data_sources', 'data_note', 'data_note VARCHAR')
 
     if 'scopes' in inspector.get_table_names():
         _add_col('scopes', 'magnification', 'magnification VARCHAR')

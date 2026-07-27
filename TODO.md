@@ -13,6 +13,14 @@
 
 ## Future
 
+### Auto-run reload-data seed scripts during upgrade
+- [ ] `/admin/upgrade/run` (routers/upgrade.py) pulls code + submodule but never executes
+      `scripts/reload_data_seeds/data/*.py` — new calibers still require a manual SSH run per
+      script after every upgrade
+- [ ] Decide how to detect which scripts are "new" (or just re-run all, since each is idempotent)
+- [ ] Decide error handling if one script fails partway through a batch
+- [ ] Surface results (rows imported per caliber) in the upgrade log the UI already shows
+
 ### Unlimited Photos per Item
 - [ ] Create `ItemPhoto` table (id, item_type, item_id, image_path, sort_order, created_at)
 - [ ] Add generic photo management endpoints (add, delete, reorder, set primary)

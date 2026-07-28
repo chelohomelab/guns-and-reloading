@@ -596,6 +596,14 @@ _BARNES_POWDER_MAP = {
 _BARNES_ROW_RE = re.compile(r'^\*?(?P<name>.+?)\s+(?P<min_gr>\d+(?:\.\d+)?)\s+(?P<min_vel>\d+)\s+(?P<max_gr>\d+(?:\.\d+)?)\s*(?P<mx_c>[Cc])?\s+(?P<max_vel>\d+)$')
 _BARNES_NUMS_ONLY_RE = re.compile(r'^(?P<min_gr>\d+(?:\.\d+)?)\s+(?P<min_vel>\d+)\s+(?P<max_gr>\d+(?:\.\d+)?)\s*(?P<mx_c>[Cc])?\s+(?P<max_vel>\d+)$')
 _BARNES_LABEL_RE = re.compile(r'^(?P<weight>\d+(?:\.\d+)?)-grain\s+(?P<model>.+)$', re.IGNORECASE)
+# Newer "ForWeb" template revision: one bullet per single line, SKU/S.D./B.C./C.O.A.L. all
+# inline instead of the old multi-line label + separate "Sectional Density"/"Ballistic
+# Coefficient"/"C.O.A.L" block (confirmed against a real 270 Winchester file dated 2026-07;
+# no "/" multi-model alternates seen in this format so far, unlike the old one).
+_BARNES_LABEL_COMPACT_RE = re.compile(
+    r'^(?P<weight>\d+(?:\.\d+)?)gr\s+(?P<model>.+?)\s+(?P<sku>\d+)\s+'
+    r'(?P<sd>\d*\.\d+)\s+(?P<bc>\d*\.\d+)\s+(?P<coal>[\d.]+)"?$', re.IGNORECASE,
+)
 
 
 def _merge_wrapped_barnes_rows(table_rows: list[str]) -> list[str]:
@@ -683,10 +691,16 @@ def _barnes_col_rows(page, side: str) -> list[tuple[float, str]]:
 
     def _looks_right(text: str) -> bool:
         m = _BARNES_ROW_RE.match(text) or _BARNES_NUMS_ONLY_RE.match(text)
-        if m and "name" in m.groupdict() and re.search(r'\d+-grain', m.group("name"), re.IGNORECASE):
-            # The row regex's non-greedy name will happily swallow a whole "N-grain ..." label
-            # glued onto the front of a data row on the same visual line (a genuine column-bleed
-            # case, not a clean single-column match) — don't treat that as a clean right-side row.
+        if m and "name" in m.groupdict() and (
+            re.search(r'\d+-grain', m.group("name"), re.IGNORECASE)
+            or m.group("name").startswith((
+                "Sectional Density", "Ballistic Coefficient", "C.O.A.L", "Suggested Bullet Use",
+            ))
+        ):
+            # The row regex's non-greedy name will happily swallow a whole "N-grain ..." label,
+            # or a left-column continuation line ("Sectional Density .166", etc.), glued onto
+            # the front of a data row on the same visual line (a genuine column-bleed case, not
+            # a clean single-column match) — don't treat that as a clean right-side row.
             return False
         return bool(m or text.startswith(("Minimum", "Maximum", "Powder", "Charge Velocity", "(grains)")))
 
@@ -726,6 +740,15 @@ def _barnes_col_rows(page, side: str) -> list[tuple[float, str]]:
                 if gap > biggest_gap:
                     biggest_gap = gap
                     gap_idx = i
+        if gap_idx is not None and _looks_right(whole_text):
+            # whole_text already parses cleanly as a right-column row/header entirely on its
+            # own — _looks_right's swallow-guard (above) makes this reliable even when a
+            # left-column label or continuation line is glued onto a data row on the same
+            # visual line. Never split a line that already classifies cleanly just because it
+            # happens to contain a wide internal gap — confirmed necessary on newer, wider-
+            # column-layout templates (e.g. Barnes' "ForWeb" revision) whose real column gaps
+            # can exceed the 35pt gutter-gap threshold above.
+            gap_idx = None
         parts = [ws_sorted[:gap_idx], ws_sorted[gap_idx:]] if gap_idx else [ws_sorted]
         for part in parts:
             text = " ".join(w["text"] for w in part)
@@ -766,30 +789,38 @@ def parse_barnes_pdf(pdf_bytes: bytes, filename: str | None = None) -> dict:
         page0_text = pdf.pages[0].extract_text() or ""
         caliber = _derive_barnes_caliber(filename, page0_text)
 
-        barrel_length = None
-        trim_length = None
-        twist = None
-        case_brand = None
-        primer_display = None
-        test_firearm = None
-        m = re.search(r'Case Trim:\s*([\d.]+.?)\s*Barrel Length:\s*([\d.]+.?)', page0_text)
-        if m:
-            trim_length, barrel_length = m.group(1), m.group(2)
-        m = re.search(r'Twist Rate:\s*(\S+)', page0_text)
-        if m:
-            twist = m.group(1)
-        # "Case: Winchester Primer: Federal 210" / "Twist Rate: 1:12” Barrel: Krieger" — both
-        # previously parsed nowhere at all (only Case Trim/Barrel Length/Twist Rate were kept).
-        m = re.search(r'Case:\s*(.+?)\s+Primer:\s*(.+)', page0_text)
-        if m:
-            case_brand, primer_display = m.group(1).strip(), m.group(2).strip()
-        m = re.search(r'Barrel:\s*(.+)', page0_text)
-        if m:
-            test_firearm = m.group(1).strip()
+        # Field pairing on each line varies by template revision — the older layout pairs
+        # "Case: X Primer: Y" and "Twist Rate: Z Barrel: W" per line, while a newer "ForWeb"
+        # revision (confirmed on a 270 Winchester file) instead pairs "Case: X Barrel Length: Y"
+        # and "Primer: X Twist Rate: Y", with no "Barrel:" (test firearm) field at all. Extract
+        # every "Label: value" independently (longest label names first, so "Case Trim Length"
+        # isn't swallowed by the bare "Case" alternative) rather than assuming any one pairing.
+        _field_labels = ["Case Trim Length", "Case Trim", "Case", "Primer", "Barrel Length", "Twist Rate", "Barrel"]
+        _field_alt = "|".join(re.escape(l) for l in _field_labels)
+        _field_re = re.compile(rf'(?:{_field_alt}):\s*(.+?)(?=\s+(?:{_field_alt}):|$)')
+        _field_label_re = re.compile(rf'({_field_alt}):')
+        fields: dict[str, str] = {}
+        for line in page0_text.split("\n"):
+            labels = _field_label_re.findall(line)
+            values = _field_re.findall(line)
+            for label, value in zip(labels, values):
+                fields.setdefault(label, value.strip())
+
+        case_brand = fields.get("Case")
+        primer_display = fields.get("Primer")
+        barrel_length = fields.get("Barrel Length")
+        twist = fields.get("Twist Rate")
+        trim_length = fields.get("Case Trim Length") or fields.get("Case Trim")
+        test_firearm = fields.get("Barrel")
 
         rows: list[dict] = []
         rejected: list[str] = []
-        for page in pdf.pages[1:]:
+        # Every page runs through the same extraction, including page 0 — in the older template
+        # it's pure intro/spec text with no real "Minimum Maximum" table or bullet labels, so it
+        # naturally yields zero tables and zero labels (harmless no-op). Newer "ForWeb" template
+        # revisions (confirmed on a 270 Winchester file) put the first weight class's real data
+        # table directly on page 0, which a hardcoded pdf.pages[1:] skip silently dropped.
+        for page in pdf.pages:
             left = _barnes_col_rows(page, "left")
             right = _barnes_col_rows(page, "right")
 
@@ -803,10 +834,21 @@ def parse_barnes_pdf(pdf_bytes: bytes, filename: str | None = None) -> dict:
             cur = None
             label_done = False
             for top, text in left:
+                m_compact = _BARNES_LABEL_COMPACT_RE.match(text)
+                if m_compact:
+                    if cur is not None:
+                        labels.append(cur)
+                    cur = {
+                        "top": top, "text": text,
+                        "sd": m_compact.group("sd"), "bc": m_compact.group("bc"),
+                        "coal": m_compact.group("coal"), "sku": m_compact.group("sku"),
+                    }
+                    label_done = True  # self-contained — nothing further to accumulate
+                    continue
                 if _BARNES_LABEL_RE.match(text):
                     if cur is not None:
                         labels.append(cur)
-                    cur = {"top": top, "text": text, "sd": None, "bc": None, "coal": None}
+                    cur = {"top": top, "text": text, "sd": None, "bc": None, "coal": None, "sku": None}
                     label_done = False
                     continue
                 if cur is None:
@@ -852,6 +894,14 @@ def parse_barnes_pdf(pdf_bytes: bytes, filename: str | None = None) -> dict:
                 )) or re.match(r'^\d+$', text.strip()):
                     continue
                 if current is None:
+                    if not table_starts:
+                        # Nothing recognized as a table has started yet on this page — some
+                        # layouts (e.g. Barnes' newer "ForWeb" template) repeat page-0-style
+                        # spec text ("Barrel Length:", "Twist Rate:", the SKU/S.D./B.C./O.A.L.
+                        # column header) on the right half of every data page too, ahead of the
+                        # first real "Minimum" header. Ignore it rather than let it become a
+                        # bogus leading table with no matching table_starts entry.
+                        continue
                     current = []
                 current.append(text)
             if current is not None:
@@ -876,14 +926,14 @@ def parse_barnes_pdf(pdf_bytes: bytes, filename: str | None = None) -> dict:
                 # TAC-TX FB" sharing one propellant table) — and each label's SD/BC/C.O.A.L. can
                 # genuinely differ even at the same weight, so every individual model (after
                 # splitting on "/") keeps its own label's spec values rather than one shared set.
-                entries: list[tuple[float, str, str | None, str | None, str | None]] = []
+                entries: list[tuple[float, str, str | None, str | None, str | None, str | None]] = []
                 for label in block_labels:
-                    m = _BARNES_LABEL_RE.match(label["text"])
+                    m = _BARNES_LABEL_COMPACT_RE.match(label["text"]) or _BARNES_LABEL_RE.match(label["text"])
                     if not m:
                         continue
                     weight = float(m.group("weight"))
                     for model in (part.strip() for part in m.group("model").split("/") if part.strip()):
-                        entries.append((weight, model, label["sd"], label["bc"], label["coal"]))
+                        entries.append((weight, model, label["sd"], label["bc"], label["coal"], label.get("sku")))
                 if not entries:
                     rejected.append(f"[unmatched block] {table_rows[:1]}")
                     continue
@@ -894,9 +944,10 @@ def parse_barnes_pdf(pdf_bytes: bytes, filename: str | None = None) -> dict:
                         continue
                     d = m.groupdict()
                     powder_brand, powder_name = _split_barnes_powder(d["name"])
-                    for weight, model, sd, bc, coal in entries:
+                    for weight, model, sd, bc, coal, sku in entries:
                         rows.append({
                             "bullet_weight_gr": weight, "bullet_brand": "Barnes", "bullet_model": model,
+                            "bullet_code": sku,
                             "bullet_dia": None, "bullet_sd": float(sd) if sd else None, "bullet_bc": float(bc) if bc else None,
                             "case_brand": case_brand, "primer_display": primer_display,
                             "powder_brand": powder_brand, "powder_name": powder_name, "coal": coal,
@@ -1587,6 +1638,7 @@ def _parse_hornady_chapter(pdf, start: int, end: int) -> dict:
     weight = dia = None
     bullets: list[tuple[float, str]] = []  # (col_x0, "weight gr model")
     coals: dict[float, str] = {}
+    item_nos: dict[float, str] = {}  # col_x0 -> Hornady's own catalog item number (real SKU)
     velocity_cols: list[tuple[float, int]] = []
     in_data = False
     for pi in range(start, end + 1):
@@ -1595,7 +1647,7 @@ def _parse_hornady_chapter(pdf, start: int, end: int) -> dict:
             if not joined.strip():
                 continue
             if joined.startswith("SECTIONAL DENSITY"):
-                bullets, coals, velocity_cols, in_data = [], {}, [], False
+                bullets, coals, item_nos, velocity_cols, in_data = [], {}, {}, [], False
                 continue
             wm = _HORNADY_WEIGHT_RE.search(joined.replace("DIAMETER:", " DIAMETER:").split(" DIAMETER:")[0].strip())
             if wm:
@@ -1604,7 +1656,17 @@ def _parse_hornady_chapter(pdf, start: int, end: int) -> dict:
                 if dm:
                     dia = dm.group(1).rstrip('"”')
                 continue
-            if joined.startswith(("Item No.", "G1 B.C.")):
+            if joined.startswith("Item No."):
+                # One "Item No. 21710" (or several repeated per bullet column on the same
+                # visual line, e.g. "Item No. 17105 Item No. 1710") — same per-column gap-split
+                # pattern as C.O.L. below, previously thrown away entirely (never captured).
+                for grp in _hornady_gap_split(ws):
+                    gtext = " ".join(w["text"] for w in grp)
+                    im = re.search(r'Item No\.\s*(\S+)', gtext)
+                    if im:
+                        item_nos[grp[0]["x0"]] = im.group(1)
+                continue
+            if joined.startswith("G1 B.C."):
                 continue
             if joined.startswith("C.O.L.:"):
                 for grp in _hornady_gap_split(ws):
@@ -1652,8 +1714,10 @@ def _parse_hornady_chapter(pdf, start: int, end: int) -> dict:
                 velocity = nearest[1]
                 for col_x0, model in bullets:
                     coal = min(coals.items(), key=lambda kv: abs(kv[0] - col_x0))[1] if coals else None
+                    item_no = min(item_nos.items(), key=lambda kv: abs(kv[0] - col_x0))[1] if item_nos else None
                     rows.append({
                         "bullet_weight_gr": weight, "bullet_brand": "Hornady", "bullet_model": model,
+                        "bullet_code": item_no,
                         "bullet_dia": dia,
                         "case_brand": case_brand, "primer_display": primer_display,
                         "powder_brand": powder_brand, "powder_name": powder_name, "coal": coal,
@@ -1754,11 +1818,19 @@ def _load_dict(l: "models.ReloadDataLoad", in_stock_powders: set, in_stock_bulle
         _normalize_bore_dia(l.bullet_dia),
     )
     exact_key = base_key + (_normalize_model_token(l.bullet_model),)
+    # A manufacturer catalog SKU is a far stronger signal than brand+weight+model text — when
+    # both sides have one (and the manufacturer is one confirmed to publish a genuinely unique
+    # per-product number, see _SKU_MATCH_MANUFACTURERS), trust it outright rather than falling
+    # through to the text-based match below.
+    sku_matched = bool(
+        l.bullet_code and l.bullet_brand in _SKU_MATCH_MANUFACTURERS
+        and ((l.bullet_brand or "").strip().lower(), l.bullet_code.strip().lower()) in in_stock_bullets["by_sku"]
+    )
     # Exact brand+weight+caliber+model match → confidently "in stock". If only
     # brand+weight+caliber match but the model text differs (e.g. Hodgdon's "HPBT-SMK" vs.
     # your inventory's "MatchKing"), don't guess either way — surface what you actually
     # own so you can judge for yourself whether it's the same bullet.
-    bullet_in_stock = exact_key in in_stock_bullets["exact"]
+    bullet_in_stock = sku_matched or exact_key in in_stock_bullets["exact"]
     bullet_owned_model = None
     if not bullet_in_stock:
         owned = in_stock_bullets["by_base"].get(base_key)
@@ -1781,6 +1853,7 @@ def _load_dict(l: "models.ReloadDataLoad", in_stock_powders: set, in_stock_bulle
         "max_density_pct": l.max_density_pct, "max_is_compressed": l.max_is_compressed,
         "powder_in_stock": powder_key in in_stock_powders,
         "bullet_in_stock": bullet_in_stock,
+        "bullet_sku_matched": sku_matched,
         "bullet_owned_model": bullet_owned_model,
         "manufacturer": l.source.manufacturer if l.source else None,
         "caliber": l.source.caliber if l.source else None,
@@ -1808,23 +1881,37 @@ def _in_stock_powder_keys(db: Session) -> set:
     return {((b or "").strip().lower(), (n or "").strip().lower()) for b, n in rows}
 
 
+# Manufacturers whose reload-data "bullet_code" is confirmed to be a genuine unique per-product
+# catalog number (safe to match on) rather than a shared type/style abbreviation. Nosler's
+# "code" (AB/CC/RDF/BST/VMG/...) is a bullet-line abbreviation reused across many different
+# weights, not unique — matching on it could wrongly claim a completely different weight is in
+# stock, so it's deliberately excluded. Hodgdon's source data has no code field at all. Barnes
+# only has one on its newer "ForWeb" template revision — older files leave bullet_code null,
+# which the lookup below naturally skips (see is_sku_reliable below).
+_SKU_MATCH_MANUFACTURERS = {"Sierra", "Speer", "Hornady", "Barnes"}
+
+
 def _in_stock_bullet_keys(db: Session) -> dict:
     """Returns {"exact": set of (brand, weight, caliber, model) tuples, "by_base": dict of
-    (brand, weight, caliber) -> set of raw owned model display strings}. "exact" drives the
-    in-stock badge; "by_base" lets a brand/weight/caliber match with a differing model name
-    surface what's actually owned instead of guessing it's the same bullet (see
-    _normalize_model_token's docstring — Hodgdon's abbreviated codes like "HPBT-SMK" won't
-    equal a user's own label like "MatchKing" even though they're the same real bullet).
+    (brand, weight, caliber) -> set of raw owned model display strings, "by_sku": set of
+    (brand, sku) tuples}. "exact"/"by_sku" drive the in-stock badge; "by_base" lets a
+    brand/weight/caliber match with a differing model name surface what's actually owned instead
+    of guessing it's the same bullet (see _normalize_model_token's docstring — Hodgdon's
+    abbreviated codes like "HPBT-SMK" won't equal a user's own label like "MatchKing" even
+    though they're the same real bullet). A SKU match (see _SKU_MATCH_MANUFACTURERS) is a much
+    stronger signal than brand/weight/model text, so it's checked first by the caller.
     """
     rows = db.query(
         models.BulletInventory.brand, models.BulletInventory.weight_gr, models.BulletInventory.caliber,
         models.BulletInventory.product_line, models.BulletInventory.bullet_type,
+        models.BulletInventory.sku,
     ).filter(
         func.coalesce(models.BulletInventory.qty_sealed, 0) + func.coalesce(models.BulletInventory.qty_open, 0) > 0
     ).all()
     exact = set()
     by_base = {}
-    for b, w, c, product_line, bullet_type in rows:
+    by_sku = set()
+    for b, w, c, product_line, bullet_type, sku in rows:
         base = ((b or "").strip().lower(), w or 0, _normalize_bore_dia(c))
         # A bullet's identifying model name might live in either field depending on how the
         # user entered it (see product_line vs bullet_type inconsistency in real inventory
@@ -1834,7 +1921,9 @@ def _in_stock_bullet_keys(db: Session) -> dict:
             if model_key:
                 exact.add(base + (model_key,))
                 by_base.setdefault(base, set()).add(model_field.strip())
-    return {"exact": exact, "by_base": by_base}
+        if sku and sku.strip():
+            by_sku.add(((b or "").strip().lower(), sku.strip().lower()))
+    return {"exact": exact, "by_base": by_base, "by_sku": by_sku}
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────

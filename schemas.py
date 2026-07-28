@@ -72,6 +72,7 @@ class BulletComponentPatch(BaseModel):
     weight_gr: Optional[float] = None
     bullet_type: Optional[str] = None
     bc_g1: Optional[float] = None
+    sku: Optional[str] = None
     quantity: Optional[int] = None
     price_paid: Optional[float] = None
     notes: Optional[str] = None

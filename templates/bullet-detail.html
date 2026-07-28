@@ -107,6 +107,10 @@
                         <input type="text" id="ef-bullet-type" placeholder="e.g. Spitzer" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
                     </div>
                     <div>
+                        <label class="block text-xs text-gray-200 font-semibold mb-1">SKU / Item No.</label>
+                        <input type="text" id="ef-sku" placeholder="e.g. 22601" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                    </div>
+                    <div>
                         <label class="block text-xs text-gray-200 font-semibold mb-1">BC G1</label>
                         <input type="number" step="0.001" min="0" id="ef-bc-g1" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
                     </div>
@@ -436,6 +440,7 @@
             cells += cell('Caliber', caliber, 'text-amber-400 font-mono');
             cells += cell('Weight', weight ? weight + ' gr' : null, 'text-white font-mono');
             cells += cell('Bullet Type', b.bullet_type || null, 'text-gray-300 font-mono');
+            cells += cell('SKU / Item No.', b.sku || null, 'text-gray-300 font-mono');
             cells += cell('BC G1', b.bc_g1 != null ? b.bc_g1 : null, 'text-blue-300 font-mono');
             cells += cell('Price Paid', b.price_paid ? `$${parseFloat(b.price_paid).toFixed(2)}` : null, 'text-green-400 font-mono');
             cells += cell('Quantity', b.quantity || 0, 'text-white font-mono');
@@ -451,6 +456,7 @@
             document.getElementById('ef-caliber').value = b.caliber || '';
             document.getElementById('ef-weight').value = b.weight_gr || '';
             document.getElementById('ef-bullet-type').value = b.bullet_type || '';
+            document.getElementById('ef-sku').value = b.sku || '';
             document.getElementById('ef-bc-g1').value = b.bc_g1 != null ? b.bc_g1 : '';
             document.getElementById('ef-price').value = b.price_paid || '';
             document.getElementById('ef-notes').value = b.notes || '';
@@ -524,6 +530,7 @@
                 caliber: document.getElementById('ef-caliber').value.trim(),
                 weight_gr: parseFloat(document.getElementById('ef-weight').value) || null,
                 bullet_type: document.getElementById('ef-bullet-type').value.trim() || null,
+                sku: document.getElementById('ef-sku').value.trim() || null,
                 bc_g1: parseFloat(document.getElementById('ef-bc-g1').value) || null,
                 price_paid: parseFloat(document.getElementById('ef-price').value) || null,
                 notes: document.getElementById('ef-notes').value.trim() || null,

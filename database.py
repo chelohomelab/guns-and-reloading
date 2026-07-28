@@ -161,6 +161,11 @@ class BulletInventory(Base):
     weight_gr = Column(Float)
     bullet_type = Column(String, nullable=True)   # "BTHP", "Hybrid", "FMJ"
     bc_g1 = Column(Float, nullable=True)
+    # Manufacturer's own catalog/part number (e.g. Hornady "22601", Barnes "30271", Sierra
+    # "#1234") — unlike upc (the retail box barcode), this identifies the bullet model itself
+    # and, when both the owned bullet and the reload-data source have one, lets the reload data
+    # matcher confirm the exact product instead of guessing off brand/weight/model text.
+    sku = Column(String, nullable=True)
     quantity = Column(Integer, default=0)
     qty_sealed = Column(Integer, default=0)
     qty_open = Column(Integer, default=0)
@@ -623,6 +628,7 @@ def init_db():
         _add_col('bullet_inventory', 'upc', 'upc VARCHAR')
         _add_col('bullet_inventory', 'is_muzzleloader', 'is_muzzleloader BOOLEAN DEFAULT FALSE')
         _add_col('bullet_inventory', 'datasheet_path', 'datasheet_path VARCHAR')
+        _add_col('bullet_inventory', 'sku', 'sku VARCHAR')
 
     for tbl in ('casing_inventory', 'powder_inventory', 'primer_inventory'):
         if tbl in inspector.get_table_names():

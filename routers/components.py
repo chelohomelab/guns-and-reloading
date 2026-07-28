@@ -27,7 +27,7 @@ def _primer_dict(p: models.PrimerInventory) -> dict:
 def _bullet_dict(b: models.BulletInventory) -> dict:
     return {"id": b.id, "brand": b.brand, "product_line": b.product_line,
             "caliber": b.caliber, "weight_gr": b.weight_gr, "bullet_type": b.bullet_type,
-            "bc_g1": b.bc_g1,
+            "bc_g1": b.bc_g1, "sku": getattr(b, "sku", None),
             "quantity": b.quantity,
             "qty_sealed": getattr(b, "qty_sealed", 0) or 0,
             "qty_open": getattr(b, "qty_open", 0) or 0,
@@ -311,6 +311,7 @@ async def add_bullet_component(
     quantity: int = Form(0),
     qty_sealed: int = Form(0), qty_open: int = Form(0),
     price: float = Form(0.0), notes: str = Form(None), upc: str = Form(None),
+    sku: str = Form(None),
     is_muzzleloader: bool = Form(False),
     image_1: UploadFile = File(None), image_2: UploadFile = File(None),
     db: Session = Depends(get_db),
@@ -323,7 +324,7 @@ async def add_bullet_component(
             img1 = cached.image_path
     b = models.BulletInventory(brand=brand, product_line=product_line, caliber=caliber,
                                weight_gr=weight_gr, bullet_type=bullet_type,
-                               bc_g1=bc_g1,
+                               bc_g1=bc_g1, sku=(sku.strip() if sku else None),
                                quantity=quantity, qty_sealed=qty_sealed, qty_open=qty_open,
                                price_paid=price, notes=notes,
                                image_path=img1, image_path_2=img2, upc=upc,

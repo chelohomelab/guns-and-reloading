@@ -38,3 +38,8 @@ venv/
 .DS_Store
 Thumbs.db
 static/htmls/
+
+# Claude Code's own local settings dir — created whenever it runs against this repo (e.g. a
+# service-account HOME won't see a personal global gitignore, so this must be excluded here to
+# keep `git status --porcelain` clean for the app's own upgrade/rollback dirty-check).
+.claude/

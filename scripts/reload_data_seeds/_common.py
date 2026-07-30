@@ -28,10 +28,9 @@ sys.path.insert(0, str(APP_DIR))
 os.chdir(APP_DIR)
 
 import database as models  # noqa: E402
+from config import UPLOAD_DIR  # noqa: E402
 from dependencies import delete_uploaded_file  # noqa: E402
 from routers.barcode import normalize_caliber  # noqa: E402
-
-UPLOAD_DIR = "static/uploads"
 
 
 def _resolve_source_pdf(path: str | None) -> str | None:

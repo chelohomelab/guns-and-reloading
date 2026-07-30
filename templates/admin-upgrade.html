@@ -42,6 +42,7 @@
         <p class="text-sm text-gray-400 mt-1">Pull the latest release from git and restart the app. A backup is taken automatically first, so you can roll back if something goes wrong.</p>
     </div>
 
+    {% if git_available %}
     <!-- Current version -->
     <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-3">
         <h2 class="text-sm font-bold uppercase tracking-wider text-amber-400">Current Version</h2>
@@ -74,6 +75,11 @@
         </button>
         <p class="text-[11px] text-gray-500">Reverts the code AND restores the database/photos to exactly how they were right before the last upgrade — anything entered since then will be lost.</p>
     </div>
+    {% else %}
+    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5">
+        <p class="text-sm text-gray-400">Self-upgrade isn't available for this install type — no local git checkout was found. Update via your platform's normal mechanism instead (a new Docker image tag, or a new desktop installer release).</p>
+    </div>
+    {% endif %}
 
 </main>
 
@@ -251,7 +257,9 @@
         }
     }
 
+    {% if git_available %}
     checkForUpdates();
+    {% endif %}
 </script>
 
 </body>

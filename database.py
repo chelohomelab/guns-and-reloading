@@ -1,11 +1,14 @@
+from pathlib import Path
+
 from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
-import os as _os
-_os.makedirs("data", exist_ok=True)
+from paths import DATA_DIR
 
-DATABASE_URL = "sqlite:///./data/reloading.db"
+_db_dir = Path(DATA_DIR) / "data"
+_db_dir.mkdir(parents=True, exist_ok=True)
+DATABASE_URL = f"sqlite:///{(_db_dir / 'reloading.db').as_posix()}"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

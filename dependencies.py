@@ -65,7 +65,7 @@ async def save_uploaded_document(file: UploadFile, prefix: str) -> Optional[str]
 def delete_uploaded_file(url_path: Optional[str]):
     if not url_path or not url_path.startswith("/static/uploads/"):
         return
-    fs_path = os.path.join("static", "uploads", os.path.basename(url_path))
+    fs_path = os.path.join(UPLOAD_DIR, os.path.basename(url_path))
     try:
         os.remove(fs_path)
     except FileNotFoundError:

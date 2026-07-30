@@ -65,6 +65,17 @@ def _is_dirty() -> bool:
     return bool(r["stdout"])
 
 
+def _dirty_files() -> list:
+    # Raw subprocess call, not _run()/_git() — those .strip() the combined stdout blob, which
+    # eats the leading status-column space off just the first porcelain line and throws off its
+    # fixed-width "XY <path>" slicing.
+    try:
+        r = subprocess.run(["git", "status", "--porcelain"], cwd=REPO_ROOT, capture_output=True, text=True, timeout=10)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return []
+    return [line[3:] for line in r.stdout.splitlines() if line]
+
+
 def _pip_install() -> dict:
     return _run([sys.executable, "-m", "pip", "install", "--no-cache-dir", "-r", "requirements.txt"], timeout=300)
 
@@ -146,6 +157,7 @@ def upgrade_check(request: Request):
             "error": f"git fetch failed: {fetch['stderr'] or 'no network / no access to origin'}",
             "current": current,
             "dirty": _is_dirty(),
+            "dirty_files": _dirty_files(),
             "rollback": _rollback_summary(),
         }
 
@@ -160,6 +172,7 @@ def upgrade_check(request: Request):
         "up_to_date": current is not None and latest is not None and current["hash"] == latest["hash"],
         "commits_behind": commits_behind,
         "dirty": _is_dirty(),
+        "dirty_files": _dirty_files(),
         "rollback": _rollback_summary(),
     }
 

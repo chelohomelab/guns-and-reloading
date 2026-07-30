@@ -37,9 +37,9 @@
 <main class="container mx-auto p-4 max-w-3xl space-y-6">
 
     <!-- Header -->
-    <div>
+    <div class="bg-gray-900/70 rounded-xl p-4">
         <h1 class="text-2xl font-bold text-amber-400">🚀 Upgrade</h1>
-        <p class="text-sm text-gray-400 mt-1">Pull the latest release from git and restart the app. A backup is taken automatically first, so you can roll back if something goes wrong.</p>
+        <p class="text-sm text-gray-300 mt-1">Pull the latest release from git and restart the app. A backup is taken automatically first, so you can roll back if something goes wrong.</p>
     </div>
 
     <!-- Current version -->
@@ -118,7 +118,10 @@
             const res = await fetch('/admin/upgrade/check');
             const d = await res.json();
 
-            document.getElementById('current-version').innerHTML = fmtCommit(d.current) + (d.dirty ? '<div class="text-yellow-400 text-xs mt-1">⚠ Local changes present on this server — upgrade/rollback are blocked until resolved.</div>' : '');
+            const dirtyFilesHtml = (d.dirty && d.dirty_files && d.dirty_files.length)
+                ? `<div class="mt-1 pl-4 font-mono text-[11px] text-yellow-300/80">${d.dirty_files.map(f => `· ${f}`).join('<br>')}</div>`
+                : '';
+            document.getElementById('current-version').innerHTML = fmtCommit(d.current) + (d.dirty ? `<div class="text-yellow-400 text-xs mt-1">⚠ Local changes present on this server — upgrade/rollback are blocked until resolved. SSH in and run <code>git status</code> / <code>git checkout -- &lt;file&gt;</code> to review and discard them, then refresh this page.${dirtyFilesHtml}</div>` : '');
 
             if (!d.ok) {
                 statusEl.textContent = d.error || 'Could not check for updates.';

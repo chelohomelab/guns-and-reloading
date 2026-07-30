@@ -1,6 +1,14 @@
 # Installation Guide
 
-Prerequisites: a running Debian 12 LXC with Python 3 and Git installed. See [LXC Setup](lxc-setup.md) if you haven't done that yet.
+Prerequisites: a running Debian 12 LXC (or any fresh Debian/Ubuntu machine) with root access.
+
+**Fast path**: run `scripts/install.sh` as root — it automates every step below (clone, venv,
+dependencies, systemd install/enable/start) in one shot. The rest of this guide is the manual
+step-by-step, useful if you want to understand or customize what it's doing.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/chelohomelab/inventory-and-reloading/main/scripts/install.sh | bash
+```
 
 ---
 

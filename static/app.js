@@ -30,6 +30,7 @@ let currentGroupShots = [];
 let state = "idle";
 let calibrationPoints = [];
 let pixelsPerInch = null;
+let lastGridDetectResult = null;   // kept from the last detectGridPixelsPerInch() call, even on failure, as a sanity check for manual calibration
 let currentPoa = null;                 // {x,y} Point of Aim in canvas-pixel space, shared per uploaded photo
 
 // Deleting a placed shot marker is a toggleable mode (see toggleDeleteMode/deleteModeActive)
@@ -2488,20 +2489,21 @@ function _buildGunOptionsHTML(items, tcBarrels, placeholder, cartridgeCaliber) {
     const shotguns = gunItems.filter(g => g.frame_type === 'Shotgun');
     const handguns = gunItems.filter(g => g.frame_type === 'Pistol');
 
+    const _gunLabel = g => `${g.brand} ${g.model}${g.caliber ? ' (' + g.caliber + ')' : ''}`;
     let html = `<option value="">${placeholder}</option>`;
     if (rifles.length > 0) {
         html += `<optgroup label="── Rifles ──">` +
-            rifles.map(g => `<option value="${g.id}">${g.brand} ${g.model}</option>`).join('') +
+            rifles.map(g => `<option value="${g.id}">${_gunLabel(g)}</option>`).join('') +
             `</optgroup>`;
     }
     if (shotguns.length > 0) {
         html += `<optgroup label="── Shotguns ──">` +
-            shotguns.map(g => `<option value="${g.id}">${g.brand} ${g.model}</option>`).join('') +
+            shotguns.map(g => `<option value="${g.id}">${_gunLabel(g)}</option>`).join('') +
             `</optgroup>`;
     }
     if (handguns.length > 0) {
         html += `<optgroup label="── Handguns ──">` +
-            handguns.map(g => `<option value="${g.id}">${g.brand} ${g.model}</option>`).join('') +
+            handguns.map(g => `<option value="${g.id}">${_gunLabel(g)}</option>`).join('') +
             `</optgroup>`;
     }
     if (tcItems.length > 0) {
@@ -2555,7 +2557,7 @@ let _measureGuns = [], _measureTcBarrels = [], _measureAmmoItems = [];
 function _ammoOptionLabel(a) {
     const isSg = a.ammo_category === 'shotgun' || a.ammo_category === 'shotgun_slug';
     if (isSg) return `${a.brand}${a.caliber ? ' ' + a.caliber : ''}${a.shell_size ? ' ' + a.shell_size + '"' : ''} (Shotgun)`;
-    return `${a.brand}${a.bullet_weight ? ' (' + a.bullet_weight + 'gr)' : ''}`;
+    return `${a.brand}${a.bullet_weight ? ' (' + a.bullet_weight + 'gr' + (a.bullet_type ? ' ' + a.bullet_type : '') + ')' : (a.bullet_type ? ' (' + a.bullet_type + ')' : '')}`;
 }
 
 // cartridgeCaliber optional — when given, restricts to ammo chambered for that caliber (same
@@ -2778,6 +2780,7 @@ if (targetUpload) {
                 const markPoaBtn = document.getElementById('mark-poa-btn');
 
                 const gridResult = detectGridPixelsPerInch();
+                lastGridDetectResult = gridResult;
                 if (gridResult.ppi) {
                     pixelsPerInch = gridResult.ppi;
                     state = "measuring";
@@ -3017,8 +3020,13 @@ function finalizePlacement(pos) {
             if (calibrationPoints.length === 2) {
                 const calBox = document.getElementById('calibration-box');
                 const banner = document.getElementById('status-banner');
+                const refInches = document.getElementById('ref-inches');
                 if (calBox) calBox.classList.remove('hidden');
                 if (banner) banner.innerText = "Input exact physical scale dimension width (Inches) and click Lock Calibration.";
+                // Force a deliberate entry instead of silently locking in a stale/default value
+                // (e.g. a leftover "1.0" from the last target) — that mismatch is what produces
+                // wildly oversized shot markers on a re-calibrated photo.
+                if (refInches) { refInches.value = ''; refInches.focus(); }
             }
         } else if (state === "measuring") {
             // A quick tap always places a new shot — even one that lands on top of an existing
@@ -3259,7 +3267,21 @@ function lockCalibration() {
     if (!refInches) return;
     const inches = parseFloat(refInches.value);
     if (calibrationPoints.length < 2 || isNaN(inches) || inches <= 0) return;
-    pixelsPerInch = Math.sqrt(Math.pow(calibrationPoints[1].x - calibrationPoints[0].x, 2) + Math.pow(calibrationPoints[1].y - calibrationPoints[0].y, 2)) / inches;
+    const candidatePpi = Math.sqrt(Math.pow(calibrationPoints[1].x - calibrationPoints[0].x, 2) + Math.pow(calibrationPoints[1].y - calibrationPoints[0].y, 2)) / inches;
+
+    // Sanity check against the target's own grid spacing, even if auto-detection wasn't
+    // confident enough to trust automatically — a manual entry that's off by several times
+    // (e.g. the reference-size field was left at a stale value) produces comically oversized
+    // shot markers, and this is the only cross-check available at calibration time.
+    const roughRef = lastGridDetectResult && (lastGridDetectResult.rough || lastGridDetectResult.median);
+    if (roughRef && (candidatePpi > roughRef * 2.5 || candidatePpi < roughRef * 0.4)) {
+        const proceed = confirm(
+            `This calibration works out to ~${Math.round(candidatePpi)} px/inch, but the target's own grid lines suggest roughly ~${Math.round(roughRef)} px/inch — that's a big mismatch and will likely make shot markers the wrong size.\n\nDouble-check the "Reference Size (Inches)" value against the two points you clicked. Continue anyway?`
+        );
+        if (!proceed) return;
+    }
+
+    pixelsPerInch = candidatePpi;
     state = "measuring";
     calibrationPoints = [];
 

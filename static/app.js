@@ -84,6 +84,24 @@ let currentPlatformSort = "brand";
 let currentOpticSort = "brand";
 let currentSearchQuery = "";
 
+// Keeps /inventory's URL in sync with whichever tab/sub-tab is actually showing — mirrors the
+// pattern switchTab() already uses for the homepage's own tabs. Without this, a reload always
+// falls back to the defaults read in inventory.html's window.onload (inv=platforms, etc.)
+// regardless of which tab the user was actually looking at.
+function syncInventoryUrl() {
+    // Sub-tab params must be scoped to the tab they belong to — currentPlatformTab/
+    // currentAmmoFilter/currentComponentFilter never reset when you switch away from their
+    // tab, so an unscoped write here would keep e.g. "platform=shotgun" attached to the URL
+    // even while browsing Optics, and a reload would then wrongly re-apply it.
+    const params = new URLSearchParams();
+    params.set('inv', currentInventoryTab);
+    if (currentInventoryTab === 'platforms' && currentPlatformTab !== 'general') params.set('platform', currentPlatformTab);
+    if (currentInventoryTab === 'ammo' && currentAmmoFilter !== 'factory') params.set('ammofilter', currentAmmoFilter);
+    if (currentInventoryTab === 'components' && currentComponentFilter !== 'powders') params.set('comp', currentComponentFilter);
+    const newUrl = `/inventory?${params.toString()}`;
+    if (location.pathname + location.search !== newUrl) history.replaceState(null, '', newUrl);
+}
+
 function applyInventorySearch() {
     const el = document.getElementById('inventory-search');
     currentSearchQuery = (el ? el.value : '').toLowerCase().trim();
@@ -754,6 +772,7 @@ function switchInventoryTab(tab) {
     if (tab === 'optics')      loadScopes();
     if (tab === 'ammo')        loadAmmoInventory(currentAmmoFilter);
     if (tab === 'components')  loadComponentInventory(currentComponentFilter);
+    syncInventoryUrl();
 }
 
 function switchPlatformTab(tab) {
@@ -785,6 +804,7 @@ function switchPlatformTab(tab) {
         if (activeBtn) activeBtn.className = "px-3 py-1 rounded bg-gray-800 text-amber-500 cursor-pointer";
         loadCatalog(currentFrameType());
     }
+    syncInventoryUrl();
 }
 
 async function loadTCInventory() {
@@ -928,6 +948,7 @@ function switchAmmoFilter(type) {
     if (handBtn) handBtn.className = type === 'handload'
         ? "px-3 py-1 rounded bg-gray-800 text-amber-400 cursor-pointer" : inactive;
     loadAmmoInventory(type);
+    syncInventoryUrl();
 }
 
 function switchAmmoCategory(cat) {
@@ -952,6 +973,7 @@ function switchComponentFilter(type) {
             : "px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer";
     });
     loadComponentInventory(type);
+    syncInventoryUrl();
 }
 
 function switchComponentMode(mode) {

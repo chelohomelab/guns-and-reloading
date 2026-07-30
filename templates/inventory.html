@@ -342,13 +342,16 @@
         const inv = p.get('inv') || 'platforms';
         if (p.has('ammofilter')) currentAmmoFilter = p.get('ammofilter');
         switchInventoryTab(inv);
-        if (p.has('platform')) switchPlatformTab(p.get('platform'));
-        if (p.has('ammofilter')) switchAmmoFilter(p.get('ammofilter'));
-        if (p.has('cal')) {
+        // Sub-tab params only apply to the tab they belong to — guards against a URL that
+        // (via an old bookmark, or history left over from switching tabs) carries a stray
+        // param for a different tab than the one "inv" actually selects.
+        if (inv === 'platforms' && p.has('platform')) switchPlatformTab(p.get('platform'));
+        if (inv === 'ammo' && p.has('ammofilter')) switchAmmoFilter(p.get('ammofilter'));
+        if (inv === 'ammo' && p.has('cal')) {
             currentAmmoCaliberFilter = decodeURIComponent(p.get('cal'));
             loadAmmoInventory(p.get('ammofilter') || currentAmmoFilter);
         }
-        if (p.has('comp')) switchComponentFilter(p.get('comp'));
+        if (inv === 'components' && p.has('comp')) switchComponentFilter(p.get('comp'));
     };
     // Re-fetch ammo list when navigating back (browser back button restores stale bfcache state)
     window.addEventListener('pageshow', (e) => {

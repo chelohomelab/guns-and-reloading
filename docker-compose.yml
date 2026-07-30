@@ -5,8 +5,9 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Both persistent: survive container rebuilds and updates
-      - ./data:/app/data               # SQLite database
-      - ./uploads:/app/static/uploads  # Photo uploads
+      # Single persistent volume — db, uploads, and backups all live under here, matching
+      # INVENTORY_DATA_DIR below. Survives container rebuilds and updates.
+      - ./appdata:/data
     environment:
       - PYTHONUNBUFFERED=1
+      - INVENTORY_DATA_DIR=/data

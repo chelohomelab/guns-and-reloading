@@ -9,6 +9,15 @@
     <meta name="theme-color" content="#0f0f0f">
     <meta name="mobile-web-app-capable" content="yes">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+      }
+      window.addEventListener('online',  () => document.getElementById('offline-banner')?.classList.add('hidden'));
+      window.addEventListener('offline', () => document.getElementById('offline-banner')?.classList.remove('hidden'));
+      if (!navigator.onLine) document.addEventListener('DOMContentLoaded', () =>
+        document.getElementById('offline-banner')?.classList.remove('hidden'));
+    </script>
     <style>
       #main-bg { background-image: url('/static/images/phone-background.png'); background-size: cover; background-position: center; background-color: #0f0f0f; }
       @media (min-width: 1024px) { #main-bg { background-image: url('/static/images/background.png'); } }
@@ -17,6 +26,7 @@
 <body class="bg-gray-950 text-gray-100 font-sans antialiased select-none flex min-h-dvh lg:h-dvh lg:overflow-hidden">
 
     <div id="toast-container" class="fixed top-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
+    <div id="offline-banner" class="hidden fixed top-0 inset-x-0 z-[200] bg-amber-900/95 text-amber-200 text-xs font-bold text-center py-1">📴 Offline — showing cached data</div>
 
     <input type="file" id="global-picture-replacer" accept="image/*" class="hidden" onchange="processPictureReplacement(this)">
 

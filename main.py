@@ -30,7 +30,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
     # cookie — they're called cross-origin from whatever site the import bookmarklet
     # runs on (a retailer, or google.com for the field-capture case), which never has
     # this app's session cookie.
-    _PUBLIC = {"/login", "/setup", "/import/capture", "/import/capture-field"}
+    # /sw.js is exempt so the browser's periodic background service-worker update check never
+    # gets redirected to /login HTML if the session happens to be expired at that moment — a
+    # redirected response isn't valid JS and would break the service worker's own update.
+    _PUBLIC = {"/login", "/setup", "/import/capture", "/import/capture-field", "/sw.js"}
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path

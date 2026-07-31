@@ -357,6 +357,7 @@
 
     </main>
 
+    <script src="/static/offline-queue.js?v=1"></script>
     <script>
         function _camToInput(camId, targetId) {
             const cam = document.getElementById(camId);
@@ -604,6 +605,7 @@
         }
 
         window.onload = function() {
+            OfflineQueue.init();
             const params = new URLSearchParams(window.location.search);
             currentAmmoId = params.get('id');
             if (!currentAmmoId) { window.location.href = 'index.html'; return; }
@@ -984,13 +986,14 @@
             const rounds = parseInt(input?.value);
             if (!rounds || rounds <= 0) { showToast('Enter a valid round count.', 'error'); return; }
             try {
-                const res = await fetch(`/ammo/${currentAmmoId}/use-rounds/`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ rounds })
+                const { queued, response } = await OfflineQueue.queueOrSend(`/ammo/${currentAmmoId}/use-rounds/`, {
+                    body: { rounds }
                 });
-                if (res.ok) {
-                    const updated = await res.json();
+                if (queued) {
+                    input.value = '';
+                    showToast(`${rounds} rounds queued — will sync when back online.`);
+                } else if (response && response.ok) {
+                    const updated = await response.json();
                     ammoData = { ...ammoData, ...updated };
                     renderAmmoProfile(ammoData);
                     input.value = '';

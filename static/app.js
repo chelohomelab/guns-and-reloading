@@ -3972,7 +3972,7 @@ async function commitSessionToDatabase() {
     }
 
     const saveBtn = document.getElementById('db-save-session-btn');
-    if (saveBtn) { saveBtn.disabled = true; saveBtn.innerText = "Uploading…"; }
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.innerText = navigator.onLine === false ? "Queuing…" : "Uploading…"; }
 
     const barrelId = await resolveBarrelIdFromGunSelect(gunSelect);
 
@@ -3982,7 +3982,8 @@ async function commitSessionToDatabase() {
         return;
     }
 
-    let successCount = 0;
+    let sentCount = 0;
+    let queuedCount = 0;
     let failCount = 0;
 
     for (const g of groups) {
@@ -4023,20 +4024,26 @@ async function commitSessionToDatabase() {
         if (groupBlob) formData.append('target_image', groupBlob, 'target.jpg');
 
         try {
-            const res = await fetch('/performance-log/', { method: 'POST', body: formData });
-            if (res.ok) { successCount++; } else { failCount++; }
+            const { queued, response } = await OfflineQueue.queueOrSend('/performance-log/', { body: formData });
+            if (queued) { queuedCount++; }
+            else if (response && response.ok) { sentCount++; }
+            else { failCount++; }
         } catch (_) { failCount++; }
     }
 
     if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = "🚀 Upload Data to Homelab DB"; }
 
     if (failCount === 0) {
-        showToast(`${successCount} group${successCount > 1 ? 's' : ''} committed to database.`);
+        if (queuedCount > 0) {
+            showToast(`${sentCount} saved, ${queuedCount} queued — will sync when back online.`);
+        } else {
+            showToast(`${sentCount} group${sentCount > 1 ? 's' : ''} committed to database.`);
+        }
         groups = [];
         updateSidebarList();
         redrawCanvas();
     } else {
-        showToast(`${successCount} saved, ${failCount} failed. Check console for details.`, "error");
+        showToast(`${sentCount + queuedCount} saved, ${failCount} failed. Check console for details.`, "error");
     }
 }
 function resetCanvas() {

@@ -1739,6 +1739,18 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
+    <script src="/static/offline-queue.js?v=1"></script>
     <script src="/static/app.js?v=127"></script>
+    <script>
+      OfflineQueue.init();
+      document.querySelector('a[href="/logout"]')?.addEventListener('click', async (e) => {
+        const n = await OfflineQueue.pendingCount();
+        if (n > 0 && !confirm(
+          `You have ${n} item(s) not yet saved to the server. If you sign out now on a ` +
+          `shared device, they'll be sent under whoever's account is active when your ` +
+          `connection comes back. Sign out anyway?`
+        )) e.preventDefault();
+      });
+    </script>
 </body>
 </html>

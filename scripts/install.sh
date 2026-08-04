@@ -110,7 +110,12 @@ fi
 
 echo "[install] Enabling and starting services..."
 systemctl daemon-reload
-systemctl enable --now inventory
+# `enable --now` only starts a service if it isn't already running — on a reinstall/update run
+# (re-running this script to pick up new code on an already-installed instance), the app would
+# otherwise keep running whatever was already in memory, silently ignoring everything `git pull`
+# just updated on disk. `restart` correctly starts it either way.
+systemctl enable inventory
+systemctl restart inventory
 systemctl enable --now inventory-backup.timer
 if $AVAHI_OK; then systemctl enable --now avahi-daemon || AVAHI_OK=false; fi
 if $CADDY_OK; then systemctl restart caddy || CADDY_OK=false; fi

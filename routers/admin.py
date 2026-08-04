@@ -26,6 +26,14 @@ async def admin_users_page(request: Request, db: Session = Depends(get_db)):
     })
 
 
+@router.get("/admin/https-setup", response_class=HTMLResponse)
+async def admin_https_setup_page(request: Request):
+    _require_admin(request)
+    return templates.TemplateResponse("admin-https-setup.html", {
+        "request": request, "user": request.state.user,
+    })
+
+
 @router.patch("/admin/users/{user_id}")
 def admin_patch_user(user_id: int, payload: AdminUserPatch, request: Request, db: Session = Depends(get_db)):
     _require_admin(request)

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTPS Setup — Guns & Reloading</title>
+    <link rel="icon" type="image/png" href="/static/images/app-icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0f0f0f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/davidshimjs-qrcodejs@0.0.2/qrcode.min.js"></script>
+    <style>
+      body { background-image: url('/static/images/phone-background.png'); background-size: cover; background-position: center; background-color: #0f0f0f; }
+      @media (min-width: 1024px) { body { background-image: url('/static/images/background.png'); } }
+    </style>
+</head>
+<body class="text-gray-100 font-sans antialiased">
+
+<div id="toast-container" class="fixed top-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
+
+<nav class="bg-gray-800 border-b border-gray-700 p-4 sticky top-0 z-50">
+    <div class="container mx-auto flex justify-between items-center">
+        <div class="flex items-center gap-4">
+            <a href="/" class="text-amber-500 font-bold text-xl tracking-wide">🎯 Guns & Reloading</a>
+            <span class="text-gray-600">›</span>
+            <span class="text-sm text-gray-300 font-semibold">HTTPS Setup</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="/admin/upgrade" class="text-xs text-gray-400 hover:text-gray-200 transition">Upgrade</a>
+            <span class="text-gray-600">|</span>
+            <a href="/admin/backup" class="text-xs text-gray-400 hover:text-gray-200 transition">Backup</a>
+            <span class="text-gray-600">|</span>
+            <span class="text-xs text-gray-400 font-mono">{{ user.username }}</span>
+            <a href="/logout" class="px-2.5 py-1.5 rounded bg-gray-700 hover:bg-red-900 hover:text-red-300 font-medium text-xs text-gray-400 transition">Sign out</a>
+        </div>
+    </div>
+</nav>
+
+<main class="container mx-auto p-4 max-w-3xl space-y-6">
+
+    <!-- Header -->
+    <div class="bg-gray-900/70 rounded-xl p-4">
+        <h1 class="text-2xl font-bold text-amber-400">🔒 HTTPS Setup</h1>
+        <p class="text-sm text-gray-300 mt-1">
+            Offline features (browsing your inventory and logging range sessions with zero signal)
+            need a secure connection to work at all — plain "not secure" browsing silently disables
+            them. This server already has one, generated locally with no internet involved. Each
+            phone/tablet just needs a one-time, one-tap step to trust it.
+        </p>
+    </div>
+
+    <!-- Step 1: scan or visit -->
+    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-amber-400">Step 1 — On the phone, scan this or visit the link</h2>
+        <div class="flex flex-col sm:flex-row items-center gap-5">
+            <div id="qr-code" class="bg-white p-3 rounded-lg shrink-0"></div>
+            <div class="space-y-2 text-sm text-gray-300 min-w-0">
+                <p>Make sure the phone is on the same WiFi network as this server, then either:</p>
+                <ul class="list-disc list-inside space-y-1 text-gray-400">
+                    <li>Scan the QR code with the phone's camera, or</li>
+                    <li>Open this address in the phone's browser:
+                        <div id="ca-url" class="font-mono text-amber-400 break-all mt-1"></div>
+                    </li>
+                </ul>
+                <p class="text-xs text-gray-500">This downloads one small file — the certificate that proves this specific server is really this server, nothing more.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2: install -->
+    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-blue-400">Step 2 — Install it on the phone</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div class="bg-gray-900/60 rounded-lg p-4 space-y-2">
+                <p class="font-bold text-gray-200">Android</p>
+                <ol class="list-decimal list-inside space-y-1 text-gray-400">
+                    <li>Tap the downloaded file, or go to Settings → Security → "Install a certificate"</li>
+                    <li>Choose "CA certificate" when prompted</li>
+                    <li>Pick the downloaded file — a warning about "monitoring" is normal and expected here, since this cert only lets your own phone trust your own server</li>
+                </ol>
+            </div>
+            <div class="bg-gray-900/60 rounded-lg p-4 space-y-2">
+                <p class="font-bold text-gray-200">iPhone / iPad</p>
+                <ol class="list-decimal list-inside space-y-1 text-gray-400">
+                    <li>Open the downloaded profile — it'll prompt to install</li>
+                    <li>Settings → General → VPN &amp; Device Management → install it</li>
+                    <li><strong class="text-amber-400">Then</strong>: Settings → General → About → Certificate Trust Settings → turn on full trust for it (easy to miss — it won't work without this last step)</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 3: confirm -->
+    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-2">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-emerald-400">Step 3 — Confirm it worked</h2>
+        <p class="text-sm text-gray-300">
+            Reload this app on the phone. The address bar should show a lock icon with no warning.
+            Repeat this whole process once per device — it's a one-time setup per phone/tablet, not
+            something you need to redo later.
+        </p>
+    </div>
+
+</main>
+
+<script>
+    const url = window.location.origin + '/static/uploads/ca.crt';
+    document.getElementById('ca-url').textContent = url;
+    if (window.QRCode) {
+        new QRCode(document.getElementById('qr-code'), { text: url, width: 176, height: 176 });
+    } else {
+        document.getElementById('qr-code').innerHTML = '<p class="text-xs text-gray-800 p-4">QR code library failed to load — use the link instead.</p>';
+    }
+</script>
+
+</body>
+</html>

@@ -50,6 +50,38 @@
         </p>
     </div>
 
+    <!-- Before you start: what to expect -->
+    <div class="bg-gray-800 border border-amber-800/50 rounded-xl p-5 space-y-3">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-amber-400">❓ Before you scan: what's about to happen</h2>
+        <p class="text-sm text-gray-300">
+            When you scan the QR code below and install the certificate, your phone
+            <strong class="text-gray-200">will</strong> show a warning that looks something like
+            <em>"A third party or your organization can monitor your online activity, including
+            emails, apps, and secure websites."</em> That's expected — don't let it stop you. It's a
+            generic warning Android/iOS shows for trusting <strong class="text-gray-200">any</strong>
+            certificate authority, not something specific to this app. Here's exactly what it does
+            and doesn't do:
+        </p>
+        <ul class="text-sm text-gray-300 space-y-2 list-disc list-inside">
+            <li><strong class="text-gray-200">What it actually does:</strong> lets your phone verify
+                "yes, this is genuinely my own server" instead of showing a security warning every time
+                you open the app. That's the only thing it does.</li>
+            <li><strong class="text-gray-200">What it doesn't do:</strong> it isn't spyware, isn't a VPN
+                profile, doesn't route your traffic anywhere, and gives this app — or us — no new
+                ability to see your phone's data, your browsing on other sites, your location, or
+                anything else. No code runs on your phone because of this; it's a cryptographic trust
+                decision, nothing more.</li>
+            <li><strong class="text-gray-200">Where the actual key lives:</strong> the private key that
+                makes this certificate work exists only on this server, generated here, never uploaded
+                anywhere, never touching your phone. Only someone with physical or remote access to
+                <em>this specific machine</em> could ever misuse it — and if that ever happened, it'd be
+                a compromise of your own server, not something this feature itself enables.</li>
+            <li>Your phone already trusts roughly 100 certificate authorities out of the box (Let's
+                Encrypt, DigiCert, and so on) without ever asking you. This is the same kind of trust
+                decision, scoped to one more authority — specifically, your own.</li>
+        </ul>
+    </div>
+
     <!-- Step 1: scan or visit -->
     <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
         <h2 class="text-sm font-bold uppercase tracking-wider text-amber-400">Step 1 — On the phone, scan this or visit the link</h2>
@@ -77,7 +109,7 @@
                 <ol class="list-decimal list-inside space-y-1 text-gray-400">
                     <li>Don't tap the downloaded file directly — Android blocks installing a CA certificate that way. Instead, search Settings for "certificate" and choose <strong class="text-gray-200">Install a certificate</strong></li>
                     <li>Choose <strong class="text-gray-200">CA certificate</strong> specifically (not "VPN & app user certificate")</li>
-                    <li>Pick the downloaded file from Downloads. You'll see a warning here — see "Why does my phone warn me about this?" below, it's expected and explained there</li>
+                    <li>Pick the downloaded file from Downloads. You'll see the warning described above — that's expected</li>
                     <li>If it still shows "not secure" afterward, fully force-stop Chrome (Settings → Apps → Chrome → Force stop) and reopen it — Chrome can hang onto a stale "untrusted" result from before you installed the certificate</li>
                 </ol>
             </div>
@@ -90,36 +122,6 @@
                 </ol>
             </div>
         </div>
-    </div>
-
-    <!-- Why the warning appears -->
-    <div class="bg-gray-800 border border-amber-800/50 rounded-xl p-5 space-y-3">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-amber-400">❓ Why does my phone warn me about this?</h2>
-        <p class="text-sm text-gray-300">
-            Your phone will show something like <em>"A third party or your organization can monitor
-            your online activity, including emails, apps, and secure websites."</em> That's a generic
-            warning Android/iOS shows for trusting <strong class="text-gray-200">any</strong> certificate
-            authority — it's not specific to this app, and it's not wrong to take seriously. Here's
-            exactly what this does and doesn't do:
-        </p>
-        <ul class="text-sm text-gray-300 space-y-2 list-disc list-inside">
-            <li><strong class="text-gray-200">What it actually does:</strong> lets your phone verify
-                "yes, this is genuinely my own server" instead of showing a security warning every time
-                you open the app. That's the only thing it does.</li>
-            <li><strong class="text-gray-200">What it doesn't do:</strong> it isn't spyware, isn't a VPN
-                profile, doesn't route your traffic anywhere, and gives this app — or us — no new
-                ability to see your phone's data, your browsing on other sites, your location, or
-                anything else. No code runs on your phone because of this; it's a cryptographic trust
-                decision, nothing more.</li>
-            <li><strong class="text-gray-200">Where the actual key lives:</strong> the private key that
-                makes this certificate work exists only on this server, generated here, never uploaded
-                anywhere, never touching your phone. Only someone with physical or remote access to
-                <em>this specific machine</em> could ever misuse it — and if that ever happened, it'd be
-                a compromise of your own server, not something this feature itself enables.</li>
-            <li>Your phone already trusts roughly 100 certificate authorities out of the box (Let's
-                Encrypt, DigiCert, and so on) without ever asking you. This is the same kind of trust
-                decision, scoped to one more authority — specifically, your own.</li>
-        </ul>
     </div>
 
     <!-- Step 3: confirm -->

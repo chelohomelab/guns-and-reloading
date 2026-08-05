@@ -129,7 +129,7 @@ account), and set up `avahi-daemon` so this server is reachable at a stable `<ho
 address instead of a raw IP that changes whenever your router reassigns it.
 
 The only remaining step is per-device, once: each phone/tablet needs to trust that certificate.
-Sign in as an admin and go to **⚙️ → 🔒 HTTPS Setup** — it shows a QR code and walks through the
+Sign in as an admin and go to **⚙️ → 📱 Phone/Tablet Setup** — it shows a QR code and walks through the
 one-time install on Android and iOS. After that one-time step, `https://<hostname>.local` works
 exactly like any other trusted, secure website, and the offline features start working.
 

@@ -140,7 +140,7 @@ fi
 IP=$(hostname -I | awk '{print $1}')
 if $CADDY_OK && $AVAHI_OK; then
     PRIMARY_URL="https://${HOSTNAME_LOCAL}"
-    HTTPS_NOTE="(or http://$IP:8000 — both work; see /admin/https-setup after logging in to get your phone trusting the HTTPS certificate too)"
+    HTTPS_NOTE="(or http://$IP:8000 — both work; see /admin/phone-setup after logging in to get your phone/tablet trusting the certificate too)"
 else
     PRIMARY_URL="http://$IP:8000"
     HTTPS_NOTE="(LAN-only HTTPS wasn't set up this run — see the WARNINGs above. The app itself works fine over plain HTTP; re-run this script later to retry HTTPS setup once network conditions are better.)"

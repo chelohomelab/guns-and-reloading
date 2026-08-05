@@ -26,10 +26,10 @@ async def admin_users_page(request: Request, db: Session = Depends(get_db)):
     })
 
 
-@router.get("/admin/https-setup", response_class=HTMLResponse)
-async def admin_https_setup_page(request: Request):
+@router.get("/admin/phone-setup", response_class=HTMLResponse)
+async def admin_phone_setup_page(request: Request):
     _require_admin(request)
-    return templates.TemplateResponse("admin-https-setup.html", {
+    return templates.TemplateResponse("admin-phone-setup.html", {
         "request": request, "user": request.state.user,
     })
 

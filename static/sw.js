@@ -13,7 +13,7 @@
 //
 // SW_VERSION is a manual bump, mirroring the existing manually-bumped `?v=NNN` convention
 // already used for app.js — bump it whenever this file's caching behavior changes.
-const SW_VERSION = 'v1';
+const SW_VERSION = 'v2';
 const STATIC_CACHE = `gr-static-${SW_VERSION}`;
 const SHELL_CACHE = `gr-shell-${SW_VERSION}`;
 const DATA_CACHE = `gr-data-${SW_VERSION}`;
@@ -23,6 +23,8 @@ const KNOWN_CACHES = [STATIC_CACHE, SHELL_CACHE, DATA_CACHE, IMAGE_CACHE];
 const STATIC_URLS = [
   '/static/manifest.json',
   '/static/images/app-icon.png',
+  '/static/images/icon-192.png',
+  '/static/images/icon-512.png',
   '/static/images/logo.png',
   '/static/images/background.png',
   '/static/images/phone-background.png',

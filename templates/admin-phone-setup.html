@@ -125,24 +125,36 @@
     </div>
 
     <!-- Step 3: confirm -->
-    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-2">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-emerald-400">Step 3 — Confirm it worked</h2>
-        <p class="text-sm text-gray-300">
-            Reload this app on the phone. The address bar should show a lock icon with no warning.
-            Repeat this whole process once per device — it's a one-time setup per phone/tablet, not
-            something you need to redo later.
-        </p>
+    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-emerald-400">Step 3 — Open the app</h2>
+        <div class="flex flex-col sm:flex-row items-center gap-5">
+            <div id="qr-code-app" class="bg-white p-3 rounded-lg shrink-0"></div>
+            <div class="space-y-2 text-sm text-gray-300 min-w-0">
+                <p>Scan this to go straight to the app, or open this address:</p>
+                <div id="app-url" class="font-mono text-amber-400 break-all"></div>
+                <p class="text-xs text-gray-500">
+                    The address bar should show a lock icon with no warning this time. Repeat this
+                    whole process once per device — it's a one-time setup per phone/tablet, not
+                    something you need to redo later.
+                </p>
+            </div>
+        </div>
     </div>
 
 </main>
 
 <script>
-    const url = window.location.origin + '/static/uploads/ca.crt';
-    document.getElementById('ca-url').textContent = url;
+    const caUrl = window.location.origin + '/static/uploads/ca.crt';
+    document.getElementById('ca-url').textContent = caUrl;
+    const appUrl = window.location.origin + '/';
+    document.getElementById('app-url').textContent = appUrl;
     if (window.QRCode) {
-        new QRCode(document.getElementById('qr-code'), { text: url, width: 176, height: 176 });
+        new QRCode(document.getElementById('qr-code'), { text: caUrl, width: 176, height: 176 });
+        new QRCode(document.getElementById('qr-code-app'), { text: appUrl, width: 176, height: 176 });
     } else {
-        document.getElementById('qr-code').innerHTML = '<p class="text-xs text-gray-800 p-4">QR code library failed to load — use the link instead.</p>';
+        const fallback = '<p class="text-xs text-gray-800 p-4">QR code library failed to load — use the link instead.</p>';
+        document.getElementById('qr-code').innerHTML = fallback;
+        document.getElementById('qr-code-app').innerHTML = fallback;
     }
 </script>
 

@@ -124,16 +124,25 @@ if $CADDY_OK; then
     echo "[install] Waiting for Caddy to provision its local CA..."
     mkdir -p "$APP_DIR/static/uploads"
     for i in $(seq 1 15); do
-        if curl -s http://localhost:2019/pki/ca/local/certificates 2>/dev/null | grep -q "BEGIN CERTIFICATE"; then
-            curl -s http://localhost:2019/pki/ca/local/certificates > "$APP_DIR/static/uploads/ca.crt"
-            echo "[install] CA certificate saved — downloadable at https://${HOSTNAME_LOCAL}/static/uploads/ca.crt"
+        # Only the root certificate needs to be manually trusted on each device — Caddy's
+        # /pki/ca/local/certificates endpoint returns the full chain (intermediate concatenated
+        # BEFORE the root), and installers that only read the first certificate in a multi-cert
+        # file (confirmed via real iOS/Android device testing) end up "installing" the
+        # intermediate instead. An intermediate isn't self-signed, so it never shows up in
+        # Certificate Trust Settings to actually be trusted — the install silently does nothing
+        # useful. The /pki/ca/local (no /certificates) endpoint exposes the root on its own as
+        # clean JSON, avoiding this entirely.
+        ROOT_PEM=$(curl -s http://localhost:2019/pki/ca/local 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('root_certificate',''), end='')" 2>/dev/null)
+        if [ -n "$ROOT_PEM" ]; then
+            printf '%s' "$ROOT_PEM" > "$APP_DIR/static/uploads/ca.crt"
+            echo "[install] CA root certificate saved — downloadable at https://${HOSTNAME_LOCAL}/static/uploads/ca.crt"
             break
         fi
         sleep 2
     done
     if [ ! -s "$APP_DIR/static/uploads/ca.crt" ]; then
-        echo "[install] WARNING: could not fetch the local CA certificate yet — check 'systemctl status caddy'"
-        echo "[install] and retry manually later: curl http://localhost:2019/pki/ca/local/certificates > $APP_DIR/static/uploads/ca.crt"
+        echo "[install] WARNING: could not fetch the local CA root certificate yet — check 'systemctl status caddy'"
+        echo "[install] and retry manually later: curl -s http://localhost:2019/pki/ca/local | python3 -c \"import json,sys; print(json.load(sys.stdin)['root_certificate'], end='')\" > $APP_DIR/static/uploads/ca.crt"
     fi
 fi
 

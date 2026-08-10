@@ -141,17 +141,6 @@
             </a>
         </nav>
 
-        <!-- Inventory stats -->
-        <div class="p-2.5 border-b border-gray-800">
-            <p class="text-[10px] text-gray-600 uppercase tracking-widest px-1 mb-1.5">Inventory</p>
-            <div id="landing-stats" class="grid grid-cols-2 gap-1">
-                <div class="bg-gray-800/60 rounded-lg py-2 text-center"><div class="text-sm">🔫</div><div class="text-sm font-black text-gray-600">—</div><div class="text-[9px] text-gray-600 uppercase tracking-wide">Firearms</div><div class="text-[10px] font-bold text-gray-700 mt-0.5">$—</div></div>
-                <div class="bg-gray-800/60 rounded-lg py-2 text-center"><div class="text-sm">🔭</div><div class="text-sm font-black text-gray-600">—</div><div class="text-[9px] text-gray-600 uppercase tracking-wide">Optics</div><div class="text-[10px] font-bold text-gray-700 mt-0.5">$—</div></div>
-                <div class="bg-gray-800/60 rounded-lg py-2 text-center"><div class="text-sm">🧪</div><div class="text-sm font-black text-gray-600">—</div><div class="text-[9px] text-gray-600 uppercase tracking-wide">Ammo</div><div class="text-[10px] font-bold text-gray-700 mt-0.5">$—</div></div>
-                <div class="bg-gray-800/60 rounded-lg py-2 text-center"><div class="text-sm">🔩</div><div class="text-sm font-black text-gray-600">—</div><div class="text-[9px] text-gray-600 uppercase tracking-wide">Components</div><div class="text-[10px] font-bold text-gray-700 mt-0.5">$—</div></div>
-            </div>
-        </div>
-
         </div><!-- end scrollable middle -->
 
         <!-- User menu -->
@@ -1783,7 +1772,8 @@
 
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <script src="/static/offline-queue.js?v=1"></script>
-    <script src="/static/app.js?v=127"></script>
+    <script src="/static/price-blur.js"></script>
+    <script src="/static/app.js?v=129"></script>
     <script>
       OfflineQueue.init();
       document.querySelector('a[href="/logout"]')?.addEventListener('click', async (e) => {

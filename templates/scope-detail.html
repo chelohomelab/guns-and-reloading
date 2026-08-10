@@ -56,6 +56,7 @@
       @media (min-width: 1024px) { body { background-image: url('/static/images/background.png'); } }
     </style>
 </head>
+    <script src="/static/price-blur.js"></script>
 <body class="text-gray-100 font-sans antialiased">
     <div id="offline-banner" class="hidden fixed top-0 inset-x-0 z-[200] bg-amber-900/95 text-amber-200 text-xs font-bold text-center py-1">📴 Offline — showing cached data</div>
     <div id="install-banner" class="hidden fixed bottom-4 right-4 z-[190] bg-blue-900/95 text-blue-100 text-xs font-bold rounded-lg shadow-lg px-3 py-2 flex items-center gap-2">
@@ -443,7 +444,7 @@
             let cells = '';
             cells += cell('Magnification', s.magnification || null, 'text-blue-300 font-mono');
             cells += cell('Units', s.units || 'MOA', 'text-gray-300 font-mono');
-            cells += cell('Price Paid', s.price_paid ? `$${parseFloat(s.price_paid).toFixed(2)}` : null, 'text-green-400 font-mono');
+            cells += cell('Price Paid', s.price_paid ? blurPrice(s.price_paid) : null, 'text-green-400 font-mono');
             cells += cell('Quantity', qty, 'text-white font-mono');
 
             // Mounted On

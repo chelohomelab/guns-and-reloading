@@ -840,12 +840,9 @@ async function loadTCInventory() {
                             <button onclick="document.getElementById('rcedit-${r.id}').classList.toggle('hidden')"
                                 class="flex-1 px-2 py-1.5 bg-amber-700 hover:bg-amber-600 text-white text-xs font-bold rounded transition cursor-pointer">✏️ Edit</button>
                             ${r.is_sold
-                                ? `<span class="px-2 py-1.5 text-xs text-red-400 font-mono">Sold $${parseFloat(r.price_sold||0).toFixed(2)}</span>`
+                                ? `<span class="px-2 py-1.5 text-xs text-red-400 font-mono">Sold ${blurPrice(r.price_sold)}</span>`
                                 : `<button onclick="openSellModal(${r.id},'${r.platform} Receiver','tc-receiver')" class="px-2 py-1.5 bg-gray-700 hover:bg-emerald-800 text-gray-300 hover:text-white text-xs font-bold rounded transition cursor-pointer">$ Sell</button>`}
                             <button onclick="trashItem('tc-receiver',${r.id},'${r.platform} Receiver')" class="px-2 py-1.5 bg-gray-700 hover:bg-red-900 text-gray-400 hover:text-red-300 text-xs font-bold rounded transition cursor-pointer" title="Move to trash">🗑️</button>
-                        </div>
-                        <div class="flex justify-end">
-                            <span class="text-xs text-gray-500 font-mono">$${parseFloat(r.price_paid || 0).toFixed(2)}</span>
                         </div>
                     </div>
                 </div>`;
@@ -860,7 +857,7 @@ async function loadTCInventory() {
                 const flags = [b.is_threaded && 'Threaded', b.has_muzzle_brake && 'Brake'].filter(Boolean).join(' · ');
                 const barrelLabel = `${b.tc_platform} ${b.caliber}`;
                 const barrelSoldBtn = b.is_sold
-                    ? `<span class="text-xs text-red-400 font-mono">Sold $${parseFloat(b.price_sold||0).toFixed(2)}</span>`
+                    ? `<span class="text-xs text-red-400 font-mono">Sold ${blurPrice(b.price_sold)}</span>`
                     : `<button onclick="event.stopPropagation();openSellModal(${b.id},'${barrelLabel.replace(/'/g,"\\'")}','tc-barrel')" class="px-2 py-1 bg-gray-700 hover:bg-emerald-800 text-gray-300 hover:text-white text-xs font-bold rounded transition cursor-pointer">$ Sell</button>`;
                 return `
                 <div class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden shadow-xl flex flex-col hover:border-blue-400/60 transition cursor-pointer" onclick="window.location.href='tc-barrel-detail.html?id=${b.id}'">
@@ -880,7 +877,6 @@ async function loadTCInventory() {
                         <div class="flex items-center gap-2 mt-auto pt-1 border-t border-gray-700">
                             ${barrelSoldBtn}
                             <div class="flex-1"></div>
-                            <span class="text-xs text-gray-500 font-mono">$${parseFloat(b.price_paid || 0).toFixed(2)}</span>
                             <button onclick="event.stopPropagation();trashItem('tc-barrel',${b.id},'${barrelLabel.replace(/'/g,"\\'")}');" class="px-2 py-1 bg-gray-700 hover:bg-red-900 text-gray-400 hover:text-red-300 text-xs font-bold rounded transition cursor-pointer" title="Move to trash">🗑️</button>
                         </div>
                     </div>
@@ -1127,7 +1123,7 @@ function renderPowderCard(p) {
             </div>
             <div class="flex justify-between items-center gap-2">
                 <p class="text-base font-bold text-white">${p.brand} ${p.name}</p>
-                <span class="text-xs text-gray-400 font-mono whitespace-nowrap">$${parseFloat(p.price_paid||0).toFixed(2)}</span>
+                ${blurPrice(p.price_paid)}
             </div>
             <div class="bg-gray-900/60 rounded-lg p-3 text-center">
                 <p class="text-2xl font-bold font-mono text-emerald-400">${p.weight_lbs ?? 0} <span class="text-sm text-gray-400">${p.pellet_mode ? 'qty' : 'lbs'}</span></p>
@@ -1236,7 +1232,7 @@ function renderPrimerCard(p, lowThreshold = 200) {
                     <p class="text-base font-bold text-white">${p.brand}</p>
                     <p class="text-sm text-orange-400">${p.primer_type}</p>
                 </div>
-                <span class="text-xs text-gray-400 font-mono whitespace-nowrap">$${parseFloat(p.price_paid||0).toFixed(2)}</span>
+                ${blurPrice(p.price_paid)}
             </div>
             <div class="bg-gray-900/60 rounded-lg p-3 text-center">
                 <p class="text-2xl font-bold font-mono ${qtyColor}">${(p.quantity??0).toLocaleString()} <span class="text-sm text-gray-400">count</span></p>
@@ -1308,7 +1304,7 @@ function renderBulletCard(b, lowThreshold = 100) {
                     <p class="text-sm font-bold text-white">${b.brand}${b.product_line ? ' · '+b.product_line : ''}</p>
                     ${b.bullet_type ? `<p class="text-[11px] text-gray-400">${b.bullet_type}</p>` : ''}
                 </div>
-                <span class="text-xs text-gray-400 font-mono whitespace-nowrap">$${parseFloat(b.price_paid||0).toFixed(2)}</span>
+                ${blurPrice(b.price_paid)}
             </div>
             <div class="flex justify-between items-center">
                 <span class="text-sm font-bold font-mono ${qtyColor}">${(b.quantity??0).toLocaleString()} <span class="text-[10px] text-gray-500">ct</span></span>
@@ -1374,7 +1370,7 @@ function renderCasingCard(c, lowThreshold = 50) {
                         ${conditionBadge}
                     </div>
                 </div>
-                <span class="text-xs text-gray-400 font-mono whitespace-nowrap">$${parseFloat(c.price_paid||0).toFixed(2)}</span>
+                ${blurPrice(c.price_paid)}
             </div>
             <div class="bg-gray-900/60 rounded-lg p-3 text-center">
                 <p class="text-2xl font-bold font-mono ${qtyColor}">${(c.quantity??0).toLocaleString()} <span class="text-sm text-gray-400">count</span></p>
@@ -1719,7 +1715,6 @@ function renderScopeCard(s) {
                     ${s.magnification ? `<p class="text-xs text-blue-300 font-mono">${s.magnification}</p>` : ''}
                 </div>
                 <div class="text-right shrink-0">
-                    <span class="text-xs text-gray-400 font-mono">$${parseFloat(s.price_paid || 0).toFixed(2)}</span>
                     <p class="text-[10px] mt-0.5">${firstMount ? `📍 <a href="${firstMount.type === 'firearm' ? 'firearm-detail.html' : 'tc-barrel-detail.html'}?id=${firstMount.id}" onclick="event.stopPropagation()" class="text-emerald-400 hover:text-emerald-300 font-medium hover:underline">${firstMount.label}</a>` : `📍 <span class="text-gray-500 italic">Unmounted</span>`}</p>
                 </div>
             </div>
@@ -2255,7 +2250,7 @@ function renderAmmoCard(ammo) {
         const boxLabel = sealed ? `${sealed} box${sealed !== 1 ? 'es' : ''}` : '';
         stockLine = `<div class="bg-gray-900/60 rounded p-2 text-center mt-1">
             <p class="text-sm font-bold font-mono text-blue-400">${total} <span class="text-xs text-gray-400">rds</span></p>
-            <p class="text-xs text-gray-200 font-semibold">${boxLabel}${price ? ` · $${price.toFixed(2)}/box` : ''}</p>
+            <p class="text-xs text-gray-200 font-semibold">${boxLabel}${price ? ` · ${blurPrice(price)}/box` : ''}</p>
         </div>`;
     }
 
@@ -4093,7 +4088,7 @@ async function loadCatalog(frameType = currentFrameType()) {
         const detailPage = gun.frame_type === 'Shotgun' ? 'shotgun-detail.html' : gun.frame_type === 'Pistol' ? 'handgun-detail.html' : 'firearm-detail.html';
         const gunLabel = `${gun.brand} ${gun.model}`;
         const soldBtnMarkup = gun.is_sold
-            ? `<span class="text-xs text-red-400 font-mono">Sold $${parseFloat(gun.price_sold || 0).toFixed(2)}</span>`
+            ? `<span class="text-xs text-red-400 font-mono">Sold ${blurPrice(gun.price_sold)}</span>`
             : `<button onclick="openSellModal(${gun.id},'${gunLabel.replace(/'/g,"\\'")}','firearm')" class="px-2 py-1 bg-gray-700 hover:bg-emerald-800 text-gray-300 hover:text-white text-xs font-bold rounded transition cursor-pointer">$ Sell</button>`;
         const gunFit = gun.frame_type === 'Pistol' ? 'contain' : 'cover';
         const gunGallery = makePhotoGallery(`gun-${gun.id}`, '🔫', gun.image_path_1, gun.image_path_2, gunFit);
@@ -4108,7 +4103,6 @@ async function loadCatalog(frameType = currentFrameType()) {
                 </div>
                 <div class="flex justify-between items-center gap-2 cursor-pointer hover:text-amber-400 transition" onclick="window.location.href='${detailPage}?id=${gun.id}'">
                     <h3 class="text-base font-bold text-white tracking-tight">${gunLabel}</h3>
-                    <span class="text-xs text-gray-400 font-mono whitespace-nowrap">$${parseFloat(gun.price_paid || 0).toFixed(2)}</span>
                 </div>
                 ${gun.serial_number ? `<p class="text-xs text-gray-200 font-semibold font-mono">S/N: ${gun.serial_number}</p>` : ''}
                 <div class="flex gap-2 pt-1 border-t border-gray-700">
@@ -4594,35 +4588,8 @@ async function applyPreferences() {
     } catch (_) {}
 }
 
-async function loadLandingStats() {
-    const el = document.getElementById('landing-stats');
-    if (!el) return;
-    try {
-        const [firearms, scopes, ammo, powders, primers, bullets, casings] = await Promise.all([
-            fetch('/catalog/').then(r => r.json()),
-            fetch('/scopes/').then(r => r.json()),
-            fetch('/ammo/').then(r => r.json()),
-            fetch('/components/powders/').then(r => r.json()),
-            fetch('/components/primers/').then(r => r.json()),
-            fetch('/components/bullets/').then(r => r.json()),
-            fetch('/components/casings/').then(r => r.json()),
-        ]);
-        const sumPrice = arr => arr.reduce((t, x) => t + (parseFloat(x.price_paid) || 0), 0);
-        const stats = [
-            { icon: '🔫', value: firearms.length, spent: sumPrice(firearms), label: 'Firearms' },
-            { icon: '🔭', value: scopes.length,   spent: sumPrice(scopes),   label: 'Optics' },
-            { icon: '🧪', value: ammo.length,      spent: sumPrice(ammo),     label: 'Ammo' },
-            { icon: '🔩', value: powders.length + primers.length + bullets.length + casings.length, spent: sumPrice(powders) + sumPrice(primers) + sumPrice(bullets) + sumPrice(casings), label: 'Components' },
-        ];
-        el.innerHTML = stats.map(s => `
-            <div class="bg-gray-800/50 rounded-lg py-2.5 text-center">
-                <div class="text-base">${s.icon}</div>
-                <div class="text-sm font-black text-white">${s.value}</div>
-                <div class="text-[9px] text-gray-500 uppercase tracking-wide">${s.label}</div>
-                <div class="text-[10px] font-bold text-emerald-500 mt-0.5">$${s.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-            </div>`).join('');
-    } catch (_) {}
-}
+// Inventory value stats moved to /profile/ — private data, not shown on the
+// shared dashboard sidebar. See loadLandingStats() in templates/profile.html.
 
 // ── Barcode Scanner ────────────────────────────────────────────────────────────
 
@@ -7360,7 +7327,7 @@ function renderReloadDataResults(rows, resultsElId = 'reload-data-results') {
 // deleteReloadDataSource() there instead.
 
 window.onload = () => {
-    fetchInitialLookupData(); applyPreferences(); loadLandingStats(); initCustomAC();
+    fetchInitialLookupData(); applyPreferences(); initCustomAC();
     const p = new URLSearchParams(location.search);
     if (p.has('tab')) switchTab(p.get('tab'));
     if (p.has('cat')) {

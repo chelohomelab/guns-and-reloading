@@ -400,6 +400,7 @@
     </main>
 
     <script src="/static/offline-queue.js?v=1"></script>
+    <script src="/static/price-blur.js"></script>
     <script>
         function _camToInput(camId, targetId) {
             const cam = document.getElementById(camId);
@@ -738,7 +739,7 @@
                 if (a.lead_free != null) cells += cell('Lead Free', a.lead_free ? 'Yes' : 'No', a.lead_free ? 'text-emerald-400' : 'text-gray-400');
             }
             cells += cell('Range Sessions', a.usage_count !== undefined ? a.usage_count : '—', 'text-blue-400');
-            if (a.price_paid) cells += cell('Price / Box', `$${parseFloat(a.price_paid).toFixed(2)}`, 'text-green-400 font-mono');
+            if (a.price_paid) cells += cell('Price / Box', blurPrice(a.price_paid), 'text-green-400 font-mono');
             if (a.upc) cells += cell('UPC', a.upc, 'text-gray-400 font-mono text-[11px]');
             cells += `<div class="bg-gray-900/60 p-3 rounded-lg border border-gray-700">
                 <span class="text-xs text-gray-200 font-semibold block mb-1">Total Spent</span>

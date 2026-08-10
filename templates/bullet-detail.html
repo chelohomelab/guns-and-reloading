@@ -56,6 +56,7 @@
       @media (min-width: 1024px) { body { background-image: url('/static/images/background.png'); } }
     </style>
 </head>
+    <script src="/static/price-blur.js"></script>
 <body class="text-gray-100 font-sans antialiased">
     <div id="offline-banner" class="hidden fixed top-0 inset-x-0 z-[200] bg-amber-900/95 text-amber-200 text-xs font-bold text-center py-1">📴 Offline — showing cached data</div>
     <div id="install-banner" class="hidden fixed bottom-4 right-4 z-[190] bg-blue-900/95 text-blue-100 text-xs font-bold rounded-lg shadow-lg px-3 py-2 flex items-center gap-2">
@@ -494,7 +495,7 @@
             cells += cell('Bullet Type', b.bullet_type || null, 'text-gray-300 font-mono');
             cells += cell('SKU / Item No.', b.sku || null, 'text-gray-300 font-mono');
             cells += cell('BC G1', b.bc_g1 != null ? b.bc_g1 : null, 'text-blue-300 font-mono');
-            cells += cell('Price Paid', b.price_paid ? `$${parseFloat(b.price_paid).toFixed(2)}` : null, 'text-green-400 font-mono');
+            cells += cell('Price Paid', b.price_paid ? blurPrice(b.price_paid) : null, 'text-green-400 font-mono');
             cells += cell('Quantity', b.quantity || 0, 'text-white font-mono');
 
             grid.innerHTML = cells;

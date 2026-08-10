@@ -1,0 +1,64 @@
+name: Build Desktop Installers
+
+# Manual trigger only for now — wire to `push: tags: ['v*']` once this is proven out on all
+# three platforms. Windows .exe / macOS .app+.dmg / Linux AppImage artifacts can't be produced
+# or tested outside real per-OS runners, which is exactly what this workflow exists to provide.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Linux GTK/WebKit2 runtime deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y python3-gi gir1.2-webkit2-4.1 libgtk-3-dev
+
+      - name: Install desktop requirements
+        run: pip install -r requirements-desktop.txt
+
+      - name: Build with PyInstaller
+        run: pyinstaller desktop/inventory.spec
+
+      # --- Per-OS packaging ---------------------------------------------------------------
+      # Windows: Inno Setup script wraps the PyInstaller onedir build into a real installer
+      # with a Start Menu shortcut and a WebView2 runtime bootstrapper check.
+      - name: Package Windows installer (Inno Setup)
+        if: matrix.os == 'windows-latest'
+        run: |
+          echo "TODO: iscc desktop/windows/installer.iss"
+          echo "Requires desktop/windows/installer.iss to exist first — not yet written."
+
+      # macOS: .app bundle -> .dmg. Unsigned/unnotarized for now (Apple Developer account is a
+      # deliberate later step, not a v1 blocker) — expect a Gatekeeper warning on first launch.
+      - name: Package macOS .dmg
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "TODO: create-dmg or hdiutil against dist/InventoryAndReloading.app"
+          echo "Requires the PyInstaller build to produce a .app bundle first."
+
+      # Linux: AppImage — most portable, no package-manager dependency, but still needs the
+      # GTK/WebKit2 runtime libs present on the host system (installed above for this build,
+      # NOT bundled into the AppImage itself — document this in release notes).
+      - name: Package Linux AppImage
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo "TODO: appimagetool against dist/InventoryAndReloading"
+          echo "Requires appimagetool to be downloaded/installed in this job first."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.os }}
+          path: dist/**

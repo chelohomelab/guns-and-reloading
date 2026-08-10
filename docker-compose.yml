@@ -5,8 +5,35 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Both persistent: survive container rebuilds and updates
-      - ./data:/app/data               # SQLite database
-      - ./uploads:/app/static/uploads  # Photo uploads
+      # Single persistent volume — db, uploads, and backups all live under here, matching
+      # INVENTORY_DATA_DIR below. Survives container rebuilds and updates.
+      - ./appdata:/data
     environment:
       - PYTHONUNBUFFERED=1
+      - INVENTORY_DATA_DIR=/data
+
+  # Optional but recommended: LAN-only HTTPS via a locally-generated certificate authority (no
+  # public domain, no internet exposure). Required for the offline PWA features (service workers
+  # refuse to register on plain http:// origins other than localhost) to work on a phone browsing
+  # this server. See Caddyfile and docs/installation.md for the one-time per-device setup this
+  # still needs, and /admin/https-setup in the app itself once it's running.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - INVENTORY_HOSTNAME=${INVENTORY_HOSTNAME:-inventory.local}
+
+volumes:
+  # Must be a named (persistent) volume, not ephemeral — losing it means Caddy generates a brand
+  # new CA on next start, silently invalidating every device that already trusted the old one.
+  caddy_data:
+  caddy_config:

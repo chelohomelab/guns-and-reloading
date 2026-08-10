@@ -11,18 +11,34 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from config import templates
+from paths import DATA_DIR
 from routers.backup import _load_config, restore_zip_bytes, save_backup_zip
 
 router = APIRouter()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-UPGRADE_STATE_PATH = Path("data/upgrade_state.json")
+# Docker images exclude .git (see .dockerignore) and a PyInstaller desktop bundle never has one
+# at all — this self-upgrade mechanism (git fetch/merge + systemd restart) only makes sense for
+# a real git checkout. Computed once at import time; drives graceful degradation below rather
+# than letting git commands error against a missing .git.
+GIT_AVAILABLE = (REPO_ROOT / ".git").is_dir()
+UPGRADE_STATE_PATH = Path(DATA_DIR) / "data" / "upgrade_state.json"
 BRANCH = "main"
 
 
 def _require_admin(request: Request):
     if not getattr(request.state, "user", None) or not request.state.user.is_admin:
         raise HTTPException(status_code=403, detail="Admin required")
+
+
+def _require_git():
+    if not GIT_AVAILABLE:
+        raise HTTPException(
+            status_code=400,
+            detail="Self-upgrade isn't available for this install type — no local git checkout "
+                   "found. Update via your platform's normal mechanism instead (a new Docker "
+                   "image tag, or a new desktop installer release).",
+        )
 
 
 def _run(cmd: list, timeout: int = 60) -> dict:
@@ -140,6 +156,7 @@ async def upgrade_page(request: Request):
     return templates.TemplateResponse("admin-upgrade.html", {
         "request": request,
         "user": request.state.user,
+        "git_available": GIT_AVAILABLE,
     })
 
 
@@ -148,6 +165,7 @@ async def upgrade_page(request: Request):
 @router.get("/admin/upgrade/check")
 def upgrade_check(request: Request):
     _require_admin(request)
+    _require_git()
 
     current = _commit_info("HEAD")
     fetch = _git("fetch", "origin", BRANCH, timeout=30)
@@ -194,6 +212,7 @@ def _rollback_summary() -> dict | None:
 @router.post("/admin/upgrade/run")
 def upgrade_run(request: Request):
     _require_admin(request)
+    _require_git()
     log = []
 
     if _is_dirty():
@@ -248,6 +267,7 @@ def upgrade_run(request: Request):
 @router.post("/admin/upgrade/rollback")
 def upgrade_rollback(request: Request):
     _require_admin(request)
+    _require_git()
     state = _load_upgrade_state()
     if not state:
         raise HTTPException(400, "No upgrade to roll back — nothing recorded.")

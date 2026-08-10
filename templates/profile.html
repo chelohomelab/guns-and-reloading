@@ -33,6 +33,17 @@
 
 <main class="container mx-auto p-4 max-w-2xl space-y-8">
 
+    <div id="value">
+        <h2 class="text-xl font-bold mb-1">Inventory Value</h2>
+        <p class="text-sm text-gray-400 mb-6">Private to your account — not shown anywhere else in the app.</p>
+        <div id="landing-stats" class="grid grid-cols-2 gap-2">
+            <div class="bg-gray-800 border border-gray-700 rounded-xl py-3 text-center"><div class="text-lg">🔫</div><div class="text-lg font-black text-gray-600">—</div><div class="text-[10px] text-gray-600 uppercase tracking-wide">Firearms</div><div class="text-xs font-bold text-gray-700 mt-0.5">$—</div></div>
+            <div class="bg-gray-800 border border-gray-700 rounded-xl py-3 text-center"><div class="text-lg">🔭</div><div class="text-lg font-black text-gray-600">—</div><div class="text-[10px] text-gray-600 uppercase tracking-wide">Optics</div><div class="text-xs font-bold text-gray-700 mt-0.5">$—</div></div>
+            <div class="bg-gray-800 border border-gray-700 rounded-xl py-3 text-center"><div class="text-lg">🧪</div><div class="text-lg font-black text-gray-600">—</div><div class="text-[10px] text-gray-600 uppercase tracking-wide">Ammo</div><div class="text-xs font-bold text-gray-700 mt-0.5">$—</div></div>
+            <div class="bg-gray-800 border border-gray-700 rounded-xl py-3 text-center"><div class="text-lg">🔩</div><div class="text-lg font-black text-gray-600">—</div><div class="text-[10px] text-gray-600 uppercase tracking-wide">Components</div><div class="text-xs font-bold text-gray-700 mt-0.5">$—</div></div>
+        </div>
+    </div>
+
     <div>
         <h2 class="text-xl font-bold mb-1">Feature Preferences</h2>
         <p class="text-sm text-gray-400 mb-6">Turn off sections you don't use — they'll be hidden from the main app. Your data is always kept safe.</p>
@@ -130,7 +141,38 @@ async function loadPrefs() {
     }
 }
 
+async function loadLandingStats() {
+    const el = document.getElementById('landing-stats');
+    if (!el) return;
+    try {
+        const [firearms, scopes, ammo, powders, primers, bullets, casings] = await Promise.all([
+            fetch('/catalog/').then(r => r.json()),
+            fetch('/scopes/').then(r => r.json()),
+            fetch('/ammo/').then(r => r.json()),
+            fetch('/components/powders/').then(r => r.json()),
+            fetch('/components/primers/').then(r => r.json()),
+            fetch('/components/bullets/').then(r => r.json()),
+            fetch('/components/casings/').then(r => r.json()),
+        ]);
+        const sumPrice = arr => arr.reduce((t, x) => t + (parseFloat(x.price_paid) || 0), 0);
+        const stats = [
+            { icon: '🔫', value: firearms.length, spent: sumPrice(firearms), label: 'Firearms' },
+            { icon: '🔭', value: scopes.length,   spent: sumPrice(scopes),   label: 'Optics' },
+            { icon: '🧪', value: ammo.length,      spent: sumPrice(ammo),     label: 'Ammo' },
+            { icon: '🔩', value: powders.length + primers.length + bullets.length + casings.length, spent: sumPrice(powders) + sumPrice(primers) + sumPrice(bullets) + sumPrice(casings), label: 'Components' },
+        ];
+        el.innerHTML = stats.map(s => `
+            <div class="bg-gray-800 border border-gray-700 rounded-xl py-3 text-center">
+                <div class="text-lg">${s.icon}</div>
+                <div class="text-lg font-black text-white">${s.value}</div>
+                <div class="text-[10px] text-gray-500 uppercase tracking-wide">${s.label}</div>
+                <div class="text-xs font-bold text-emerald-500 mt-0.5">$${s.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            </div>`).join('');
+    } catch (_) {}
+}
+
 loadPrefs();
+loadLandingStats();
 </script>
 </body>
 </html>

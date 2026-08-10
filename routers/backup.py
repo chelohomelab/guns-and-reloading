@@ -16,13 +16,18 @@ from sqlalchemy.orm import Session
 import database as models
 from config import UPLOAD_DIR, templates
 from dependencies import get_db
+from paths import DATA_DIR
+from version import __version__
 
 router = APIRouter()
 
-DB_PATH = Path("data/reloading.db")
-BACKUP_CONFIG_PATH = Path("data/backup_config.json")
+DB_PATH = Path(DATA_DIR) / "data" / "reloading.db"
+BACKUP_CONFIG_PATH = Path(DATA_DIR) / "data" / "backup_config.json"
 DEFAULT_CONFIG = {
-    "local_path": "/opt/inventory-and-reloading/backups",
+    # Default only — a saved data/backup_config.json always wins over this. With DATA_DIR unset
+    # and systemd's WorkingDirectory=/opt/inventory-and-reloading, this resolves to the exact
+    # same physical directory the old hardcoded absolute string did.
+    "local_path": str(Path(DATA_DIR) / "backups"),
     "keep_count": 7,
     "rclone_remote": "",
     "rclone_path": "inventory-backup",
@@ -75,7 +80,7 @@ def _build_zip(buf: io.BytesIO):
             "created_at": datetime.utcnow().isoformat() + "Z",
             "db_size_bytes": DB_PATH.stat().st_size if DB_PATH.exists() else 0,
             "photo_count": sum(1 for _ in uploads.rglob("*") if _.is_file()) if uploads.exists() else 0,
-            "app_version": "1.9",
+            "app_version": __version__,
         }
         zf.writestr("backup_meta.json", json.dumps(meta, indent=2))
 

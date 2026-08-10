@@ -1,6 +1,14 @@
 # Installation Guide
 
-Prerequisites: a running Debian 12 LXC with Python 3 and Git installed. See [LXC Setup](lxc-setup.md) if you haven't done that yet.
+Prerequisites: a running Debian 12 LXC (or any fresh Debian/Ubuntu machine) with root access.
+
+**Fast path**: run `scripts/install.sh` as root — it automates every step below (clone, venv,
+dependencies, systemd install/enable/start) in one shot. The rest of this guide is the manual
+step-by-step, useful if you want to understand or customize what it's doing.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/chelohomelab/inventory-and-reloading/main/scripts/install.sh | bash
+```
 
 ---
 
@@ -110,9 +118,31 @@ The database and uploads are untouched either way. The app is typically back onl
 
 ---
 
-## 7. (Optional) HTTPS with a Reverse Proxy
+## 7. HTTPS for Your Phone (Set Up Automatically)
 
-For HTTPS access from outside your LAN, put a reverse proxy in front of port 8000. Two common options on Proxmox:
+The offline features (browsing your inventory and logging range sessions with zero signal) need a
+secure connection to work at all — a modern browser silently refuses to enable them on a plain
+"not secure" `http://` address. `install.sh` already set this up for you: it installed
+[Caddy](https://caddyserver.com) as a reverse proxy in front of the app, generated a private
+certificate authority entirely on this machine (no public domain, no internet involved, no
+account), and set up `avahi-daemon` so this server is reachable at a stable `<hostname>.local`
+address instead of a raw IP that changes whenever your router reassigns it.
+
+The only remaining step is per-device, once: each phone/tablet needs to trust that certificate.
+Sign in as an admin and go to **⚙️ → 📱 Phone/Tablet Setup** — it shows a QR code and walks through the
+one-time install on Android and iOS. After that one-time step, `https://<hostname>.local` works
+exactly like any other trusted, secure website, and the offline features start working.
+
+Plain `http://<lxc-ip>:8000` keeps working too, unaffected — this is purely additive.
+
+---
+
+## 8. (Optional) HTTPS for Access From Outside Your LAN
+
+The section above is for browsing this server from *inside* your own home network — no public
+domain or internet exposure needed. If you specifically want to reach it from *outside* your LAN,
+that's a different, opt-in setup: put a reverse proxy in front of port 8000 with a real public
+domain name and a Let's Encrypt certificate. Two common options on Proxmox:
 
 ### Option A — Nginx Proxy Manager (recommended for beginners)
 - Deploy NPM as a separate LXC or Docker container
@@ -139,7 +169,7 @@ Caddy handles TLS automatically via Let's Encrypt.
 
 ---
 
-## 8. Stopping / Removing the App
+## 9. Stopping / Removing the App
 
 ```bash
 # Stop the service

@@ -9,12 +9,64 @@
     <meta name="theme-color" content="#0f0f0f">
     <meta name="mobile-web-app-capable" content="yes">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+      }
+      window.addEventListener('online',  () => document.getElementById('offline-banner')?.classList.add('hidden'));
+      window.addEventListener('offline', () => document.getElementById('offline-banner')?.classList.remove('hidden'));
+      if (!navigator.onLine) document.addEventListener('DOMContentLoaded', () =>
+        document.getElementById('offline-banner')?.classList.remove('hidden'));
+
+      let deferredInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        if (localStorage.getItem('pwa-install-dismissed') !== '1') {
+          document.getElementById('install-banner')?.classList.remove('hidden');
+        }
+      });
+      window.addEventListener('appinstalled', () => {
+        document.getElementById('install-banner')?.classList.add('hidden');
+      });
+      function installApp() {
+        document.getElementById('install-banner')?.classList.add('hidden');
+        if (deferredInstallPrompt) {
+          deferredInstallPrompt.prompt();
+          deferredInstallPrompt.userChoice.finally(() => { deferredInstallPrompt = null; });
+        }
+      }
+      function dismissInstallBanner() {
+        localStorage.setItem('pwa-install-dismissed', '1');
+        document.getElementById('install-banner')?.classList.add('hidden');
+        document.getElementById('ios-install-banner')?.classList.add('hidden');
+      }
+      // iOS has no beforeinstallprompt API at all — detect manually and show instructions instead.
+      (function() {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isStandalone = navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+        if (isIOS && !isStandalone && localStorage.getItem('pwa-install-dismissed') !== '1') {
+          document.addEventListener('DOMContentLoaded', () =>
+            document.getElementById('ios-install-banner')?.classList.remove('hidden'));
+        }
+      })();
+    </script>
     <style>
       body { background-image: url('/static/images/phone-background.png'); background-size: cover; background-position: center; background-color: #0f0f0f; }
       @media (min-width: 1024px) { body { background-image: url('/static/images/background.png'); } }
     </style>
 </head>
 <body class="text-gray-100 font-sans antialiased">
+    <div id="offline-banner" class="hidden fixed top-0 inset-x-0 z-[200] bg-amber-900/95 text-amber-200 text-xs font-bold text-center py-1">📴 Offline — showing cached data</div>
+    <div id="install-banner" class="hidden fixed bottom-4 right-4 z-[190] bg-blue-900/95 text-blue-100 text-xs font-bold rounded-lg shadow-lg px-3 py-2 flex items-center gap-2">
+        <span>📲 Install this app</span>
+        <button onclick="installApp()" class="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-white cursor-pointer">Install</button>
+        <button onclick="dismissInstallBanner()" class="text-blue-300 hover:text-white cursor-pointer">✕</button>
+    </div>
+    <div id="ios-install-banner" class="hidden fixed bottom-4 right-4 z-[190] bg-blue-900/95 text-blue-100 text-xs font-bold rounded-lg shadow-lg px-3 py-2 flex items-center gap-2 max-w-[280px]">
+        <span>📲 Tap Share, then "Add to Home Screen"</span>
+        <button onclick="dismissInstallBanner()" class="text-blue-300 hover:text-white cursor-pointer shrink-0">✕</button>
+    </div>
 
     <nav class="bg-gray-800 border-b border-gray-700 p-4 sticky top-0 z-50 shadow-md">
         <div class="container mx-auto flex justify-between items-center max-w-5xl">
@@ -347,6 +399,8 @@
 
     </main>
 
+    <script src="/static/offline-queue.js?v=1"></script>
+    <script src="/static/price-blur.js"></script>
     <script>
         function _camToInput(camId, targetId) {
             const cam = document.getElementById(camId);
@@ -594,6 +648,7 @@
         }
 
         window.onload = function() {
+            OfflineQueue.init();
             const params = new URLSearchParams(window.location.search);
             currentAmmoId = params.get('id');
             if (!currentAmmoId) { window.location.href = 'index.html'; return; }
@@ -684,7 +739,7 @@
                 if (a.lead_free != null) cells += cell('Lead Free', a.lead_free ? 'Yes' : 'No', a.lead_free ? 'text-emerald-400' : 'text-gray-400');
             }
             cells += cell('Range Sessions', a.usage_count !== undefined ? a.usage_count : '—', 'text-blue-400');
-            if (a.price_paid) cells += cell('Price / Box', `$${parseFloat(a.price_paid).toFixed(2)}`, 'text-green-400 font-mono');
+            if (a.price_paid) cells += cell('Price / Box', blurPrice(a.price_paid), 'text-green-400 font-mono');
             if (a.upc) cells += cell('UPC', a.upc, 'text-gray-400 font-mono text-[11px]');
             cells += `<div class="bg-gray-900/60 p-3 rounded-lg border border-gray-700">
                 <span class="text-xs text-gray-200 font-semibold block mb-1">Total Spent</span>
@@ -974,13 +1029,14 @@
             const rounds = parseInt(input?.value);
             if (!rounds || rounds <= 0) { showToast('Enter a valid round count.', 'error'); return; }
             try {
-                const res = await fetch(`/ammo/${currentAmmoId}/use-rounds/`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ rounds })
+                const { queued, response } = await OfflineQueue.queueOrSend(`/ammo/${currentAmmoId}/use-rounds/`, {
+                    body: { rounds }
                 });
-                if (res.ok) {
-                    const updated = await res.json();
+                if (queued) {
+                    input.value = '';
+                    showToast(`${rounds} rounds queued — will sync when back online.`);
+                } else if (response && response.ok) {
+                    const updated = await response.json();
                     ammoData = { ...ammoData, ...updated };
                     renderAmmoProfile(ammoData);
                     input.value = '';

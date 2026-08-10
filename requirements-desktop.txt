@@ -1,0 +1,7 @@
+# Desktop packaging only — deliberately NOT merged into requirements.txt. pywebview pulls in
+# platform GUI toolkit bindings (GTK+WebKit2 on Linux) that server deployments (Docker/LXC/
+# systemd) have no use for and that could fail to install cleanly in a headless container.
+# Keeping this file separate guarantees desktop packaging work can never regress those installs.
+-r requirements.txt
+pywebview==5.3.2
+pyinstaller==6.11.0

@@ -11,13 +11,17 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-APP_DIR = Path(__file__).parent.parent
-DB_PATH = APP_DIR / "data" / "reloading.db"
-UPLOADS_DIR = APP_DIR / "static" / "uploads"
-CONFIG_PATH = APP_DIR / "data" / "backup_config.json"
+APP_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(APP_DIR))
+from paths import DATA_DIR  # noqa: E402
+from version import __version__  # noqa: E402
+
+DB_PATH = Path(DATA_DIR) / "data" / "reloading.db"
+UPLOADS_DIR = Path(DATA_DIR) / "static" / "uploads"
+CONFIG_PATH = Path(DATA_DIR) / "data" / "backup_config.json"
 
 DEFAULT_CONFIG = {
-    "local_path": str(APP_DIR / "backups"),
+    "local_path": str(Path(DATA_DIR) / "backups"),
     "keep_count": 7,
     "rclone_remote": "",
     "rclone_path": "inventory-backup",
@@ -61,7 +65,7 @@ def build_zip(out_path: Path):
             "created_at": datetime.utcnow().isoformat() + "Z",
             "db_size_bytes": DB_PATH.stat().st_size if DB_PATH.exists() else 0,
             "photo_count": photo_count,
-            "app_version": "1.9",
+            "app_version": __version__,
         }
         zf.writestr("backup_meta.json", json.dumps(meta, indent=2))
 

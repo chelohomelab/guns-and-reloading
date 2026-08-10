@@ -1,0 +1,23 @@
+# Used by the `caddy` service in docker-compose.yml — LAN-only HTTPS via a locally-generated
+# certificate authority (no public domain, no internet exposure, no accounts).
+#
+# {$INVENTORY_HOSTNAME} must resolve to this Docker host on your LAN — either via mDNS (install
+# avahi-daemon on the Docker HOST machine, not in a container; it then announces <hostname>.local
+# automatically) or a manual /etc/hosts entry on each device. Set it in a .env file next to
+# docker-compose.yml, e.g.: INVENTORY_HOSTNAME=myserver.local
+# Defaults to "inventory.local" if unset — you'll likely need to override this to your actual
+# Docker host's real hostname for it to resolve on your network at all.
+{$INVENTORY_HOSTNAME:inventory.local} {
+    # Served directly by Caddy from its own generated CA — never proxied to the app — so the
+    # cert stays in sync automatically with no cross-container file copying needed. Matches the
+    # exact URL the app itself would serve on the LXC/systemd deployment target (which copies
+    # this file into its own static/uploads/ instead), so /admin/https-setup's QR code/link
+    # works identically regardless of which deployment produced it.
+    handle /static/uploads/ca.crt {
+        root * /data/caddy/pki/authorities/local
+        rewrite * /root.crt
+        file_server
+    }
+    reverse_proxy app:8000
+    tls internal
+}

@@ -112,32 +112,12 @@
             <a id="nav-btn-measure" href="/?tab=measure-tab" onclick="navClick(event, () => switchTab('measure-tab'))"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">🎯</span>
-                <div><div class="text-sm font-bold text-white">Range Session</div><div class="text-[10px] text-blue-400/70">Log a shot string</div></div>
-            </a>
-            <a id="nav-btn-ladder" href="/?tab=ladder-tab" onclick="navClick(event, () => switchTab('ladder-tab'))"
-                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 hover:border-purple-500/40 transition cursor-pointer text-left">
-                <span class="text-lg">🪜</span>
-                <div><div class="text-sm font-bold text-white">Ladder Test</div><div class="text-[10px] text-purple-400/70">Find the node</div></div>
+                <div><div class="text-sm font-bold text-white">Range Session</div><div class="text-[10px] text-blue-400/70">Sessions &amp; ladder tests</div></div>
             </a>
             <a id="nav-btn-reload-data" href="/?tab=reload-data-tab" onclick="navClick(event, () => switchTab('reload-data-tab'))"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">📖</span>
                 <div><div class="text-sm font-bold text-white">Reloading Data Center</div><div class="text-[10px] text-rose-400/70">6 manufacturers</div></div>
-            </a>
-            <a href="/?tab=add-tab&cat=platforms" onclick="navClick(event, () => { switchTab('add-tab'); switchFormCategory('cat-platforms'); })"
-                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 border border-amber-800/40 hover:border-amber-500/40 transition cursor-pointer text-left">
-                <span class="text-lg">⚙️</span>
-                <div><div class="text-sm font-bold text-white">Add Inventory</div><div class="text-[10px] text-amber-500/70">Firearms &amp; gear</div></div>
-            </a>
-            <a href="/?tab=add-tab&cat=ammunition" onclick="navClick(event, () => { switchTab('add-tab'); switchFormCategory('cat-ammunition'); })"
-                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-sky-950/60 hover:bg-sky-900/60 border border-sky-800/40 hover:border-sky-500/40 transition cursor-pointer text-left">
-                <span class="text-lg">🧪</span>
-                <div><div class="text-sm font-bold text-white">Add Ammunition</div><div class="text-[10px] text-sky-400/70">Factory &amp; handloads</div></div>
-            </a>
-            <a href="/?tab=add-tab&cat=components" onclick="navClick(event, () => { switchTab('add-tab'); switchFormCategory('cat-components'); })"
-                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/40 hover:border-emerald-500/40 transition cursor-pointer text-left">
-                <span class="text-lg">🔩</span>
-                <div><div class="text-sm font-bold text-white">Add Components</div><div class="text-[10px] text-emerald-500/70">Powder, primers, bullets</div></div>
             </a>
         </nav>
 
@@ -190,8 +170,11 @@
         <section id="landing-tab" class="min-h-[88vh]"></section>
 
         <section id="measure-tab" class="hidden space-y-4">
-            <div class="flex justify-between items-center border-b border-gray-700 pb-2">
-                <h2 class="text-2xl font-bold">Range Session</h2>
+            <div class="flex justify-between items-center border-b border-gray-700 pb-2 flex-wrap gap-2">
+                <div class="flex gap-2">
+                    <button id="range-btn-session" onclick="switchRangeSubTab('session')" class="px-3 py-1.5 rounded bg-gray-800 text-blue-400 text-sm font-bold cursor-pointer">🎯 Range Session</button>
+                    <button id="range-btn-ladder" onclick="switchRangeSubTab('ladder')" class="px-3 py-1.5 rounded text-gray-400 hover:text-white text-sm font-bold cursor-pointer">🪜 Ladder Test</button>
+                </div>
                 <div class="flex gap-2">
                     <button onclick="downloadAnnotatedTarget()" id="download-btn" class="hidden px-4 py-2 bg-emerald-600 hover:bg-emerald-500 font-bold text-xs rounded text-white shadow-md transition cursor-pointer">
                         💾 Download Full Session
@@ -199,10 +182,11 @@
                     <button onclick="saveForShare()" id="share-btn" class="hidden px-4 py-2 bg-blue-600 hover:bg-blue-500 font-bold text-xs rounded text-white shadow-md transition cursor-pointer">
                         📲 Save for Social
                     </button>
+                    <button onclick="showLadderListView()" id="ladder-back-btn" class="hidden px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs font-bold rounded text-white transition cursor-pointer">← All Tests</button>
                 </div>
             </div>
-            
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+
+            <div id="range-pane-session" class="grid grid-cols-1 lg:grid-cols-4 gap-4">
                 <div class="lg:col-span-3 bg-gray-800 p-4 rounded-lg border border-gray-700 space-y-4 shadow-xl">
                     <div>
                         <label class="block text-sm text-gray-200 font-semibold mb-1">Upload Target Image to Begin</label>
@@ -300,15 +284,9 @@
                         🚀 Upload Data to Homelab DB
                     </button>
                 </div>
-            </div>
-        </section>
+            </div><!-- end range-pane-session -->
 
-        <section id="ladder-tab" class="hidden space-y-4">
-            <div class="flex justify-between items-center border-b border-gray-700 pb-2">
-                <h2 class="text-2xl font-bold">Ladder Test</h2>
-                <button onclick="showLadderListView()" id="ladder-back-btn" class="hidden px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs font-bold rounded text-white transition cursor-pointer">← All Tests</button>
-            </div>
-
+            <div id="range-pane-ladder" class="hidden space-y-4">
             <!-- List view -->
             <div id="ladder-list-view" class="space-y-4">
                 <button onclick="showLadderCreateForm()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm rounded shadow-md transition cursor-pointer">+ New Ladder Test</button>
@@ -467,6 +445,7 @@
                     </div>
                 </div>
             </div>
+            </div><!-- end range-pane-ladder -->
         </section>
 
         <section id="reload-data-tab" class="hidden space-y-4">
@@ -1773,7 +1752,7 @@
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <script src="/static/offline-queue.js?v=1"></script>
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=129"></script>
+    <script src="/static/app.js?v=130"></script>
     <script>
       OfflineQueue.init();
       document.querySelector('a[href="/logout"]')?.addEventListener('click', async (e) => {

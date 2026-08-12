@@ -734,24 +734,60 @@ function navClick(e, fn) {
 
 function switchTab(tabId) {
     if (tabId === 'catalog-tab') { window.location.href = '/inventory'; return; }
-    ['landing-tab', 'measure-tab', 'add-tab', 'ladder-tab', 'reload-data-tab'].forEach(id => {
+    // 'ladder-tab' is now a sub-view inside the Range Session page, not its own top-level
+    // tab — kept as an alias so existing '?tab=ladder-tab' deep links (scanner/wishlist
+    // sidebar nav) keep working.
+    const isLadderAlias = tabId === 'ladder-tab';
+    const realTabId = isLadderAlias ? 'measure-tab' : tabId;
+
+    ['landing-tab', 'measure-tab', 'add-tab', 'reload-data-tab'].forEach(id => {
         document.getElementById(id)?.classList.add('hidden');
     });
 
-    const target = document.getElementById(tabId);
+    const target = document.getElementById(realTabId);
     if (target) target.classList.remove('hidden');
 
     // Keep the URL in sync with whichever tab is actually showing — otherwise a stale
     // ?tab=... from an earlier navigation (e.g. arriving via another page's nav link)
     // sends a page refresh back to that old tab instead of the one currently visible.
-    const newUrl = tabId === 'landing-tab' ? '/' : `/?tab=${encodeURIComponent(tabId)}`;
+    const newUrl = realTabId === 'landing-tab' ? '/' : `/?tab=${encodeURIComponent(tabId)}`;
     if (location.pathname + location.search !== newUrl) {
         history.replaceState(null, '', newUrl);
     }
 
-    if (tabId === 'measure-tab') setupMeasureDropdowns();
-    if (tabId === 'ladder-tab') showLadderListView();
+    if (realTabId === 'measure-tab') {
+        setupMeasureDropdowns();
+        switchRangeSubTab(isLadderAlias ? 'ladder' : 'session');
+    }
     if (tabId === 'reload-data-tab') openReloadDataTab();
+}
+
+// Range Session and Ladder Test are sub-views of the same page — both get filled in
+// after a range trip, so switching between them shouldn't lose in-progress work on
+// either side (unlike switchTab, which fully tears down and rebuilds the target tab).
+function switchRangeSubTab(sub) {
+    const isSession = sub === 'session';
+    document.getElementById('range-pane-session')?.classList.toggle('hidden', !isSession);
+    document.getElementById('range-pane-ladder')?.classList.toggle('hidden', isSession);
+
+    const inactiveCls = 'px-3 py-1.5 rounded text-gray-400 hover:text-white text-sm font-bold cursor-pointer';
+    const sessionBtn = document.getElementById('range-btn-session');
+    const ladderBtn = document.getElementById('range-btn-ladder');
+    if (sessionBtn) sessionBtn.className = isSession
+        ? 'px-3 py-1.5 rounded bg-gray-800 text-blue-400 text-sm font-bold cursor-pointer'
+        : inactiveCls;
+    if (ladderBtn) ladderBtn.className = !isSession
+        ? 'px-3 py-1.5 rounded bg-gray-800 text-purple-400 text-sm font-bold cursor-pointer'
+        : inactiveCls;
+
+    if (isSession) {
+        document.getElementById('ladder-back-btn')?.classList.add('hidden');
+        updateSidebarList();
+    } else {
+        document.getElementById('download-btn')?.classList.add('hidden');
+        document.getElementById('share-btn')?.classList.add('hidden');
+        showLadderListView();
+    }
 }
 
 function switchInventoryTab(tab) {

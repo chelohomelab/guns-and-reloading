@@ -290,9 +290,15 @@ function closeSidebar() {
     document.getElementById('sidebar-overlay').classList.add('hidden');
 }
 
-function toggleUserMenu() {
-    const menu = document.getElementById('user-menu');
-    const arrow = document.getElementById('user-menu-arrow');
+// id lets the same dropdown-toggle logic serve both the mobile sidebar's user menu
+// ('user-menu', the default) and the desktop top bar's separate copy ('desktop-user-menu')
+// — they're two distinct elements, live in the DOM at the same time, shown/hidden purely by
+// breakpoint, so they can't share one id.
+function toggleUserMenu(id) {
+    id = id || 'user-menu';
+    const menu = document.getElementById(id);
+    const arrow = document.getElementById(id + '-arrow');
+    if (!menu) return;
     const isOpen = !menu.classList.contains('hidden');
     menu.classList.toggle('hidden');
     if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
@@ -4664,7 +4670,7 @@ async function applyPreferences() {
         if (off('feat_handguns'))  hide('plat-btn-handgun', 'btn-add-handgun');
         if (off('feat_tc'))        hide('plat-btn-tc', 'btn-add-tc-receiver', 'btn-add-tc-barrel');
         if (off('feat_reloading')) hide('inv-btn-components', 'btn-cat-components');
-        if (off('feat_ammo_log'))  hide('inv-btn-ammo', 'btn-cat-ammunition', 'nav-btn-measure', 'nav-btn-measure-mobile');
+        if (off('feat_ammo_log'))  hide('inv-btn-ammo', 'btn-cat-ammunition', 'nav-btn-measure', 'topnav-btn-measure', 'nav-btn-measure-mobile');
     } catch (_) {}
 }
 
@@ -7419,13 +7425,15 @@ window.onload = () => {
         else switchFormCategory('cat-' + cat);
     }
     if (p.get('handload') === '1') applyLadderHandoff();
-    // Close user-menu dropdown when clicking outside
-    const userMenu = document.getElementById('user-menu');
-    if (userMenu) {
+    // Close user-menu dropdown(s) when clicking outside — 'user-menu' is the mobile
+    // sidebar's copy, 'desktop-user-menu' is the desktop top bar's (see toggleUserMenu).
+    ['user-menu', 'desktop-user-menu'].forEach(id => {
+        const menu = document.getElementById(id);
+        if (!menu) return;
         document.addEventListener('click', e => {
-            if (!userMenu.classList.contains('hidden') && !userMenu.parentElement.contains(e.target)) {
-                userMenu.classList.add('hidden');
+            if (!menu.classList.contains('hidden') && !menu.parentElement.contains(e.target)) {
+                menu.classList.add('hidden');
             }
         });
-    }
+    });
 };

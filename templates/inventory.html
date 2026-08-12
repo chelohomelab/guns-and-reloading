@@ -52,11 +52,14 @@
       })();
     </script>
     <style>
-      #main-bg { background-image: url('/static/images/phone-background.png'); background-size: cover; background-position: center; background-color: #0f0f0f; }
-      @media (min-width: 1024px) { #main-bg { background-image: url('/static/images/background.png'); } }
+      body { background-color: transparent !important; }
+      #bg-layer { position: fixed; inset: 0; z-index: -1; background-image: url('/static/images/phone-background.png'); background-size: cover; background-position: center; background-color: #0f0f0f; }
+      @media (min-width: 1024px) { #bg-layer { background-image: url('/static/images/background-widescreen.png'); background-size: cover; background-repeat: no-repeat; background-position: center; } }
     </style>
 </head>
 <body class="bg-gray-950 text-gray-100 font-sans antialiased select-none flex min-h-dvh lg:h-dvh lg:overflow-hidden">
+
+<div id="bg-layer"></div>
 
     <div id="toast-container" class="fixed top-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
     <div id="offline-banner" class="hidden fixed top-0 inset-x-0 z-[200] bg-amber-900/95 text-amber-200 text-xs font-bold text-center py-1">📴 Offline — showing cached data</div>
@@ -89,8 +92,8 @@
         </div>
     </div>
 
-    <!-- Left Sidebar -->
-    <aside id="sidebar" class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 z-40 hidden lg:flex lg:relative">
+    <!-- Left Sidebar — mobile only now (lg+ uses the top bar inside #main-bg instead) -->
+    <aside id="sidebar" class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 z-40 hidden">
 
         <!-- Logo + title -->
         <a href="/" class="block p-4 border-b border-gray-800 text-center cursor-pointer hover:bg-gray-800/40 transition">
@@ -133,7 +136,8 @@
                 <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
                 <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
                 {% if upgrade_available %}<a href="/admin/upgrade" class="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-900/30 transition">🚀 Upgrade</a>{% endif %}
-                <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Reloading Data Center</a>
+                <a href="/admin/phone-setup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-300 hover:bg-purple-900/30 transition">📱 Phone/Tablet Setup</a>
+                <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Add Reload Data</a>
                 {% endif %}
                 <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
                 <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
@@ -161,6 +165,52 @@
             </button>
             <img src="/static/images/logo.png" alt="G&R" class="h-7 w-auto">
             <span class="text-amber-500 font-bold text-sm">Inventory Vault</span>
+        </header>
+
+        <!-- Desktop-only top bar (hidden below lg) — replaces the sidebar as primary nav -->
+        <header class="hidden lg:flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800 shrink-0 z-20">
+            <div class="flex items-center gap-1.5">
+                <a href="/" class="flex items-center gap-2 pr-4 mr-1.5 border-r border-gray-700 cursor-pointer">
+                    <img src="/static/images/logo.png" alt="G&R" class="h-8 w-auto drop-shadow-lg">
+                    <span class="text-amber-500 font-black text-lg tracking-wide">Guns &amp; Reloading</span>
+                </a>
+                <a href="/inventory"
+                    class="flex flex-col px-3 py-1.5 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 transition">
+                    <span class="text-sm font-bold text-amber-400">Inventory</span>
+                    <span class="text-[10px] text-amber-500/60">Browse your vault</span>
+                </a>
+                <a id="topnav-btn-measure" href="/?tab=measure-tab"
+                    class="flex flex-col px-3 py-1.5 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition cursor-pointer">
+                    <span class="text-sm font-bold text-white">Range Session</span>
+                    <span class="text-[10px] text-blue-400/70">Sessions &amp; ladder tests</span>
+                </a>
+                <a id="topnav-btn-reload-data" href="/?tab=reload-data-tab"
+                    class="flex flex-col px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer">
+                    <span class="text-sm font-bold text-white">Reloading Data Center</span>
+                    <span class="text-[10px] text-rose-400/70">6 manufacturers</span>
+                </a>
+            </div>
+            <div class="relative">
+                <button onclick="toggleUserMenu('desktop-user-menu')" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 transition cursor-pointer">
+                    <span class="text-sm">⚙️</span>
+                    <span class="text-sm font-medium text-gray-300">{{ user.username }}</span>
+                    <span id="desktop-user-menu-arrow" class="text-gray-500 text-xs transition-transform duration-200">▼</span>
+                </button>
+                <div id="desktop-user-menu" class="hidden absolute top-full right-0 mt-1 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
+                    {% if user.is_admin %}
+                    <a href="/admin/users" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">👤 Users</a>
+                    <a href="/wishlist" class="flex items-center gap-2 px-4 py-2.5 text-sm text-amber-300 hover:bg-amber-900/30 transition">⭐ Wishlist</a>
+                    <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
+                    <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
+                    <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
+                    {% if upgrade_available %}<a href="/admin/upgrade" class="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-900/30 transition">🚀 Upgrade</a>{% endif %}
+                    <a href="/admin/phone-setup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-300 hover:bg-purple-900/30 transition">📱 Phone/Tablet Setup</a>
+                    <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Add Reload Data</a>
+                    {% endif %}
+                    <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
+                    <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
+                </div>
+            </div>
         </header>
 
         <main class="flex-1 p-4 lg:overflow-y-scroll lg:min-h-0" style="-webkit-overflow-scrolling: touch;">
@@ -356,7 +406,7 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=130"></script>
+    <script src="/static/app.js?v=132"></script>
     <script>
     window.onload = () => {
         fetchInitialLookupData(); applyPreferences(); initCustomAC();

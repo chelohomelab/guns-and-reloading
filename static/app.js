@@ -7425,9 +7425,10 @@ window.onload = () => {
         else switchFormCategory('cat-' + cat);
     }
     if (p.get('handload') === '1') applyLadderHandoff();
-    // Close user-menu dropdown(s) when clicking outside — 'user-menu' is the mobile
-    // sidebar's copy, 'desktop-user-menu' is the desktop top bar's (see toggleUserMenu).
-    ['user-menu', 'desktop-user-menu'].forEach(id => {
+    // Close user-menu dropdown(s) when clicking outside — 'user-menu' is the legacy
+    // sidebar-bottom copy (older pages not yet migrated), 'mobile-user-menu' is the mobile
+    // top bar's copy, 'desktop-user-menu' is the desktop top bar's (see toggleUserMenu).
+    ['user-menu', 'mobile-user-menu', 'desktop-user-menu'].forEach(id => {
         const menu = document.getElementById(id);
         if (!menu) return;
         document.addEventListener('click', e => {

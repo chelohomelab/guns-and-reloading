@@ -126,28 +126,6 @@
 
         </div><!-- end scrollable middle -->
 
-        <!-- User menu -->
-        <div class="p-3 border-t border-gray-800 relative">
-            <div id="user-menu" class="hidden absolute bottom-full left-3 right-3 mb-1 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
-                {% if user.is_admin %}
-                <a href="/admin/users" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">👤 Users</a>
-                <a href="/wishlist" class="flex items-center gap-2 px-4 py-2.5 text-sm text-amber-300 hover:bg-amber-900/30 transition">⭐ Wishlist</a>
-                <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
-                <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
-                <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
-                {% if upgrade_available %}<a href="/admin/upgrade" class="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-900/30 transition">🚀 Upgrade</a>{% endif %}
-                <a href="/admin/phone-setup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-300 hover:bg-purple-900/30 transition">📱 Phone/Tablet Setup</a>
-                <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Add Reload Data</a>
-                {% endif %}
-                <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
-                <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
-            </div>
-            <button onclick="toggleUserMenu()" class="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-gray-800 transition cursor-pointer">
-                <span class="text-sm">⚙️</span>
-                <span class="text-sm font-medium text-gray-300 flex-1 text-left">{{ user.username }}</span>
-                <span id="user-menu-arrow" class="text-gray-500 text-xs transition-transform duration-200">▲</span>
-            </button>
-        </div>
     </aside>
 
     <!-- Sidebar overlay -->
@@ -157,7 +135,8 @@
     <div id="main-bg" class="flex-1 flex flex-col min-w-0 lg:min-h-0 lg:overflow-hidden">
 
         <!-- Mobile top bar -->
-        <header class="lg:hidden flex items-center gap-3 p-3 bg-gray-900/95 border-b border-gray-800 shrink-0 z-20">
+        <header class="lg:hidden flex items-center justify-between gap-3 p-3 bg-gray-900/95 border-b border-gray-800 shrink-0 z-20">
+            <div class="flex items-center gap-3">
             <button onclick="openSidebar()" class="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 cursor-pointer" aria-label="Open menu">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
@@ -165,6 +144,28 @@
             </button>
             <img src="/static/images/logo.png" alt="G&R" class="h-7 w-auto">
             <span class="text-amber-500 font-bold text-sm">Inventory Vault</span>
+            </div>
+            <div class="relative">
+                <button onclick="toggleUserMenu('mobile-user-menu')" class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg hover:bg-gray-800 transition cursor-pointer">
+                    <span class="text-sm">⚙️</span>
+                    <span class="text-sm font-medium text-gray-300">{{ user.username }}</span>
+                    <span id="mobile-user-menu-arrow" class="text-gray-500 text-xs transition-transform duration-200">▼</span>
+                </button>
+                <div id="mobile-user-menu" class="hidden absolute top-full right-0 mt-1 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
+                    {% if user.is_admin %}
+                    <a href="/admin/users" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">👤 Users</a>
+                    <a href="/wishlist" class="flex items-center gap-2 px-4 py-2.5 text-sm text-amber-300 hover:bg-amber-900/30 transition">⭐ Wishlist</a>
+                    <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
+                    <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
+                    <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
+                    {% if upgrade_available %}<a href="/admin/upgrade" class="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-900/30 transition">🚀 Upgrade</a>{% endif %}
+                    <a href="/admin/phone-setup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-300 hover:bg-purple-900/30 transition">📱 Phone/Tablet Setup</a>
+                    <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Add Reload Data</a>
+                    {% endif %}
+                    <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
+                    <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
+                </div>
+            </div>
         </header>
 
         <!-- Desktop-only top bar (hidden below lg) — replaces the sidebar as primary nav -->
@@ -406,7 +407,7 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=132"></script>
+    <script src="/static/app.js?v=133"></script>
     <script>
     window.onload = () => {
         fetchInitialLookupData(); applyPreferences(); initCustomAC();

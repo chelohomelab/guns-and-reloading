@@ -52,12 +52,14 @@
       })();
     </script>
     <style>
-      body { background-image: url('/static/images/phone-background.png'); background-size: cover; background-position: center; background-color: #0f0f0f; }
-      @media (min-width: 1024px) { body { background-image: url('/static/images/background.png'); } }
+      body { background-color: transparent !important; }
+      #bg-layer { position: fixed; inset: 0; z-index: -1; background-image: url('/static/images/phone-background.png'); background-size: cover; background-position: center; background-color: #0f0f0f; }
+      @media (min-width: 1024px) { #bg-layer { background-image: url('/static/images/background-widescreen.png'); background-size: cover; background-repeat: no-repeat; background-position: center; } }
     </style>
 </head>
     <script src="/static/price-blur.js"></script>
 <body class="text-gray-100 font-sans antialiased">
+<div id="bg-layer"></div>
     <div id="offline-banner" class="hidden fixed top-0 inset-x-0 z-[200] bg-amber-900/95 text-amber-200 text-xs font-bold text-center py-1">📴 Offline — showing cached data</div>
     <div id="install-banner" class="hidden fixed bottom-4 right-4 z-[190] bg-blue-900/95 text-blue-100 text-xs font-bold rounded-lg shadow-lg px-3 py-2 flex items-center gap-2">
         <span>📲 Install this app</span>
@@ -69,7 +71,53 @@
         <button onclick="dismissInstallBanner()" class="text-blue-300 hover:text-white cursor-pointer shrink-0">✕</button>
     </div>
 
-    <nav class="bg-gray-800 border-b border-gray-700 p-4 sticky top-0 z-50 shadow-md">
+    <!-- Desktop-only site nav bar (hidden below lg) -->
+<header class="hidden lg:flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800 sticky top-0 z-50">
+    <div class="flex items-center gap-1.5">
+        <a href="/" class="flex items-center gap-2 pr-4 mr-1.5 border-r border-gray-700 cursor-pointer">
+            <img src="/static/images/logo.png" alt="G&R" class="h-8 w-auto drop-shadow-lg">
+            <span class="text-amber-500 font-black text-lg tracking-wide">Guns &amp; Reloading</span>
+        </a>
+        <a href="/inventory"
+            class="flex flex-col px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700/50 hover:border-amber-500/40 transition">
+            <span class="text-sm font-bold text-white">Inventory</span>
+            <span class="text-[10px] text-gray-500">Browse your vault</span>
+        </a>
+        <a id="topnav-btn-measure" href="/?tab=measure-tab"
+            class="flex flex-col px-3 py-1.5 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition cursor-pointer">
+            <span class="text-sm font-bold text-white">Range Session</span>
+            <span class="text-[10px] text-blue-400/70">Sessions &amp; ladder tests</span>
+        </a>
+        <a id="topnav-btn-reload-data" href="/?tab=reload-data-tab"
+            class="flex flex-col px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer">
+            <span class="text-sm font-bold text-white">Reloading Data Center</span>
+            <span class="text-[10px] text-rose-400/70">6 manufacturers</span>
+        </a>
+    </div>
+    <div class="relative">
+        <button onclick="toggleUserMenu('desktop-user-menu')" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 transition cursor-pointer">
+            <span class="text-sm">⚙️</span>
+            <span class="text-sm font-medium text-gray-300">{{ user.username }}</span>
+            <span id="desktop-user-menu-arrow" class="text-gray-500 text-xs transition-transform duration-200">▼</span>
+        </button>
+        <div id="desktop-user-menu" class="hidden absolute top-full right-0 mt-1 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
+            {% if user.is_admin %}
+            <a href="/admin/users" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">👤 Users</a>
+            <a href="/wishlist" class="flex items-center gap-2 px-4 py-2.5 text-sm text-amber-300 hover:bg-amber-900/30 transition">⭐ Wishlist</a>
+            <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
+            <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
+            <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
+            {% if upgrade_available %}<a href="/admin/upgrade" class="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-900/30 transition">🚀 Upgrade</a>{% endif %}
+            <a href="/admin/phone-setup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-300 hover:bg-purple-900/30 transition">📱 Phone/Tablet Setup</a>
+            <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Add Reload Data</a>
+            {% endif %}
+            <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
+            <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
+        </div>
+    </div>
+</header>
+
+<nav class="px-4 pt-4 pb-3">
         <div class="container mx-auto flex justify-between items-center max-w-5xl">
             <div class="flex items-center space-x-2 text-sm">
                 <a href="/"><img src="/static/images/logo.png" alt="Inventory" class="h-6 w-auto hover:opacity-80 transition inline-block"></a>
@@ -709,5 +757,22 @@
             } catch { showToast('Error contacting server.', 'error'); }
         }
     </script>
+<script>
+// This page doesn't load the shared app.js — small inline copy of its dropdown toggle.
+function toggleUserMenu(id) {
+    const menu = document.getElementById(id);
+    const arrow = document.getElementById(id + '-arrow');
+    if (!menu) return;
+    const isOpen = !menu.classList.contains('hidden');
+    menu.classList.toggle('hidden');
+    if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+document.addEventListener('click', e => {
+    const menu = document.getElementById('desktop-user-menu');
+    if (menu && !menu.classList.contains('hidden') && !menu.parentElement.contains(e.target)) {
+        menu.classList.add('hidden');
+    }
+});
+</script>
 </body>
 </html>

@@ -21,6 +21,71 @@
 
 <div id="toast-container" class="fixed top-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
 
+<!-- Left Sidebar — mobile only (hamburger-triggered drawer) -->
+<aside id="sidebar" class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 z-40 hidden fixed inset-y-0 left-0">
+    <a href="/" class="block p-4 border-b border-gray-800 text-center cursor-pointer hover:bg-gray-800/40 transition">
+        <img src="/static/images/logo.png" alt="G&R" class="h-10 w-auto mx-auto mb-1.5 drop-shadow-lg">
+        <h1 class="text-lg font-black text-amber-500 tracking-wide leading-tight">Guns &amp; Reloading</h1>
+        <p class="text-[10px] text-gray-500 mt-0.5 tracking-widest uppercase">Vault</p>
+    </a>
+    <nav class="p-2.5 space-y-1">
+        <a href="/inventory"
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700/50 hover:border-amber-500/40 transition text-left">
+            <span class="text-lg">📦</span>
+            <div><div class="text-sm font-bold text-white">Inventory</div><div class="text-[10px] text-gray-500">Browse your vault</div></div>
+        </a>
+        <a href="/?tab=measure-tab"
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition cursor-pointer text-left">
+            <span class="text-lg">🎯</span>
+            <div><div class="text-sm font-bold text-white">Range Session</div><div class="text-[10px] text-blue-400/70">Sessions &amp; ladder tests</div></div>
+        </a>
+        <a href="/?tab=reload-data-tab"
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer text-left">
+            <span class="text-lg">📖</span>
+            <div><div class="text-sm font-bold text-white">Reloading Data Center</div><div class="text-[10px] text-rose-400/70">6 manufacturers</div></div>
+        </a>
+    </nav>
+</aside>
+
+<!-- Sidebar overlay — tap outside to close -->
+<div id="sidebar-overlay" onclick="closeSidebar()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 hidden"></div>
+
+<!-- Mobile-only top bar (hidden on lg+) -->
+<header class="lg:hidden flex items-center justify-between gap-3 p-3 bg-gray-900/95 border-b border-gray-800 shrink-0 z-20">
+    <div class="flex items-center gap-3">
+    <button onclick="openSidebar()" class="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 cursor-pointer" aria-label="Open menu">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+    </button>
+    <a href="/" class="flex items-center gap-2">
+        <img src="/static/images/logo.png" alt="G&R" class="h-7 w-auto">
+        <span class="text-amber-500 font-bold text-sm">Guns &amp; Reloading</span>
+    </a>
+    </div>
+    <div class="relative">
+        <button onclick="toggleUserMenu('mobile-user-menu')" class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg hover:bg-gray-800 transition cursor-pointer">
+            <span class="text-sm">⚙️</span>
+            <span class="text-sm font-medium text-gray-300">{{ user.username }}</span>
+            <span id="mobile-user-menu-arrow" class="text-gray-500 text-xs transition-transform duration-200">▼</span>
+        </button>
+        <div id="mobile-user-menu" class="hidden absolute top-full right-0 mt-1 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
+            {% if user.is_admin %}
+            <a href="/admin/users" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">👤 Users</a>
+            <a href="/wishlist" class="flex items-center gap-2 px-4 py-2.5 text-sm text-amber-300 hover:bg-amber-900/30 transition">⭐ Wishlist</a>
+            <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
+            <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
+            <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
+            {% if upgrade_available %}<a href="/admin/upgrade" class="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-900/30 transition">🚀 Upgrade</a>{% endif %}
+            <a href="/admin/phone-setup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-300 hover:bg-purple-900/30 transition">📱 Phone/Tablet Setup</a>
+            <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Add Reload Data</a>
+            {% endif %}
+            <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
+            <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
+        </div>
+    </div>
+</header>
+
 <!-- Desktop-only site nav bar (hidden below lg) -->
 <header class="hidden lg:flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800 sticky top-0 z-50">
     <div class="flex items-center gap-1.5">
@@ -327,6 +392,14 @@ systemctl list-timers inventory-backup.timer</pre>
 
 <script>
 // This page doesn't load the shared app.js — small inline copy of its dropdown toggle.
+function openSidebar() {
+    document.getElementById('sidebar').classList.remove('hidden');
+    document.getElementById('sidebar-overlay').classList.remove('hidden');
+}
+function closeSidebar() {
+    document.getElementById('sidebar').classList.add('hidden');
+    document.getElementById('sidebar-overlay').classList.add('hidden');
+}
 function toggleUserMenu(id) {
     const menu = document.getElementById(id);
     const arrow = document.getElementById(id + '-arrow');
@@ -335,11 +408,14 @@ function toggleUserMenu(id) {
     menu.classList.toggle('hidden');
     if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
 }
-document.addEventListener('click', e => {
-    const menu = document.getElementById('desktop-user-menu');
-    if (menu && !menu.classList.contains('hidden') && !menu.parentElement.contains(e.target)) {
-        menu.classList.add('hidden');
-    }
+['desktop-user-menu', 'mobile-user-menu'].forEach(id => {
+    const menu = document.getElementById(id);
+    if (!menu) return;
+    document.addEventListener('click', e => {
+        if (!menu.classList.contains('hidden') && !menu.parentElement.contains(e.target)) {
+            menu.classList.add('hidden');
+        }
+    });
 });
 </script>
 </body>

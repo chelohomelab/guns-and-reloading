@@ -12,7 +12,7 @@ A self-hosted homelab app for tracking your firearm collection and reloading dat
 server, your own data, nothing sent anywhere else.
 {: .fs-6 .fw-300 }
 
-[View on GitHub](https://github.com/chelohomelab/inventory-and-reloading){: .btn .btn-outline }
+[View on GitHub](https://github.com/chelohomelab/guns-and-reloading){: .btn .btn-outline }
 
 ---
 

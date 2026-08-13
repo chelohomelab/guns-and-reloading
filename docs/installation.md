@@ -12,7 +12,7 @@ dependencies, systemd install/enable/start) in one shot. The rest of this guide 
 step-by-step, useful if you want to understand or customize what it's doing.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/chelohomelab/inventory-and-reloading/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/chelohomelab/guns-and-reloading/main/scripts/install.sh | bash
 ```
 
 ---
@@ -21,8 +21,8 @@ curl -fsSL https://raw.githubusercontent.com/chelohomelab/inventory-and-reloadin
 
 ```bash
 cd /opt
-git clone https://github.com/chelohomelab/inventory-and-reloading.git
-cd inventory-and-reloading
+git clone https://github.com/chelohomelab/guns-and-reloading.git
+cd guns-and-reloading
 ```
 
 ---
@@ -73,7 +73,7 @@ These directories survive updates since they are on the host filesystem:
 ## 4. Install and Enable the systemd Service
 
 ```bash
-cp /opt/inventory-and-reloading/inventory.service /etc/systemd/system/
+cp /opt/guns-and-reloading/inventory.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable inventory
 systemctl start inventory
@@ -112,7 +112,7 @@ when the app is actually running under that systemd unit (not `--reload` dev mod
 **From the shell (manual/scripted):**
 
 ```bash
-cd /opt/inventory-and-reloading
+cd /opt/guns-and-reloading
 git pull
 git submodule update --init --recursive  # only does anything if you set up 1a
 venv/bin/pip install --no-cache-dir -r requirements.txt

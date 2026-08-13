@@ -8,7 +8,7 @@ heading_anchors: true
 
 aux_links:
   "View on GitHub":
-    - "https://github.com/chelohomelab/inventory-and-reloading"
+    - "https://github.com/chelohomelab/guns-and-reloading"
 aux_links_new_tab: true
 
 footer_content: "Guns & Reloading — a self-hosted homelab project."

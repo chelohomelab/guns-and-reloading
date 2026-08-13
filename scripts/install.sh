@@ -4,8 +4,8 @@
 # Run as root: bash install.sh   (or: curl -fsSL <raw-url>/scripts/install.sh | bash)
 
 set -euo pipefail
-APP_DIR="/opt/inventory-and-reloading"
-REPO_URL="https://github.com/chelohomelab/inventory-and-reloading.git"
+APP_DIR="/opt/guns-and-reloading"
+REPO_URL="https://github.com/chelohomelab/guns-and-reloading.git"
 
 FRESH_INSTALL=true
 if [ -f "$APP_DIR/data/reloading.db" ]; then

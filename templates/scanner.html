@@ -53,13 +53,23 @@
     </script>
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <style>
-      #main-bg { background-image: url('/static/images/phone-background.png'); background-size: cover; background-position: center; background-color: #0f0f0f; }
-      @media (min-width: 1024px) { #main-bg { background-image: url('/static/images/background.png'); } }
-      /* Ensure hidden always wins over display utilities (Tailwind CDN ordering issue) */
+      body { background-color: transparent !important; }
+      #bg-layer { position: fixed; inset: 0; z-index: -1; background-image: url('/static/images/phone-background.png'); background-size: cover; background-position: center; background-color: #0f0f0f; }
+      @media (min-width: 1024px) { #bg-layer { background-image: url('/static/images/background-widescreen.png'); background-size: cover; background-repeat: no-repeat; background-position: center; } }
+      /* Ensure hidden always wins over display utilities (Tailwind CDN ordering issue) — but
+         the !important also blanked out every responsive "hidden lg:flex" toggle in this file
+         (the desktop top bars included), since a plain !important always beats a media-query
+         rule with normal specificity. Restore the lg+ override explicitly. */
       .hidden { display: none !important; }
+      @media (min-width: 1024px) {
+        .hidden.lg\:flex { display: flex !important; }
+        .hidden.lg\:block { display: block !important; }
+      }
     </style>
 </head>
 <body class="bg-gray-950 text-gray-100 font-sans antialiased select-none flex min-h-dvh lg:h-dvh lg:overflow-hidden overflow-x-hidden">
+
+<div id="bg-layer"></div>
 
 <div id="toast-container" class="fixed top-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
 <div id="offline-banner" class="hidden fixed top-0 inset-x-0 z-[200] bg-amber-900/95 text-amber-200 text-xs font-bold text-center py-1">📴 Offline — showing cached data</div>
@@ -345,14 +355,33 @@
     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
   </button>
   <span class="text-amber-500 font-bold text-sm">📡 Field Scanner</span>
-  <div class="w-6"></div>
+  <div class="relative">
+    <button onclick="toggleUserMenu('mobile-user-menu')" class="flex items-center gap-1 px-1.5 py-1.5 rounded-lg hover:bg-gray-800 transition cursor-pointer">
+      <span class="text-sm">⚙️</span>
+      <span id="mobile-user-menu-arrow" class="text-gray-500 text-xs transition-transform duration-200">▼</span>
+    </button>
+    <div id="mobile-user-menu" class="hidden absolute top-full right-0 mt-1 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
+      {% if user.is_admin %}
+      <a href="/admin/users" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">👤 Users</a>
+      <a href="/wishlist" class="flex items-center gap-2 px-4 py-2.5 text-sm text-amber-300 hover:bg-amber-900/30 transition">⭐ Wishlist</a>
+      <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
+      <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
+      <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
+      {% if upgrade_available %}<a href="/admin/upgrade" class="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-900/30 transition">🚀 Upgrade</a>{% endif %}
+      <a href="/admin/phone-setup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-300 hover:bg-purple-900/30 transition">📱 Phone/Tablet Setup</a>
+      <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Add Reload Data</a>
+      {% endif %}
+      <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
+      <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
+    </div>
+  </div>
 </div>
 
 <!-- Mobile menu overlay -->
 <div id="mobile-menu-overlay" class="lg:hidden fixed inset-0 bg-black/60 z-40 hidden" onclick="toggleMobileMenu()"></div>
 
 <!-- Left Sidebar -->
-<aside id="sidebar" class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 z-50 fixed lg:relative inset-y-0 left-0 -translate-x-full lg:translate-x-0 transition-transform duration-300">
+<aside id="sidebar" class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 z-50 fixed inset-y-0 left-0 -translate-x-full transition-transform duration-300">
   <a href="/" class="block p-4 border-b border-gray-800 text-center cursor-pointer hover:bg-gray-800/40 transition">
     <img src="/static/images/logo.png" alt="G&R" class="h-10 w-auto mx-auto mb-1.5 drop-shadow-lg">
     <h1 class="text-lg font-black text-amber-500 tracking-wide leading-tight">Guns &amp; Reloading</h1>
@@ -365,20 +394,8 @@
     <a href="/?tab=measure-tab" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition text-sm font-bold text-gray-200">
       <span>🎯</span> Range Session
     </a>
-    <a href="/?tab=ladder-tab" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 hover:border-purple-500/40 transition text-sm font-bold text-gray-200">
-      <span>🪜</span> Ladder Test
-    </a>
     <a href="/?tab=reload-data-tab" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition text-sm font-bold text-gray-200">
       <span>📖</span> Reloading Data Center
-    </a>
-    <a href="/?tab=add-tab&cat=platforms" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 border border-amber-800/40 hover:border-amber-500/40 transition text-sm font-bold text-gray-200">
-      <span>⚙️</span> Add Inventory
-    </a>
-    <a href="/?tab=add-tab&cat=ammunition" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-950/60 hover:bg-sky-900/60 border border-sky-800/40 hover:border-sky-500/40 transition text-sm font-bold text-gray-200">
-      <span>🧪</span> Add Ammunition
-    </a>
-    <a href="/?tab=add-tab&cat=components" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/40 hover:border-emerald-500/40 transition text-sm font-bold text-gray-200">
-      <span>🔩</span> Add Components
     </a>
     {% if user.is_admin %}
     <div class="pt-2">
@@ -403,23 +420,81 @@
         <span>🚀</span> Upgrade
       </a>
       {% endif %}
+      <a href="/admin/phone-setup" class="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg bg-purple-950/50 hover:bg-purple-900/50 border border-purple-700/40 transition text-sm font-bold text-purple-300">
+        <span>📱</span> Phone/Tablet Setup
+      </a>
       <a href="/admin/reload-data" class="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg bg-rose-950/50 hover:bg-rose-900/50 border border-rose-700/40 transition text-sm font-bold text-rose-300">
-        <span>📖</span> Reloading Data Center
+        <span>📖</span> Add Reload Data
       </a>
     </div>
     {% endif %}
+    <div class="pt-2 border-t border-gray-800 mt-2">
+      <a href="/profile/" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/60 hover:bg-gray-700/60 border border-gray-700/40 transition text-sm font-bold text-gray-300">
+        <span>🛠️</span> Profile
+      </a>
+      <a href="/logout" class="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg bg-red-950/40 hover:bg-red-900/40 border border-red-800/40 transition text-sm font-bold text-red-400">
+        <span>🚪</span> Sign Out
+      </a>
+    </div>
   </nav>
 </aside>
 
 <!-- Main Content -->
 <div id="main-bg" class="flex-1 flex flex-col min-h-dvh lg:min-h-0 lg:overflow-hidden pt-14 lg:pt-0">
-  <!-- Top bar -->
-  <header class="hidden lg:flex items-center justify-between px-6 py-4 bg-gray-900/80 border-b border-gray-800 backdrop-blur-sm shrink-0">
-    <div>
-      <h2 class="text-xl font-black text-white">📡 Field Scanner</h2>
-      <p class="text-xs text-gray-500 mt-0.5">Scan items in the field — review and complete data later</p>
+
+  <!-- Desktop-only site nav bar (hidden below lg) — replaces the sidebar as primary nav -->
+  <header class="hidden lg:flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800 shrink-0 z-20">
+    <div class="flex items-center gap-1.5">
+      <a href="/" class="flex items-center gap-2 pr-4 mr-1.5 border-r border-gray-700 cursor-pointer">
+        <img src="/static/images/logo.png" alt="G&R" class="h-8 w-auto drop-shadow-lg">
+        <span class="text-amber-500 font-black text-lg tracking-wide">Guns &amp; Reloading</span>
+      </a>
+      <a href="/inventory"
+        class="flex flex-col px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700/50 hover:border-amber-500/40 transition">
+        <span class="text-sm font-bold text-white">Inventory</span>
+        <span class="text-[10px] text-gray-500">Browse your vault</span>
+      </a>
+      <a id="topnav-btn-measure" href="/?tab=measure-tab"
+        class="flex flex-col px-3 py-1.5 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition cursor-pointer">
+        <span class="text-sm font-bold text-white">Range Session</span>
+        <span class="text-[10px] text-blue-400/70">Sessions &amp; ladder tests</span>
+      </a>
+      <a id="topnav-btn-reload-data" href="/?tab=reload-data-tab"
+        class="flex flex-col px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer">
+        <span class="text-sm font-bold text-white">Reloading Data Center</span>
+        <span class="text-[10px] text-rose-400/70">6 manufacturers</span>
+      </a>
+    </div>
+    <div class="relative">
+      <button onclick="toggleUserMenu('desktop-user-menu')" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 transition cursor-pointer">
+        <span class="text-sm">⚙️</span>
+        <span class="text-sm font-medium text-gray-300">{{ user.username }}</span>
+        <span id="desktop-user-menu-arrow" class="text-gray-500 text-xs transition-transform duration-200">▼</span>
+      </button>
+      <div id="desktop-user-menu" class="hidden absolute top-full right-0 mt-1 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
+        {% if user.is_admin %}
+        <a href="/admin/users" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">👤 Users</a>
+        <a href="/wishlist" class="flex items-center gap-2 px-4 py-2.5 text-sm text-amber-300 hover:bg-amber-900/30 transition">⭐ Wishlist</a>
+        <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
+        <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
+        <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
+        {% if upgrade_available %}<a href="/admin/upgrade" class="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-900/30 transition">🚀 Upgrade</a>{% endif %}
+        <a href="/admin/phone-setup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-300 hover:bg-purple-900/30 transition">📱 Phone/Tablet Setup</a>
+        <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Add Reload Data</a>
+        {% endif %}
+        <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
+        <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
+      </div>
     </div>
   </header>
+
+  <!-- Page-specific title — no background/blur (matches Inventory's own header, which just
+       sits in the content flow instead of its own bar) so there's no transparency effect to
+       fight with against a mostly-dark part of the background image. -->
+  <div class="hidden lg:block px-6 pt-4 pb-3 border-b border-gray-800 shrink-0">
+    <h2 class="text-xl font-black text-white">📡 Field Scanner</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Scan items in the field — review and complete data later</p>
+  </div>
 
   <!-- Tab switcher -->
   <div class="px-4 pt-4 pb-0 shrink-0">
@@ -729,7 +804,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=129"></script>
+<script src="/static/app.js?v=133"></script>
 <script>
 // ============================================================
 // STATE

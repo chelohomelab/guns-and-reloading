@@ -290,9 +290,15 @@ function closeSidebar() {
     document.getElementById('sidebar-overlay').classList.add('hidden');
 }
 
-function toggleUserMenu() {
-    const menu = document.getElementById('user-menu');
-    const arrow = document.getElementById('user-menu-arrow');
+// id lets the same dropdown-toggle logic serve both the mobile sidebar's user menu
+// ('user-menu', the default) and the desktop top bar's separate copy ('desktop-user-menu')
+// — they're two distinct elements, live in the DOM at the same time, shown/hidden purely by
+// breakpoint, so they can't share one id.
+function toggleUserMenu(id) {
+    id = id || 'user-menu';
+    const menu = document.getElementById(id);
+    const arrow = document.getElementById(id + '-arrow');
+    if (!menu) return;
     const isOpen = !menu.classList.contains('hidden');
     menu.classList.toggle('hidden');
     if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
@@ -734,24 +740,60 @@ function navClick(e, fn) {
 
 function switchTab(tabId) {
     if (tabId === 'catalog-tab') { window.location.href = '/inventory'; return; }
-    ['landing-tab', 'measure-tab', 'add-tab', 'ladder-tab', 'reload-data-tab'].forEach(id => {
+    // 'ladder-tab' is now a sub-view inside the Range Session page, not its own top-level
+    // tab — kept as an alias so existing '?tab=ladder-tab' deep links (scanner/wishlist
+    // sidebar nav) keep working.
+    const isLadderAlias = tabId === 'ladder-tab';
+    const realTabId = isLadderAlias ? 'measure-tab' : tabId;
+
+    ['landing-tab', 'measure-tab', 'add-tab', 'reload-data-tab'].forEach(id => {
         document.getElementById(id)?.classList.add('hidden');
     });
 
-    const target = document.getElementById(tabId);
+    const target = document.getElementById(realTabId);
     if (target) target.classList.remove('hidden');
 
     // Keep the URL in sync with whichever tab is actually showing — otherwise a stale
     // ?tab=... from an earlier navigation (e.g. arriving via another page's nav link)
     // sends a page refresh back to that old tab instead of the one currently visible.
-    const newUrl = tabId === 'landing-tab' ? '/' : `/?tab=${encodeURIComponent(tabId)}`;
+    const newUrl = realTabId === 'landing-tab' ? '/' : `/?tab=${encodeURIComponent(tabId)}`;
     if (location.pathname + location.search !== newUrl) {
         history.replaceState(null, '', newUrl);
     }
 
-    if (tabId === 'measure-tab') setupMeasureDropdowns();
-    if (tabId === 'ladder-tab') showLadderListView();
+    if (realTabId === 'measure-tab') {
+        setupMeasureDropdowns();
+        switchRangeSubTab(isLadderAlias ? 'ladder' : 'session');
+    }
     if (tabId === 'reload-data-tab') openReloadDataTab();
+}
+
+// Range Session and Ladder Test are sub-views of the same page — both get filled in
+// after a range trip, so switching between them shouldn't lose in-progress work on
+// either side (unlike switchTab, which fully tears down and rebuilds the target tab).
+function switchRangeSubTab(sub) {
+    const isSession = sub === 'session';
+    document.getElementById('range-pane-session')?.classList.toggle('hidden', !isSession);
+    document.getElementById('range-pane-ladder')?.classList.toggle('hidden', isSession);
+
+    const inactiveCls = 'px-3 py-1.5 rounded text-gray-400 hover:text-white text-sm font-bold cursor-pointer';
+    const sessionBtn = document.getElementById('range-btn-session');
+    const ladderBtn = document.getElementById('range-btn-ladder');
+    if (sessionBtn) sessionBtn.className = isSession
+        ? 'px-3 py-1.5 rounded bg-gray-800 text-blue-400 text-sm font-bold cursor-pointer'
+        : inactiveCls;
+    if (ladderBtn) ladderBtn.className = !isSession
+        ? 'px-3 py-1.5 rounded bg-gray-800 text-purple-400 text-sm font-bold cursor-pointer'
+        : inactiveCls;
+
+    if (isSession) {
+        document.getElementById('ladder-back-btn')?.classList.add('hidden');
+        updateSidebarList();
+    } else {
+        document.getElementById('download-btn')?.classList.add('hidden');
+        document.getElementById('share-btn')?.classList.add('hidden');
+        showLadderListView();
+    }
 }
 
 function switchInventoryTab(tab) {
@@ -4628,7 +4670,7 @@ async function applyPreferences() {
         if (off('feat_handguns'))  hide('plat-btn-handgun', 'btn-add-handgun');
         if (off('feat_tc'))        hide('plat-btn-tc', 'btn-add-tc-receiver', 'btn-add-tc-barrel');
         if (off('feat_reloading')) hide('inv-btn-components', 'btn-cat-components');
-        if (off('feat_ammo_log'))  hide('inv-btn-ammo', 'btn-cat-ammunition', 'nav-btn-measure', 'nav-btn-measure-mobile');
+        if (off('feat_ammo_log'))  hide('inv-btn-ammo', 'btn-cat-ammunition', 'nav-btn-measure', 'topnav-btn-measure', 'nav-btn-measure-mobile');
     } catch (_) {}
 }
 
@@ -7383,13 +7425,16 @@ window.onload = () => {
         else switchFormCategory('cat-' + cat);
     }
     if (p.get('handload') === '1') applyLadderHandoff();
-    // Close user-menu dropdown when clicking outside
-    const userMenu = document.getElementById('user-menu');
-    if (userMenu) {
+    // Close user-menu dropdown(s) when clicking outside — 'user-menu' is the legacy
+    // sidebar-bottom copy (older pages not yet migrated), 'mobile-user-menu' is the mobile
+    // top bar's copy, 'desktop-user-menu' is the desktop top bar's (see toggleUserMenu).
+    ['user-menu', 'mobile-user-menu', 'desktop-user-menu'].forEach(id => {
+        const menu = document.getElementById(id);
+        if (!menu) return;
         document.addEventListener('click', e => {
-            if (!userMenu.classList.contains('hidden') && !userMenu.parentElement.contains(e.target)) {
-                userMenu.classList.add('hidden');
+            if (!menu.classList.contains('hidden') && !menu.parentElement.contains(e.target)) {
+                menu.classList.add('hidden');
             }
         });
-    }
+    });
 };

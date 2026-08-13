@@ -1,186 +1,199 @@
+---
+title: User Guide
+nav_order: 4
+---
+
 # User Guide
+{: .no_toc }
 
-A walkthrough of every feature in the Firearm Inventory & Reloading app.
+A walkthrough of every feature in the Guns & Reloading app.
+{: .fs-6 .fw-300 }
 
----
+## Table of contents
+{: .no_toc .text-delta }
 
-## Navigation Overview
-
-The app is a single-page application. The top navigation bar contains:
-
-- **Inventory** tabs — Rifles, Shotguns, Handguns, Thompson Center
-- **Reloading** tab — Component inventory (powders, primers, bullets, casings)
-- **Ammo Log** tab — Factory and handloaded ammunition records
-- **Range Session** tab — Performance/shot-string log
-- **⚙️ Username** (top right) — Your profile and feature preferences
-- **Logout**
-
-Admins also have access to **Admin → Users** via the profile page.
+1. TOC
+{:toc}
 
 ---
 
-## Inventory — Firearms
+## Navigation
 
-### Adding a Firearm
+**On a wide screen (desktop/tablet landscape)**, a top bar runs across every page: your logo/home
+link, **Inventory**, **Range Session**, and **Reloading Data Center** on the left, and your
+username in the top right — click it to open **Profile**, admin tools (if you're an admin), and
+**Sign Out**.
 
-1. Go to the **Rifles**, **Shotguns**, or **Handguns** tab
-2. Click **+ Add** to open the add form
-3. Fill in Brand, Model, and Price Paid
-4. Optionally upload up to two photos
-5. Click **Save**
-
-### Viewing / Editing a Firearm
-
-- Click any firearm card to open its detail page
-- The detail page shows all fields, attached barrels, scope, and accessories
-- Use the **Edit** button to modify any field
-- Use **Upload Photo** to add or replace images
-
-### Marking a Firearm as Sold
-
-On the firearm detail page, click **Mark as Sold**, enter the sale price, and confirm. The firearm moves to the **Sold** view (use the Sold toggle — see below).
-
-### Sold Toggle Filter
-
-At the top right of the inventory panel there is a **Sold** button. Click it to toggle between:
-
-- **Default (off):** shows your active collection
-- **Sold (highlighted):** shows items you have sold, with sale prices
-
-The toggle works across all tabs including Thompson Center.
+**On a phone**, the same links live behind the ☰ menu button, and your username/account menu is
+in the top-right corner of the header — tap it for the same Profile/admin/Sign Out options.
 
 ---
 
-## Inventory — Barrels
+## Inventory
 
-Barrels are managed from a firearm's detail page. Each firearm can have multiple barrels (useful for multi-caliber platforms). Barrels can have their own scope mounted.
+Inventory is organized into four tabs: **Platforms** (firearms), **Optics**, **Ammunition**, and
+**Components**.
 
----
+### Platforms — Firearms, Handguns, Shotguns, Thompson Center
 
-## Inventory — Thompson Center
+The Platforms tab has its own sub-tabs: **Rifles**, **Shotguns**, **Handguns**, and **Thompson
+Center**.
 
-Thompson Center is tracked differently because receivers and barrels are bought and sold independently.
+To add one, use the **+ Add** button (or the **Add Inventory** shortcut) and fill in brand, model,
+caliber, serial number, and price paid. Up to two photos can be attached. Click any card to open
+its detail page, where you can edit every field, mount/unmount a scope, replace photos, log a
+sale, or move the item to Trash.
 
-### Receivers
+**Thompson Center** works a little differently, since receivers and barrels are bought, sold, and
+tracked independently:
 
-- Add an **Encore** or **Contender** receiver with serial number and price paid
-- Mark a receiver as sold (price recorded)
-- The Sold toggle filters receivers by sold status
+- **Receivers** — Encore or Contender, with their own serial number and price paid
+- **Barrels** — caliber, length, twist rate, hardware color, threading, and muzzle brake, each with
+  its own scope mount
 
-### TC Barrels
+A **Sold** toggle filters the current view between your active collection and items you've sold
+(with the recorded sale price). TC barrels always show regardless of the toggle, since a barrel
+doesn't have its own sold status independent of the receiver it's mounted to.
 
-- Add barrels with caliber, barrel length, twist rate, hardware color, threading, and muzzle brake details
-- TC barrels always show regardless of the Sold toggle (barrels don't have an individual sold status)
-- Attach a scope to a TC barrel independently of the receiver
+### Optics
 
----
+Scopes are a shared pool — any scope can be mounted to any rifle, handgun, shotgun, or TC barrel.
+Mount/unmount a scope directly from the firearm or barrel's detail page; mounting to a new item
+automatically unmounts it from wherever it was before.
 
-## Scopes
+### Ammunition
 
-Scopes are a shared pool — each scope can be mounted to any firearm or barrel.
+Tracks both **factory** ammo and **handloads**, with quantity kept in sealed boxes + loose rounds.
+Each entry can be scanned in via barcode (see [Add Ammo — Scan Only](#add-ammo-is-scan-only)
+below) or added manually. Handloads additionally record powder, charge weight, primer, brass, and
+COAL.
 
-- Go to **Scopes** (link in the inventory section or nav)
-- Add a scope with brand, model, and adjustment unit (MOA or MIL)
-- From a firearm or barrel detail page, use **Mount Scope** to assign a scope inline — no separate screen needed
-- A scope mounted to one item is automatically unmounted from any previous item
+A **Rounds Used** button on the ammo detail page deducts rounds from on-hand inventory — this is
+the same deduction path a Range Session entry uses when you log a session against that ammo, so
+your count stays accurate either way.
 
----
+#### Add Ammo is scan-only
 
-## Reloading Components
+The **Add Ammunition** form only accepts a barcode scan — there's no manual "type in every field"
+path for factory ammo, since the whole point is to pull brand/caliber/bullet weight/BC/etc.
+automatically from the UPC. If a scan comes back with fields the app couldn't determine, you'll see
+**Search UPC**, **Search Manufacturer #**, and **Refresh from Cache** buttons to fill in the gaps
+without retyping everything. See the [Barcode Scanner](#barcode-scanner-admin) section for the
+other (bulk/field) way to capture ammo.
 
-The **Reloading** tab tracks on-hand inventory for:
+### Components
 
-| Section | Tracked fields |
-|---|---|
-| Powders | Brand, name, weight (lbs), price |
-| Primers | Brand, type, quantity, price per 1000 |
-| Bullets | Brand, line, caliber, weight (gr), type, BC G1/G7, quantity, price |
-| Casings | Brand, caliber, quantity, times fired, price |
+Powders, primers, bullets, and casings — each tracked with brand, relevant specs (weight, caliber,
+BC G1/G7, primer type, etc.), quantity on hand, and price. A low-stock badge appears once a
+component drops below its threshold (adjustable per component type — see [Reload Data
+Center](#reloading-data-center) admin tools, or ask an admin).
 
-### Adding Components
-
-Click **+ Add** in any component section. Fill in the fields and click Save.
-
-### Deducting Components
-
-Use the **Deduct** button to subtract a used quantity (e.g., after a loading session). This keeps your on-hand count accurate.
-
-### Low Stock Alerts
-
-The app shows a warning badge when any component falls below a configurable threshold. Thresholds are set in **Settings** (admin only):
-
-| Setting | Default |
-|---|---|
-| Powder | 0.5 lbs |
-| Primers | 200 |
-| Bullets | 100 |
-| Casings | 50 |
+Use each component's **Deduct** control to subtract a used quantity after a loading session —
+this keeps on-hand counts accurate without having to re-enter the full total.
 
 ---
 
-## Ammo Log
+## Range Session
 
-Tracks both factory ammunition and handloads for use in the performance log.
+**Range Session** and **Ladder Test** live on the same page as two tabs — both get filled in after
+a trip to the range, so they're grouped together instead of being separate destinations.
 
-- **Factory ammo:** brand, caliber, bullet weight/type, BC
-- **Handloads:** same fields plus powder name, charge weight, and COAL
-- Attach a photo of the box or load workup sheet
+### Logging a session
 
----
+1. Upload a photo of your target
+2. Calibrate: click two points a known distance apart (your target's grid lines work well), enter
+   that distance, and lock it — this is what lets the app measure group size from the photo
+3. Select the firearm and ammo/load used, and the distance to target
+4. Tap each bullet hole on the photo to place a shot marker; drag a marker to nudge it, or use
+   **Remove a Shot** to delete one
+5. **Confirm & Save Group** — repeat for additional strings in the same session
+6. **Upload Data to Homelab DB** commits the whole session (group sizes, velocities if entered,
+   and the annotated photo) to your permanent records
 
-## Range Sessions (Performance Log)
+You can also mark a **Point of Aim** on the photo, which the app uses to calculate distance from
+POA to group center (useful for zeroing).
 
-Log shot strings from the range or load development.
+### Ladder Test
 
-1. Go to **Range Session**
-2. Click **+ New Session**
-3. Select the barrel and the ammo used
-4. Enter the date and raw velocities (comma-separated: `3010,2995,3005`)
-5. The app automatically calculates **Average**, **Extreme Spread (ES)**, and **Standard Deviation (SD)**
-6. Optionally upload a target photo and record group size (inches and MOA)
+A ladder test tracks a charge-weight sweep for load development. Create one with a name, caliber,
+COAL, powder/primer/bullet/casing, and a charge range (start/end/increment) — the app generates
+one step per increment automatically. Rounds per step defaults to 1; raise it if you're loading
+more than one round per charge.
 
----
+As you shoot each step, record the velocities. The app plots charge weight vs. velocity and can
+suggest candidate "nodes" (flat spots in the velocity curve, often a sign of a stable load) — click
+a point on the chart to mark or unmark it as a node. You can add extra charge steps beyond the
+original sweep at any time.
 
-## Profile & Feature Preferences
-
-Click **⚙️ Username** in the top nav to open your profile page.
-
-Each user can individually toggle off features they don't use:
-
-| Feature flag | Hides when off |
-|---|---|
-| Shotguns | Shotguns inventory tab |
-| Handguns | Handguns inventory tab |
-| Thompson Center | TC inventory tab |
-| Reloading | Reloading components tab |
-| Ammo Log | Ammo Log tab |
-
-Preferences are saved per-user in the database and apply on every device you log in from.
+Components used in a ladder test (all rounds, for every step) are deducted from your reloading
+component inventory immediately when the test is created, not later when velocities are recorded.
 
 ---
 
-## Settings (Admin)
+## Reloading Data Center
 
-Accessible from the nav bar (admin users only). Allows editing:
+A built-in reference library for published reloading data across **six manufacturers**: Hodgdon,
+Nosler, Speer, Sierra, Barnes, and Hornady. Pick a manufacturer tab, filter by caliber, and browse
+published charge data (start/max charge, velocity, pressure where available) without leaving the
+app or hunting down a PDF.
 
-- Low-stock thresholds for reloading components
-- Lookup values (dropdown lists for calibers, brands, etc.)
-
----
-
-## Admin — User Management
-
-Accessible via the profile page for admin accounts.
-
-- **Add users** — create additional accounts for family members or other users
-- **Edit users** — change username, email, or password
-- **Deactivate / Delete users** — remove access without deleting their data
+Admins can upload additional manufacturer PDFs to expand this library — see the [Admin
+Guide]({% link admin-guide.md %}).
 
 ---
 
-## Tips
+## Wishlist
 
-- **Photos:** JPEG and PNG are supported. Images are resized for display but the originals are stored.
-- **Multi-barrel rifles:** Add the rifle once, then add each barrel from the detail page. Each barrel can have its own scope and performance log.
-- **TC workflow:** Add receiver → add barrels → mount scopes per barrel → log range sessions per barrel.
-- **Backup:** The entire database is a single file at `data/reloading.db`. Copy it off the server periodically. Photos are in `uploads/`.
+A running list of gear you want to buy — rifles, handguns, shotguns, TC systems/barrels, optics,
+or anything else. Each item has a priority (Low/Medium/High), an optional estimated price, notes,
+and a link to where you found it. When you actually buy something on your wishlist, use **✓
+Acquired** to convert it straight into your real inventory instead of re-entering it from scratch.
+
+---
+
+## Barcode Scanner (admin)
+
+The Scanner page is a capture/review workflow for adding items in bulk, especially useful while
+you're physically standing in front of a shelf of components or ammo:
+
+- **Bookmarklet import** — drag the provided bookmarklet into your phone's bookmarks bar. On a
+  supported retailer's product page (MidwayUSA, Target Sports USA, Academy Sports, Palmetto State
+  Armory, LuckyGunner, Sportsman's Warehouse, Bass Pro Shops, Cabela's), tapping it captures the
+  product's specs directly from the page. A complete capture is cached immediately; an incomplete
+  one lands in the **Review** queue below for you to fill in the gaps later.
+- **Review queue** — every incomplete or newly captured item shows up here, filterable by
+  All/Incomplete/Reviewed, with a completeness badge so you can tell at a glance what still needs
+  attention.
+
+---
+
+## Profile
+
+Click your username (top right on desktop, or the account menu on mobile) → **Profile**.
+
+### Inventory Value
+
+Your collection's total count and dollar value per category (Firearms, Optics, Ammo, Components)
+— shown only here, never anywhere else in the app, since it's private financial information.
+Item-level prices elsewhere in the app are either hidden entirely (on inventory cards) or blurred
+until you tap to reveal them (on detail pages).
+
+### Feature Preferences
+
+Toggle off entire sections you don't use — Shotguns, Handguns, Thompson Center, Reloading
+Components, or Ammunition & Range Sessions. Hidden sections disappear from your nav and add forms
+everywhere, on every device you log into. This is per-user, so a family member with a simpler setup
+can hide what they don't need without affecting your account.
+
+---
+
+## Installing as an App (PWA)
+
+On both Android and iOS, the app can be installed to your home screen like a native app — no app
+store needed. Android shows an install prompt automatically; iOS doesn't support that, so look for
+"Add to Home Screen" in Safari's Share menu instead.
+
+Once installed (and once your device trusts your server's certificate — see [Phone/Tablet
+Setup]({% link admin-guide.md %}#phonetablet-setup) in the Admin Guide), the app also works
+**offline**: your inventory stays browsable with no signal, and logging a range session or
+deducting rounds used queues up locally and syncs automatically the moment you're back online.

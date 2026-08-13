@@ -1,0 +1,19 @@
+title: Guns & Reloading
+description: Documentation for the self-hosted firearm inventory and reloading tracker
+remote_theme: just-the-docs/just-the-docs
+
+color_scheme: dark
+search_enabled: true
+heading_anchors: true
+
+aux_links:
+  "View on GitHub":
+    - "https://github.com/chelohomelab/inventory-and-reloading"
+aux_links_new_tab: true
+
+footer_content: "Guns & Reloading — a self-hosted homelab project."
+
+plugins:
+  - jekyll-remote-theme
+
+nav_sort: case_insensitive

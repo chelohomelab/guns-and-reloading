@@ -1,3 +1,8 @@
+---
+title: Installation
+nav_order: 3
+---
+
 # Installation Guide
 
 Prerequisites: a running Debian 12 LXC (or any fresh Debian/Ubuntu machine) with root access.

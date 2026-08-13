@@ -1,3 +1,8 @@
+---
+title: LXC Setup
+nav_order: 2
+---
+
 # Proxmox LXC Setup
 
 This guide covers creating the Proxmox LXC container that will host the application.

@@ -132,47 +132,53 @@
     </div>
 </header>
 
-<main class="container mx-auto p-4 max-w-3xl space-y-6">
+<main class="container mx-auto p-4 max-w-lg space-y-5">
 
     <!-- Header -->
     <div class="bg-gray-900/70 rounded-xl p-4">
         <h1 class="text-2xl font-bold text-amber-400">🚀 Upgrade</h1>
-        <p class="text-sm text-gray-300 mt-1">Pull the latest release from git and restart the app. A backup is taken automatically first, so you can roll back if something goes wrong.</p>
+        <p class="text-sm text-gray-300 mt-1">A backup is taken automatically before every upgrade, so you can always roll back.</p>
     </div>
 
     {% if git_available %}
-    <!-- Current version -->
-    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-3">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-amber-400">Current Version</h2>
-        <div id="current-version" class="text-sm text-gray-300">
-            <div class="text-gray-500 italic text-xs">Loading…</div>
+    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
+        <div class="flex items-baseline justify-between">
+            <span class="text-xs text-gray-400 uppercase tracking-wider">Current Version</span>
+            <span id="current-version" class="text-xl font-bold text-white">…</span>
         </div>
-    </div>
 
-    <!-- Update status / action -->
-    <div id="update-panel" class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
-        <div class="flex justify-between items-center">
-            <h2 class="text-sm font-bold uppercase tracking-wider text-blue-400">Check for Updates</h2>
-            <button onclick="checkForUpdates()" class="text-xs text-gray-400 hover:text-gray-200 transition">↻ Refresh</button>
+        <div id="dirty-warning" class="hidden text-xs text-yellow-400 bg-yellow-950/30 border border-yellow-800/50 rounded-lg p-3"></div>
+
+        <div id="status-line" class="text-sm text-gray-400 italic">Checking for updates…</div>
+
+        <!-- New version available -->
+        <div id="new-version-block" class="hidden space-y-2 pt-2 border-t border-gray-700">
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-emerald-400 font-bold">New version: <span id="new-version-num"></span></span>
+                <button onclick="toggleDetails()" class="text-xs text-gray-400 hover:text-gray-200 transition cursor-pointer">Show details <span id="details-arrow">▾</span></button>
+            </div>
+            <div id="changes-details" class="hidden bg-gray-900 rounded-lg p-3 text-xs font-mono text-gray-400 space-y-1 max-h-48 overflow-y-auto"></div>
+            <button id="upgrade-btn" onclick="runUpgrade()" class="w-full px-4 py-2.5 bg-amber-700 hover:bg-amber-600 text-white text-sm font-bold rounded-lg transition cursor-pointer">
+                ⬆️ Upgrade to <span id="upgrade-btn-version"></span>
+            </button>
         </div>
-        <div id="update-status" class="text-sm text-gray-400 italic">Checking…</div>
-        <div id="commits-behind" class="hidden bg-gray-900 rounded-lg p-3 text-xs font-mono text-gray-400 space-y-1 max-h-48 overflow-y-auto"></div>
-        <button id="upgrade-btn" onclick="runUpgrade()" class="hidden px-4 py-2 bg-amber-700 hover:bg-amber-600 text-white text-sm font-bold rounded-lg transition cursor-pointer">
-            ⬆️ Backup &amp; Upgrade Now
-        </button>
+
         <div id="upgrade-progress" class="hidden text-xs text-yellow-400 font-mono animate-pulse">Working… this can take a minute, don't close this tab.</div>
         <div id="upgrade-log" class="hidden bg-gray-900 rounded-lg p-3 text-[11px] font-mono text-gray-400 space-y-1 max-h-64 overflow-y-auto"></div>
     </div>
 
-    <!-- Rollback -->
-    <div id="rollback-panel" class="hidden bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-3">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-red-400">⚠️ Roll Back Last Upgrade</h2>
-        <div id="rollback-info" class="text-xs text-gray-400"></div>
-        <button id="rollback-btn" onclick="runRollback()" class="px-4 py-2 bg-red-900/60 hover:bg-red-800 border border-red-700 text-red-300 text-sm font-bold rounded-lg transition cursor-pointer">
-            ↩ Roll Back to Previous Version
+    <!-- Rollback — just a button, no extra detail; the confirm dialog carries the warning -->
+    <div id="rollback-panel" class="hidden bg-gray-800 border border-gray-700 rounded-xl p-5">
+        <button id="rollback-btn" onclick="runRollback()" class="w-full px-4 py-2.5 bg-red-900/60 hover:bg-red-800 border border-red-700 text-red-300 text-sm font-bold rounded-lg transition cursor-pointer">
+            ↩ Roll Back to <span id="rollback-version"></span>
         </button>
-        <p class="text-[11px] text-gray-500">Reverts the code AND restores the database/photos to exactly how they were right before the last upgrade — anything entered since then will be lost.</p>
     </div>
+
+    {% if repo_url %}
+    <p class="text-center text-xs text-gray-500">
+        Want the full commit history or release notes? <a href="{{ repo_url }}/releases" target="_blank" rel="noopener" class="text-gray-400 hover:text-amber-400 underline transition">View on GitHub ↗</a>
+    </p>
+    {% endif %}
     {% else %}
     <div class="bg-gray-800 border border-gray-700 rounded-xl p-5">
         <p class="text-sm text-gray-400">Self-upgrade isn't available for this install type — no local git checkout was found. Update via your platform's normal mechanism instead (a new Docker image tag, or a new desktop installer release).</p>
@@ -193,12 +199,6 @@
         setTimeout(() => t.remove(), 5000);
     }
 
-    function fmtCommit(c) {
-        if (!c) return '<span class="text-gray-500">unknown</span>';
-        const tag = c.tag ? `<span class="text-amber-400 font-bold">${c.tag}</span> · ` : '';
-        return `${tag}<span class="font-mono text-gray-300">${c.hash}</span> — ${c.subject} <span class="text-gray-500">(${new Date(c.date).toLocaleDateString()})</span>`;
-    }
-
     function renderLog(container, log) {
         container.classList.remove('hidden');
         container.innerHTML = log.map(step => `
@@ -209,46 +209,63 @@
         `).join('');
     }
 
+    let _latestVersionLabel = '';
+    let _rollbackVersionLabel = '';
+
+    function toggleDetails() {
+        const box = document.getElementById('changes-details');
+        const arrow = document.getElementById('details-arrow');
+        const show = box.classList.toggle('hidden') === false;
+        arrow.textContent = show ? '▴' : '▾';
+    }
+
     async function checkForUpdates() {
-        const statusEl = document.getElementById('update-status');
-        const behindEl = document.getElementById('commits-behind');
-        const btnEl = document.getElementById('upgrade-btn');
-        statusEl.textContent = 'Checking…';
+        const statusEl = document.getElementById('status-line');
+        const newBlock = document.getElementById('new-version-block');
+        statusEl.textContent = 'Checking for updates…';
         statusEl.className = 'text-sm text-gray-400 italic';
-        behindEl.classList.add('hidden');
-        btnEl.classList.add('hidden');
+        newBlock.classList.add('hidden');
 
         try {
             const res = await fetch('/admin/upgrade/check');
             const d = await res.json();
 
-            const dirtyFilesHtml = (d.dirty && d.dirty_files && d.dirty_files.length)
-                ? `<div class="mt-1 pl-4 font-mono text-[11px] text-yellow-300/80">${d.dirty_files.map(f => `· ${f}`).join('<br>')}</div>`
-                : '';
-            document.getElementById('current-version').innerHTML = fmtCommit(d.current) + (d.dirty ? `<div class="text-yellow-400 text-xs mt-1">⚠ Local changes present on this server — upgrade/rollback are blocked until resolved. SSH in and run <code>git status</code> / <code>git checkout -- &lt;file&gt;</code> to review and discard them, then refresh this page.${dirtyFilesHtml}</div>` : '');
+            document.getElementById('current-version').textContent = d.current_version || (d.current ? d.current.hash : '—');
+
+            const dirtyEl = document.getElementById('dirty-warning');
+            if (d.dirty) {
+                const dirtyFilesHtml = (d.dirty_files && d.dirty_files.length)
+                    ? `<div class="mt-1 pl-3 font-mono text-[11px] text-yellow-300/80">${d.dirty_files.map(f => `· ${f}`).join('<br>')}</div>`
+                    : '';
+                dirtyEl.innerHTML = `⚠ Local changes present on this server — upgrade/rollback are blocked until resolved. SSH in and run <code>git status</code> / <code>git checkout -- &lt;file&gt;</code> to review and discard them, then refresh this page.${dirtyFilesHtml}`;
+                dirtyEl.classList.remove('hidden');
+            } else {
+                dirtyEl.classList.add('hidden');
+            }
 
             if (!d.ok) {
                 statusEl.textContent = d.error || 'Could not check for updates.';
                 statusEl.className = 'text-sm text-red-400';
             } else if (d.up_to_date) {
-                statusEl.textContent = '✓ Up to date.';
+                statusEl.textContent = '✓ You\'re up to date.';
                 statusEl.className = 'text-sm text-green-400';
             } else {
-                statusEl.innerHTML = `${d.commits_behind.length} commit(s) behind — latest: ${fmtCommit(d.latest)}`;
-                statusEl.className = 'text-sm text-amber-400';
-                if (d.commits_behind.length) {
-                    behindEl.classList.remove('hidden');
-                    behindEl.innerHTML = d.commits_behind.map(c => `<div>${c}</div>`).join('');
-                }
-                if (!d.dirty) btnEl.classList.remove('hidden');
+                statusEl.textContent = '';
+                _latestVersionLabel = d.latest_version || (d.latest ? d.latest.hash : 'latest');
+                document.getElementById('new-version-num').textContent = _latestVersionLabel;
+                document.getElementById('upgrade-btn-version').textContent = _latestVersionLabel;
+                const details = document.getElementById('changes-details');
+                details.innerHTML = (d.commits_behind || []).map(c => `<div>${c}</div>`).join('') || '<div class="text-gray-600 italic">No details available.</div>';
+                details.classList.add('hidden');
+                document.getElementById('details-arrow').textContent = '▾';
+                if (!d.dirty) newBlock.classList.remove('hidden');
             }
 
             const rbPanel = document.getElementById('rollback-panel');
             if (d.rollback && d.rollback.available) {
                 rbPanel.classList.remove('hidden');
-                document.getElementById('rollback-info').innerHTML =
-                    `Last upgrade: <span class="font-mono">${d.rollback.previous_commit}</span> → <span class="font-mono">${d.rollback.new_commit}</span><br>` +
-                    `at ${new Date(d.rollback.timestamp).toLocaleString()}`;
+                _rollbackVersionLabel = d.rollback.previous_version || d.rollback.previous_commit;
+                document.getElementById('rollback-version').textContent = _rollbackVersionLabel;
                 document.getElementById('rollback-btn').disabled = d.dirty;
             } else {
                 rbPanel.classList.add('hidden');
@@ -273,7 +290,7 @@
     }
 
     async function runUpgrade() {
-        if (!confirm('This will back up the database/photos, pull the latest code, install any new dependencies, and restart the app (typically back online within ~10 seconds). Continue?')) return;
+        if (!confirm(`Upgrade to ${_latestVersionLabel}? A backup is taken first, then the app restarts (typically back online within ~10 seconds).`)) return;
 
         document.getElementById('upgrade-btn').classList.add('hidden');
         document.getElementById('upgrade-progress').classList.remove('hidden');
@@ -319,7 +336,7 @@
     }
 
     async function runRollback() {
-        if (!confirm('This reverts the code AND restores the database/photos to exactly how they were right before the last upgrade. Anything entered since then will be LOST. Are you sure?')) return;
+        if (!confirm(`Roll back to ${_rollbackVersionLabel}? This reverts the code AND restores the database/photos to exactly how they were right before the last upgrade — anything entered since then will be LOST.`)) return;
         if (!confirm('Really sure? This cannot be undone.')) return;
 
         document.getElementById('rollback-btn').disabled = true;

@@ -76,6 +76,34 @@ def _commit_info(rev: str) -> dict | None:
     }
 
 
+def _version_at(rev: str) -> str | None:
+    """The VERSION file's contents at a given revision — the human-facing "1.24" style number,
+    as opposed to _commit_info's git hash/tag. Used to drive the simplified upgrade UI, which
+    talks in version numbers rather than commit hashes."""
+    r = _git("show", f"{rev}:VERSION")
+    return r["stdout"].strip() if r["ok"] and r["stdout"].strip() else None
+
+
+def _repo_web_url() -> str | None:
+    """Browsable https URL for the origin remote, so the UI can link out to GitHub for users
+    who want the full commit/release history instead of the simplified in-app view. Derived
+    from the actual remote (not hardcoded) so this keeps working for a fork."""
+    if not GIT_AVAILABLE:
+        return None
+    r = _run(["git", "remote", "get-url", "origin"], timeout=10)
+    if not r["ok"] or not r["stdout"]:
+        return None
+    url = r["stdout"].strip()
+    if url.startswith("git@github.com:"):
+        url = "https://github.com/" + url[len("git@github.com:"):]
+    if url.endswith(".git"):
+        url = url[:-4]
+    return url
+
+
+REPO_WEB_URL = _repo_web_url()
+
+
 def _is_dirty() -> bool:
     r = _git("status", "--porcelain")
     return bool(r["stdout"])
@@ -157,6 +185,7 @@ async def upgrade_page(request: Request):
         "request": request,
         "user": request.state.user,
         "git_available": GIT_AVAILABLE,
+        "repo_url": REPO_WEB_URL,
     })
 
 
@@ -168,30 +197,37 @@ def upgrade_check(request: Request):
     _require_git()
 
     current = _commit_info("HEAD")
+    current_version = _version_at("HEAD")
     fetch = _git("fetch", "origin", BRANCH, timeout=30)
     if not fetch["ok"]:
         return {
             "ok": False,
             "error": f"git fetch failed: {fetch['stderr'] or 'no network / no access to origin'}",
             "current": current,
+            "current_version": current_version,
             "dirty": _is_dirty(),
             "dirty_files": _dirty_files(),
             "rollback": _rollback_summary(),
+            "repo_url": REPO_WEB_URL,
         }
 
     latest = _commit_info(f"origin/{BRANCH}")
+    latest_version = _version_at(f"origin/{BRANCH}")
     behind = _git("log", f"HEAD..origin/{BRANCH}", "--format=%h %s")
     commits_behind = behind["stdout"].splitlines() if behind["ok"] and behind["stdout"] else []
 
     return {
         "ok": True,
         "current": current,
+        "current_version": current_version,
         "latest": latest,
+        "latest_version": latest_version,
         "up_to_date": current is not None and latest is not None and current["hash"] == latest["hash"],
         "commits_behind": commits_behind,
         "dirty": _is_dirty(),
         "dirty_files": _dirty_files(),
         "rollback": _rollback_summary(),
+        "repo_url": REPO_WEB_URL,
     }
 
 
@@ -203,6 +239,7 @@ def _rollback_summary() -> dict | None:
     backup_exists = Path(state["backup_file"]).exists() if state.get("backup_file") else False
     return {
         **state,
+        "previous_version": _version_at(state["previous_commit"]) if resolves["ok"] else None,
         "available": resolves["ok"] and backup_exists,
     }
 

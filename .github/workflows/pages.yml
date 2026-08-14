@@ -32,9 +32,9 @@ jobs:
           ruby-version: '3.3'
           bundler-cache: false
 
-      - name: Install Jekyll + the remote theme
+      - name: Install Jekyll + theme dependencies
         working-directory: docs
-        run: gem install jekyll jekyll-remote-theme
+        run: gem install jekyll jekyll-remote-theme jekyll-seo-tag jekyll-include-cache
 
       - name: Build with Jekyll
         working-directory: docs

@@ -15,5 +15,7 @@ footer_content: "Guns & Reloading — a self-hosted homelab project."
 
 plugins:
   - jekyll-remote-theme
+  - jekyll-seo-tag
+  - jekyll-include-cache
 
 nav_sort: case_insensitive

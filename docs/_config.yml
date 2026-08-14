@@ -1,5 +1,7 @@
 title: Guns & Reloading
 description: Documentation for the self-hosted firearm inventory and reloading tracker
+url: "https://chelohomelab.github.io"
+baseurl: "/guns-and-reloading"
 remote_theme: just-the-docs/just-the-docs
 
 color_scheme: dark

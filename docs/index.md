@@ -1,5 +1,6 @@
 ---
 title: Home
+layout: home
 nav_order: 1
 description: Documentation for Guns & Reloading, a self-hosted firearm inventory and reloading tracker.
 permalink: /

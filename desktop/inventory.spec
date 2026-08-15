@@ -2,9 +2,10 @@
 #   pyinstaller desktop/inventory.spec
 #
 # A .spec (rather than raw --add-data CLI flags) so asset bundling is explicit, not accidental —
-# static/uploads/ (user data) and static/reloading_data/ (gitignored dev tooling) must NEVER end
-# up inside an installer. Both are gitignored so a clean CI checkout wouldn't have them anyway,
-# but enumerating exact subpaths here means that's true by construction, not by accident.
+# static/uploads/ (user data), static/reloading_data/, and static/htmls/ (gitignored dev tooling)
+# must NEVER end up inside an installer. All three are gitignored so a clean CI checkout wouldn't
+# have them anyway, but enumerating exact subpaths here means that's true by construction, not by
+# accident.
 
 import sys
 
@@ -24,7 +25,6 @@ a = Analysis(
         ('../static/bc_reference.json', 'static'),
         ('../static/manifest.json', 'static'),
         ('../static/images', 'static/images'),
-        ('../static/htmls', 'static/htmls'),
         ('../VERSION', '.'),
     ],
     hiddenimports=[

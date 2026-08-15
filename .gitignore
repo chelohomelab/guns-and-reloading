@@ -22,6 +22,14 @@ static/reloading_data/
 *.db-shm
 *.db-wal
 
+# PyInstaller build output (desktop packaging) — regenerated per build, never commit
+/dist/
+/build/
+
+# WebView2 bootstrapper — fetched by the desktop-installer CI step, not committed (Microsoft
+# updates it independently of our release cadence)
+desktop/windows/MicrosoftEdgeWebView2Setup.exe
+
 # Python cache
 __pycache__/
 *.py[cod]

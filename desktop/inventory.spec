@@ -6,7 +6,13 @@
 # up inside an installer. Both are gitignored so a clean CI checkout wouldn't have them anyway,
 # but enumerating exact subpaths here means that's true by construction, not by accident.
 
+import sys
+
 block_cipher = None
+
+# .ico is Windows-only (macOS wants .icns, which doesn't exist yet — that leg of the build matrix
+# still ships with PyInstaller's default icon; not this task's scope).
+icon_path = 'windows/icon.ico' if sys.platform == 'win32' else None
 
 a = Analysis(
     ['../launcher.py'],
@@ -50,6 +56,7 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,
+    icon=icon_path,
 )
 
 coll = COLLECT(

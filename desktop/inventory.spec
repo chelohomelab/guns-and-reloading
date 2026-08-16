@@ -21,7 +21,14 @@ a = Analysis(
     binaries=[],
     datas=[
         ('../templates', 'templates'),
+        # Every top-level static/*.js and *.json a template actually references (grep templates/
+        # for '/static/[^/]+\.\(js\|json\)' to re-check this list after adding a new one) — a
+        # missing entry here 404s in the frozen build even though it works fine running from
+        # source, since only files listed here exist under PyInstaller's _MEIPASS.
         ('../static/app.js', 'static'),
+        ('../static/offline-queue.js', 'static'),
+        ('../static/price-blur.js', 'static'),
+        ('../static/sw.js', 'static'),
         ('../static/bc_reference.json', 'static'),
         ('../static/manifest.json', 'static'),
         ('../static/images', 'static/images'),

@@ -2,11 +2,18 @@
 #   pyinstaller desktop/inventory.spec
 #
 # A .spec (rather than raw --add-data CLI flags) so asset bundling is explicit, not accidental —
-# static/uploads/ (user data) and static/reloading_data/ (gitignored dev tooling) must NEVER end
-# up inside an installer. Both are gitignored so a clean CI checkout wouldn't have them anyway,
-# but enumerating exact subpaths here means that's true by construction, not by accident.
+# static/uploads/ (user data), static/reloading_data/, and static/htmls/ (gitignored dev tooling)
+# must NEVER end up inside an installer. All three are gitignored so a clean CI checkout wouldn't
+# have them anyway, but enumerating exact subpaths here means that's true by construction, not by
+# accident.
+
+import sys
 
 block_cipher = None
+
+# .ico is Windows-only (macOS wants .icns, which doesn't exist yet — that leg of the build matrix
+# still ships with PyInstaller's default icon; not this task's scope).
+icon_path = 'windows/icon.ico' if sys.platform == 'win32' else None
 
 a = Analysis(
     ['../launcher.py'],
@@ -14,11 +21,17 @@ a = Analysis(
     binaries=[],
     datas=[
         ('../templates', 'templates'),
+        # Every top-level static/*.js and *.json a template actually references (grep templates/
+        # for '/static/[^/]+\.\(js\|json\)' to re-check this list after adding a new one) — a
+        # missing entry here 404s in the frozen build even though it works fine running from
+        # source, since only files listed here exist under PyInstaller's _MEIPASS.
         ('../static/app.js', 'static'),
+        ('../static/offline-queue.js', 'static'),
+        ('../static/price-blur.js', 'static'),
+        ('../static/sw.js', 'static'),
         ('../static/bc_reference.json', 'static'),
         ('../static/manifest.json', 'static'),
         ('../static/images', 'static/images'),
-        ('../static/htmls', 'static/htmls'),
         ('../VERSION', '.'),
     ],
     hiddenimports=[
@@ -50,6 +63,7 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,
+    icon=icon_path,
 )
 
 coll = COLLECT(

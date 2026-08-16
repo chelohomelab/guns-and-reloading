@@ -54,7 +54,7 @@ def main():
     while not server.started:
         pass  # tight-poll — uvicorn.Server sets this once the ASGI app is actually accepting
 
-    window = webview.create_window("Inventory & Reloading", f"http://127.0.0.1:{port}")
+    window = webview.create_window("Guns & Reloading", f"http://127.0.0.1:{port}")
 
     def _on_closed():
         server.should_exit = True

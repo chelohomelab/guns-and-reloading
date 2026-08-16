@@ -19,3 +19,7 @@ def _detect_base_dir() -> Path:
 
 BASE_DIR: Path = _detect_base_dir()
 DATA_DIR: Path = Path(os.environ.get("INVENTORY_DATA_DIR", "."))
+
+# True only inside a PyInstaller-frozen desktop build (launcher.py) — never for uvicorn CLI/
+# Docker/systemd, which import main:app directly and have no _MEIPASS.
+IS_DESKTOP: bool = getattr(sys, "_MEIPASS", None) is not None

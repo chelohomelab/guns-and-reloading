@@ -179,6 +179,24 @@
         Want the full commit history or release notes? <a href="{{ repo_url }}/releases" target="_blank" rel="noopener" class="text-gray-400 hover:text-amber-400 underline transition">View on GitHub ↗</a>
     </p>
     {% endif %}
+    {% elif is_desktop %}
+    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
+        <div class="flex items-baseline justify-between">
+            <span class="text-xs text-gray-400 uppercase tracking-wider">Current Version</span>
+            <span id="desktop-current-version" class="text-xl font-bold text-white">…</span>
+        </div>
+
+        <div id="desktop-status-line" class="text-sm text-gray-400 italic">Checking for updates…</div>
+
+        <div id="desktop-update-block" class="hidden space-y-2 pt-2 border-t border-gray-700">
+            <div class="text-sm text-emerald-400 font-bold">New version: <span id="desktop-latest-version"></span></div>
+            <a id="desktop-download-btn" href="#" target="_blank" rel="noopener"
+               class="block text-center w-full px-4 py-2.5 bg-amber-700 hover:bg-amber-600 text-white text-sm font-bold rounded-lg transition">
+                ⬇️ Download <span id="desktop-download-label"></span>
+            </a>
+            <p class="text-xs text-gray-500 text-center">Run the installer over your current install — your data stays exactly where it is.</p>
+        </div>
+    </div>
     {% else %}
     <div class="bg-gray-800 border border-gray-700 rounded-xl p-5">
         <p class="text-sm text-gray-400">Self-upgrade isn't available for this install type — no local git checkout was found. Update via your platform's normal mechanism instead (a new Docker image tag, or a new desktop installer release).</p>
@@ -270,6 +288,39 @@
             } else {
                 rbPanel.classList.add('hidden');
             }
+        } catch {
+            statusEl.textContent = 'Error checking for updates.';
+            statusEl.className = 'text-sm text-red-400';
+        }
+    }
+
+    async function checkForUpdatesDesktop() {
+        const statusEl = document.getElementById('desktop-status-line');
+        const block = document.getElementById('desktop-update-block');
+        try {
+            const res = await fetch('/admin/upgrade/check');
+            const d = await res.json();
+
+            document.getElementById('desktop-current-version').textContent = d.current_version || '—';
+
+            if (!d.ok) {
+                statusEl.textContent = d.error || 'Could not check for updates.';
+                statusEl.className = 'text-sm text-red-400';
+                return;
+            }
+            if (d.up_to_date) {
+                statusEl.textContent = '✓ You\'re up to date.';
+                statusEl.className = 'text-sm text-green-400';
+                return;
+            }
+
+            statusEl.textContent = '';
+            document.getElementById('desktop-latest-version').textContent = d.latest_version || '(new release)';
+            const downloadBtn = document.getElementById('desktop-download-btn');
+            downloadBtn.href = d.download_url || d.release_url;
+            document.getElementById('desktop-download-label').textContent = d.download_url
+                ? `v${d.latest_version}` : `page for v${d.latest_version}`;
+            block.classList.remove('hidden');
         } catch {
             statusEl.textContent = 'Error checking for updates.';
             statusEl.className = 'text-sm text-red-400';
@@ -377,6 +428,8 @@
 
     {% if git_available %}
     checkForUpdates();
+    {% elif is_desktop %}
+    checkForUpdatesDesktop();
     {% endif %}
 </script>
 

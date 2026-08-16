@@ -35,11 +35,27 @@ jobs:
       # --- Per-OS packaging ---------------------------------------------------------------
       # Windows: Inno Setup script wraps the PyInstaller onedir build into a real installer
       # with a Start Menu shortcut and a WebView2 runtime bootstrapper check.
+      - name: Read app version
+        if: matrix.os == 'windows-latest'
+        id: version
+        shell: bash
+        run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
+      # Fetched at build time rather than committed — Microsoft updates this bootstrapper
+      # independently of our release cadence, and it's a large binary that doesn't belong in git.
+      # installer.iss embeds it (Files: dontcopy) and only runs it if WebView2 isn't already
+      # present on the target machine.
+      - name: Download WebView2 Runtime bootstrapper
+        if: matrix.os == 'windows-latest'
+        run: curl.exe -Lo desktop\windows\MicrosoftEdgeWebView2Setup.exe "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+
+      - name: Install Inno Setup
+        if: matrix.os == 'windows-latest'
+        run: choco install innosetup --no-progress -y
+
       - name: Package Windows installer (Inno Setup)
         if: matrix.os == 'windows-latest'
-        run: |
-          echo "TODO: iscc desktop/windows/installer.iss"
-          echo "Requires desktop/windows/installer.iss to exist first — not yet written."
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" desktop\windows\installer.iss "/DMyAppVersion=${{ steps.version.outputs.version }}"'
 
       # macOS: .app bundle -> .dmg. Unsigned/unnotarized for now (Apple Developer account is a
       # deliberate later step, not a v1 blocker) — expect a Gatekeeper warning on first launch.
@@ -58,7 +74,19 @@ jobs:
           echo "TODO: appimagetool against dist/InventoryAndReloading"
           echo "Requires appimagetool to be downloaded/installed in this job first."
 
-      - uses: actions/upload-artifact@v4
+      # Windows already has a real installer, so only upload that (the raw onedir build is a
+      # few hundred MB of bundled Python runtime, not something anyone needs from CI). macOS/
+      # Linux still upload the raw PyInstaller output until their packaging steps are written.
+      - name: Upload Windows installer
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.os }}
+          path: dist/installer/*.exe
+
+      - name: Upload raw build output
+        if: matrix.os != 'windows-latest'
+        uses: actions/upload-artifact@v4
         with:
           name: installer-${{ matrix.os }}
           path: dist/**

@@ -1,9 +1,12 @@
 import json
 import os
+import platform
 import subprocess
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 
@@ -11,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from config import templates
-from paths import DATA_DIR
+from paths import BASE_DIR, DATA_DIR, IS_DESKTOP
 from routers.backup import _load_config, restore_zip_bytes, save_backup_zip
 
 router = APIRouter()
@@ -24,6 +27,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 GIT_AVAILABLE = (REPO_ROOT / ".git").is_dir()
 UPGRADE_STATE_PATH = Path(DATA_DIR) / "data" / "upgrade_state.json"
 BRANCH = "main"
+
+# Desktop builds have no git checkout to fetch/merge, so they get a much simpler "check the
+# latest GitHub Release and hand back a download link" flow instead — see _desktop_check_update.
+DESKTOP_REPO_SLUG = "chelohomelab/guns-and-reloading"
 
 
 def _require_admin(request: Request):
@@ -102,6 +109,65 @@ def _repo_web_url() -> str | None:
 
 
 REPO_WEB_URL = _repo_web_url()
+
+
+def _read_local_version() -> str | None:
+    """The frozen desktop build's own VERSION file (bundled by desktop/inventory.spec into
+    BASE_DIR, i.e. PyInstaller's _MEIPASS) — the git-checkout equivalent is _version_at("HEAD")."""
+    version_file = BASE_DIR / "VERSION"
+    if not version_file.exists():
+        return None
+    return version_file.read_text().strip() or None
+
+
+def _tag_to_version(tag: str) -> str:
+    """"v1.24.0" -> "1.24", matching the VERSION file's "major.minor" convention that this
+    project's release tags follow. Falls back to the raw tag (minus a leading "v") if a release
+    ever ships a non-zero patch number, rather than silently mangling it."""
+    v = tag[1:] if tag.startswith("v") else tag
+    parts = v.split(".")
+    if len(parts) == 3 and parts[2] == "0":
+        return f"{parts[0]}.{parts[1]}"
+    return v
+
+
+def _desktop_check_update() -> dict:
+    """GitHub's latest-Release equivalent of upgrade_check's git-fetch flow. No in-app run/
+    rollback for desktop — the "upgrade" is just downloading and running a new installer, which
+    is safe to do over an existing install (Inno Setup's fixed AppId upgrades in place)."""
+    current_version = _read_local_version()
+    api_url = f"https://api.github.com/repos/{DESKTOP_REPO_SLUG}/releases/latest"
+    req = urllib.request.Request(
+        api_url,
+        headers={"User-Agent": "guns-and-reloading-desktop", "Accept": "application/vnd.github+json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as e:
+        return {"ok": False, "error": f"Could not check for updates: {e}", "current_version": current_version}
+
+    latest_version = _tag_to_version(data["tag_name"]) if data.get("tag_name") else None
+
+    # Only offer a direct one-click download if this OS's installer is actually attached to the
+    # release yet — build-desktop.yml doesn't auto-attach to Releases today, so early on this
+    # will usually fall through to the release page link instead, which is still correct.
+    download_url = None
+    ext = {"Windows": ".exe", "Darwin": ".dmg", "Linux": ".appimage"}.get(platform.system())
+    if ext:
+        for asset in data.get("assets", []):
+            if asset.get("name", "").lower().endswith(ext):
+                download_url = asset.get("browser_download_url")
+                break
+
+    return {
+        "ok": True,
+        "current_version": current_version,
+        "latest_version": latest_version,
+        "up_to_date": bool(latest_version) and latest_version == current_version,
+        "download_url": download_url,
+        "release_url": data.get("html_url"),
+    }
 
 
 def _is_dirty() -> bool:
@@ -185,6 +251,7 @@ async def upgrade_page(request: Request):
         "request": request,
         "user": request.state.user,
         "git_available": GIT_AVAILABLE,
+        "is_desktop": IS_DESKTOP,
         "repo_url": REPO_WEB_URL,
     })
 
@@ -194,7 +261,10 @@ async def upgrade_page(request: Request):
 @router.get("/admin/upgrade/check")
 def upgrade_check(request: Request):
     _require_admin(request)
-    _require_git()
+    if not GIT_AVAILABLE:
+        if IS_DESKTOP:
+            return _desktop_check_update()
+        _require_git()  # raises the standard "not available for this install type" 400
 
     current = _commit_info("HEAD")
     current_version = _version_at("HEAD")

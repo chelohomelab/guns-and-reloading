@@ -106,4 +106,4 @@ app.include_router(upgrade.router)
 # Global (not per-request context) — every template rendered through this Jinja2Templates
 # instance sees it automatically, so the 4 nav templates can gate the "Upgrade" link without
 # threading a new kwarg through every TemplateResponse(...) call site that renders them.
-templates.env.globals["upgrade_available"] = upgrade.GIT_AVAILABLE
+templates.env.globals["upgrade_available"] = upgrade.GIT_AVAILABLE or upgrade.IS_DESKTOP

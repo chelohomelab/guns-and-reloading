@@ -61,14 +61,14 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}
 
 [Code]
 function IsWebView2RuntimeInstalled: Boolean;
-const
-  ClientKey = 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
-  ClientKeyWow6432 = 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
 var
   Version: String;
+  ClientKey, ClientKeyWow6432: String;
 begin
   // The evergreen WebView2 runtime registers under one of these three locations depending on
   // whether it was installed machine-wide (32- or 64-bit registry view) or per-user.
+  ClientKey := 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
+  ClientKeyWow6432 := 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
   Result :=
     RegQueryStringValue(HKLM, ClientKeyWow6432, 'pv', Version)
     or RegQueryStringValue(HKLM, ClientKey, 'pv', Version)

@@ -29,6 +29,27 @@ jobs:
       - name: Install desktop requirements
         run: pip install -r requirements-desktop.txt
 
+      # Built here (not committed) since generating a real .icns needs macOS's own iconutil —
+      # same "generate on the OS that needs it" approach as the Windows WebView2 bootstrapper
+      # below. Must run before PyInstaller: inventory.spec's BUNDLE() step reads this file.
+      - name: Generate macOS app icon (icns)
+        if: matrix.os == 'macos-latest'
+        run: |
+          SRC=static/images/app-icon.png
+          ICONSET=desktop/macos/icon.iconset
+          mkdir -p "$ICONSET"
+          sips -z 16 16     "$SRC" --out "$ICONSET/icon_16x16.png"
+          sips -z 32 32     "$SRC" --out "$ICONSET/icon_16x16@2x.png"
+          sips -z 32 32     "$SRC" --out "$ICONSET/icon_32x32.png"
+          sips -z 64 64     "$SRC" --out "$ICONSET/icon_32x32@2x.png"
+          sips -z 128 128   "$SRC" --out "$ICONSET/icon_128x128.png"
+          sips -z 256 256   "$SRC" --out "$ICONSET/icon_128x128@2x.png"
+          sips -z 256 256   "$SRC" --out "$ICONSET/icon_256x256.png"
+          sips -z 512 512   "$SRC" --out "$ICONSET/icon_256x256@2x.png"
+          sips -z 512 512   "$SRC" --out "$ICONSET/icon_512x512.png"
+          sips -z 1024 1024 "$SRC" --out "$ICONSET/icon_512x512@2x.png"
+          iconutil -c icns "$ICONSET" -o desktop/macos/icon.icns
+
       - name: Build with PyInstaller
         run: pyinstaller desktop/inventory.spec
 
@@ -36,7 +57,7 @@ jobs:
       # Windows: Inno Setup script wraps the PyInstaller onedir build into a real installer
       # with a Start Menu shortcut and a WebView2 runtime bootstrapper check.
       - name: Read app version
-        if: matrix.os == 'windows-latest'
+        if: matrix.os != 'ubuntu-latest'
         id: version
         shell: bash
         run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
@@ -57,13 +78,19 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" desktop\windows\installer.iss "/DMyAppVersion=${{ steps.version.outputs.version }}"'
 
-      # macOS: .app bundle -> .dmg. Unsigned/unnotarized for now (Apple Developer account is a
-      # deliberate later step, not a v1 blocker) — expect a Gatekeeper warning on first launch.
-      - name: Package macOS .dmg
+      # macOS: .app bundle (built by inventory.spec's BUNDLE() step) -> ad-hoc signed -> .dmg.
+      # Not notarized (needs a paid Apple Developer account — a deliberate later step, not a v1
+      # blocker), so Gatekeeper still requires right-click → Open on first launch. Ad-hoc signing
+      # (no certificate needed) is still worth doing: a *completely* unsigned app downloaded from
+      # the internet often gets Apple Silicon's harsher "app is damaged" false-positive instead of
+      # the milder "unidentified developer" prompt.
+      - name: Ad-hoc codesign + package macOS .dmg
         if: matrix.os == 'macos-latest'
         run: |
-          echo "TODO: create-dmg or hdiutil against dist/InventoryAndReloading.app"
-          echo "Requires the PyInstaller build to produce a .app bundle first."
+          codesign --force --deep --sign - "dist/Guns & Reloading.app"
+          mkdir -p dist/installer
+          hdiutil create -volname "Guns & Reloading" -srcfolder "dist/Guns & Reloading.app" \
+            -ov -format UDZO "dist/installer/GunsAndReloading-Setup-${{ steps.version.outputs.version }}.dmg"
 
       # Linux: AppImage — most portable, no package-manager dependency, but still needs the
       # GTK/WebKit2 runtime libs present on the host system (installed above for this build,
@@ -74,9 +101,9 @@ jobs:
           echo "TODO: appimagetool against dist/InventoryAndReloading"
           echo "Requires appimagetool to be downloaded/installed in this job first."
 
-      # Windows already has a real installer, so only upload that (the raw onedir build is a
-      # few hundred MB of bundled Python runtime, not something anyone needs from CI). macOS/
-      # Linux still upload the raw PyInstaller output until their packaging steps are written.
+      # Windows/macOS already have real installers, so only upload those (the raw onedir/.app
+      # build is a few hundred MB of bundled Python runtime, not something anyone needs from CI).
+      # Linux still uploads the raw PyInstaller output until AppImage packaging is written.
       - name: Upload Windows installer
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
@@ -84,8 +111,15 @@ jobs:
           name: installer-${{ matrix.os }}
           path: dist/installer/*.exe
 
+      - name: Upload macOS installer
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.os }}
+          path: dist/installer/*.dmg
+
       - name: Upload raw build output
-        if: matrix.os != 'windows-latest'
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: installer-${{ matrix.os }}

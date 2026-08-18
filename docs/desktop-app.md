@@ -13,18 +13,18 @@ Disaster Recovery]({% link admin-guide.md %}#backup-disaster-recovery) in the Ad
 
 ## Downloads
 
-Builds for all three platforms come from the [`Build Desktop Installers`
-workflow](https://github.com/chelohomelab/guns-and-reloading/actions/workflows/build-desktop.yml).
-Open the most recent successful (green ✓) run, and download the installer for your OS from its
-**Artifacts** section at the bottom of the page. You'll need to be signed into GitHub for the
-download link to work.
+All three are attached directly to the [latest GitHub
+Release](https://github.com/chelohomelab/guns-and-reloading/releases/latest) — no GitHub account
+or login needed, just click and download.
 
-Windows builds are installer-tested on real hardware. macOS and Linux builds are newer and still
-being verified — if something doesn't work, that's useful to know about.
+Windows is installer-tested on real hardware. macOS and Linux are newer and still being verified —
+the Release page itself notes the current status of each; if something doesn't work, that's
+useful to know about.
 
 ### Windows
 
-1. Download `installer-windows-latest`, unzip it to get `GunsAndReloading-Setup-X.Y.exe`.
+1. Download `GunsAndReloading-Setup-X.Y.exe` from the [latest
+   Release](https://github.com/chelohomelab/guns-and-reloading/releases/latest).
 2. Run it. Windows SmartScreen will likely warn "Windows protected your PC," since the installer
    isn't code-signed — click **More info → Run anyway**.
 3. It installs the Microsoft Edge WebView2 Runtime automatically if you don't already have it,
@@ -32,7 +32,8 @@ being verified — if something doesn't work, that's useful to know about.
 
 ### macOS
 
-1. Download `installer-macos-latest`, unzip it to get a `.dmg`.
+1. Download `GunsAndReloading-Setup-X.Y.dmg` from the [latest
+   Release](https://github.com/chelohomelab/guns-and-reloading/releases/latest).
 2. Open it and drag **Guns & Reloading** into Applications.
 3. First launch: **right-click the app → Open** — not a normal double-click. The app is ad-hoc
    signed but not notarized (that needs a paid Apple Developer account), so a plain double-click
@@ -41,9 +42,9 @@ being verified — if something doesn't work, that's useful to know about.
 
 ### Linux (Fedora, Ubuntu, or any AppImage-capable distro)
 
-1. Download `installer-ubuntu-latest`, unzip it to get
-   `GunsAndReloading-Setup-X.Y-x86_64.AppImage`. The same file works on any distro — that's the
-   whole point of AppImage, nothing distro-specific to pick.
+1. Download `GunsAndReloading-Setup-X.Y-x86_64.AppImage` from the [latest
+   Release](https://github.com/chelohomelab/guns-and-reloading/releases/latest). The same file
+   works on any distro — that's the whole point of AppImage, nothing distro-specific to pick.
 2. It needs GTK3 and WebKit2GTK already on your system (same as running the app from source) —
    most desktop Linux installs already have these, but if launching it fails with a Gtk or
    WebKit2 error, install them first:

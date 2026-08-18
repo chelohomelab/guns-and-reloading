@@ -87,9 +87,29 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           codesign --force --deep --sign - "dist/Guns & Reloading.app"
+
+          # Stage the classic drag-to-install layout: the app plus a symlink to /Applications,
+          # side by side. Pointing hdiutil straight at the .app (the previous approach) puts only
+          # the app in the dmg — there's nothing to drag it onto, and it's not obvious the app
+          # even needs to leave the mounted disk image at all.
+          STAGING="dist/dmg-staging"
+          mkdir -p "$STAGING"
+          cp -R "dist/Guns & Reloading.app" "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+
           mkdir -p dist/installer
-          hdiutil create -volname "Guns & Reloading" -srcfolder "dist/Guns & Reloading.app" \
-            -ov -format UDZO "dist/installer/GunsAndReloading-Setup-${{ steps.version.outputs.version }}.dmg"
+          DMG_PATH="dist/installer/GunsAndReloading-Setup-${{ steps.version.outputs.version }}.dmg"
+          hdiutil create -volname "Guns & Reloading" -srcfolder "$STAGING" -ov -format UDZO "$DMG_PATH"
+
+          # Verify the dmg's actual contents right here rather than trusting it worked — mount it
+          # back and confirm both the app and the Applications symlink are really inside.
+          MOUNT_POINT="$(mktemp -d)"
+          hdiutil attach "$DMG_PATH" -mountpoint "$MOUNT_POINT" -nobrowse -quiet
+          echo "--- DMG contents ---"
+          ls -la "$MOUNT_POINT"
+          [ -e "$MOUNT_POINT/Guns & Reloading.app" ] || { echo "::error::App bundle missing from dmg"; exit 1; }
+          [ -L "$MOUNT_POINT/Applications" ] || { echo "::error::Applications symlink missing from dmg"; exit 1; }
+          hdiutil detach "$MOUNT_POINT" -quiet
 
       # Linux: AppImage — most portable, no package-manager dependency, but still needs the
       # GTK/WebKit2 runtime libs present on the host system (installed above for THIS build, but

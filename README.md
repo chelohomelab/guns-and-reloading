@@ -14,6 +14,7 @@ A self-hosted homelab app to track your firearm collection and reloading data.
 |---|---|
 | [LXC Setup](docs/lxc-setup.md) | Create and configure a Proxmox LXC container |
 | [Installation](docs/installation.md) | Deploy the app, first-time setup, and updating |
+| [Desktop App](docs/desktop-app.md) | Windows/macOS/Linux installers for single-computer use, no server needed |
 | [User Guide](docs/user-guide.md) | Feature walkthrough — inventory, reloading, range sessions, profiles |
 | [Admin Guide](docs/admin-guide.md) | Users, backup/restore, self-upgrade, phone/tablet HTTPS setup |
 

@@ -54,7 +54,14 @@ def main():
     while not server.started:
         pass  # tight-poll — uvicorn.Server sets this once the ASGI app is actually accepting
 
-    window = webview.create_window("Guns & Reloading", f"http://127.0.0.1:{port}")
+    # pywebview's own defaults are 800x600 with no minimum size — below the app's CSS breakpoint
+    # (1024px) that switches from its portrait "mobile" background to the widescreen one, so the
+    # window would launch (and could be resized down) into showing the wrong, badly-cropped
+    # background. min_size keeps it from ever dropping back below that breakpoint.
+    window = webview.create_window(
+        "Guns & Reloading", f"http://127.0.0.1:{port}",
+        width=1200, height=800, min_size=(1024, 700),
+    )
 
     def _on_closed():
         server.should_exit = True

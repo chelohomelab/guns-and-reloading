@@ -30,6 +30,11 @@ static/reloading_data/
 # updates it independently of our release cadence)
 desktop/windows/MicrosoftEdgeWebView2Setup.exe
 
+# macOS app icon — generated at CI build time via sips/iconutil (needs macOS itself), not
+# committed since this Linux sandbox can't produce a valid .icns to check in
+desktop/macos/icon.iconset/
+desktop/macos/icon.icns
+
 # Python cache
 __pycache__/
 *.py[cod]

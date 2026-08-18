@@ -36,5 +36,6 @@ server, your own data, nothing sent anywhere else.
 | If you're... | Go to |
 |---|---|
 | Setting up a fresh server | [LXC Setup]({% link lxc-setup.md %}) → [Installation]({% link installation.md %}) |
+| Just want it on one computer, no server | [Desktop App]({% link desktop-app.md %}) |
 | Already running it and want to learn the app | [User Guide]({% link user-guide.md %}) |
 | An admin looking for backup/upgrade/user-management tools | [Admin Guide]({% link admin-guide.md %}) |

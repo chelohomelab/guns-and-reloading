@@ -34,11 +34,16 @@ useful to know about.
 
 1. Download `GunsAndReloading-Setup-X.Y.dmg` from the [latest
    Release](https://github.com/chelohomelab/guns-and-reloading/releases/latest).
-2. Open it and drag **Guns & Reloading** into Applications.
-3. First launch: **right-click the app → Open** — not a normal double-click. The app is ad-hoc
-   signed but not notarized (that needs a paid Apple Developer account), so a plain double-click
-   gets silently blocked by Gatekeeper. Right-click → Open gives you an "Open anyway" option.
-   After that first time, it launches normally.
+2. Double-click the downloaded file. A window pops up with two icons side by side: the **Guns &
+   Reloading** app on the left and a folder icon labeled **Applications** on the right. Click and
+   hold the app icon, drag it on top of the Applications folder icon, then let go — that copies
+   it into your actual Applications folder (this window itself is just a temporary "installer,"
+   not where the app actually lives).
+3. Open a Finder window, click **Applications** in the sidebar, and find **Guns & Reloading**
+   there. **Right-click it → Open** — not a normal double-click. The app is ad-hoc signed but not
+   notarized (that needs a paid Apple Developer account), so a plain double-click gets silently
+   blocked by Gatekeeper the first time. Right-click → Open gives you an "Open anyway" option.
+   After that first time, a normal double-click works from then on.
 
 ### Linux (Fedora, Ubuntu, or any AppImage-capable distro)
 

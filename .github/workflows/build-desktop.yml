@@ -57,7 +57,6 @@ jobs:
       # Windows: Inno Setup script wraps the PyInstaller onedir build into a real installer
       # with a Start Menu shortcut and a WebView2 runtime bootstrapper check.
       - name: Read app version
-        if: matrix.os != 'ubuntu-latest'
         id: version
         shell: bash
         run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
@@ -93,17 +92,43 @@ jobs:
             -ov -format UDZO "dist/installer/GunsAndReloading-Setup-${{ steps.version.outputs.version }}.dmg"
 
       # Linux: AppImage — most portable, no package-manager dependency, but still needs the
-      # GTK/WebKit2 runtime libs present on the host system (installed above for this build,
-      # NOT bundled into the AppImage itself — document this in release notes).
+      # GTK/WebKit2 runtime libs present on the host system (installed above for THIS build, but
+      # NOT bundled into the AppImage itself — a fresh distro needs its own gtk3/webkit2gtk
+      # packages installed first; document this in release notes/docs).
       - name: Package Linux AppImage
         if: matrix.os == 'ubuntu-latest'
         run: |
-          echo "TODO: appimagetool against dist/InventoryAndReloading"
-          echo "Requires appimagetool to be downloaded/installed in this job first."
+          APPDIR=dist/AppDir
+          mkdir -p "$APPDIR/usr/bin" dist/installer
+          cp -r dist/InventoryAndReloading/* "$APPDIR/usr/bin/"
 
-      # Windows/macOS already have real installers, so only upload those (the raw onedir/.app
-      # build is a few hundred MB of bundled Python runtime, not something anyone needs from CI).
-      # Linux still uploads the raw PyInstaller output until AppImage packaging is written.
+          cat > "$APPDIR/AppRun" <<'RUNEOF'
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec "$HERE/usr/bin/InventoryAndReloading" "$@"
+          RUNEOF
+          chmod +x "$APPDIR/AppRun"
+
+          cp static/images/icon-512.png "$APPDIR/guns-and-reloading.png"
+
+          cat > "$APPDIR/guns-and-reloading.desktop" <<'DESKTOPEOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Guns & Reloading
+          Exec=AppRun
+          Icon=guns-and-reloading
+          Categories=Utility;
+          DESKTOPEOF
+
+          curl -Lo appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool
+          # appimagetool is itself packaged as an AppImage, which normally needs FUSE to run —
+          # this headless CI runner doesn't have it, so extract-and-run instead.
+          ./appimagetool --appimage-extract-and-run "$APPDIR" \
+            "dist/installer/GunsAndReloading-Setup-${{ steps.version.outputs.version }}-x86_64.AppImage"
+
+      # All three OSes have real installers now — upload just those, not the raw onedir/.app
+      # build (a few hundred MB of bundled Python runtime nobody needs pulled out of CI).
       - name: Upload Windows installer
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
@@ -118,9 +143,9 @@ jobs:
           name: installer-${{ matrix.os }}
           path: dist/installer/*.dmg
 
-      - name: Upload raw build output
+      - name: Upload Linux installer
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: installer-${{ matrix.os }}
-          path: dist/**
+          path: dist/installer/*.AppImage

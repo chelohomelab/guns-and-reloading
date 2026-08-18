@@ -39,11 +39,16 @@ useful to know about.
    hold the app icon, drag it on top of the Applications folder icon, then let go — that copies
    it into your actual Applications folder (this window itself is just a temporary "installer,"
    not where the app actually lives).
-3. Open a Finder window, click **Applications** in the sidebar, and find **Guns & Reloading**
-   there. **Right-click it → Open** — not a normal double-click. The app is ad-hoc signed but not
-   notarized (that needs a paid Apple Developer account), so a plain double-click gets silently
-   blocked by Gatekeeper the first time. Right-click → Open gives you an "Open anyway" option.
-   After that first time, a normal double-click works from then on.
+3. Open a Finder window, click **Applications** in the sidebar, and open **Guns & Reloading**
+   from there. The app is ad-hoc signed but not notarized (that needs a paid Apple Developer
+   account), so Gatekeeper blocks it the first time with a dialog offering only **Done** and
+   **Move to Trash** — no "Open Anyway" button there on current macOS versions. To get past it:
+   1. Click **Done**.
+   2. Open **System Settings → Privacy & Security**, scroll down to the **Security** section
+      near the bottom. There's a message that Guns & Reloading was blocked, with an **Open
+      Anyway** button next to it — click it (you'll likely need your Mac password or Touch ID).
+   3. Open the app again from Applications. This time a normal dialog appears with an **Open**
+      button — click it, and it launches. Every launch after that works normally.
 
 ### Linux (Fedora, Ubuntu, or any AppImage-capable distro)
 

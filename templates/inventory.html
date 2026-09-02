@@ -329,7 +329,6 @@
                     <div id="ammo-filter-row" class="flex bg-gray-950 p-0.5 rounded border border-gray-800 text-xs font-bold">
                         <button id="ammo-btn-factory" onclick="switchAmmoFilter('factory')" class="px-3 py-1 rounded bg-gray-800 text-blue-400 cursor-pointer">Factory Loads</button>
                         <button id="ammo-btn-muzzleloader" onclick="switchAmmoFilter('muzzleloader')" class="px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer">Muzzleloader</button>
-                        <button id="ammo-btn-handload" onclick="switchAmmoFilter('handload')" class="px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer">Handloads</button>
                     </div>
                     <a id="ammo-add-btn" href="/?tab=add-tab&cat=ammunition" class="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition cursor-pointer">+ Add</a>
                 </div>
@@ -417,7 +416,7 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=136"></script>
+    <script src="/static/app.js?v=137"></script>
     <script>
     window.onload = () => {
         fetchInitialLookupData(); applyPreferences(); initCustomAC();

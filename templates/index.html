@@ -1157,10 +1157,6 @@
             </div>
 
             <div id="pane-ammunition" class="hidden space-y-6">
-                <div id="ammo-type-toggle" class="flex space-x-2 border-b border-gray-800 pb-2">
-                    <button onclick="toggleAmmoType('factory')" id="btn-ammo-factory" class="px-3 py-1 text-xs font-bold rounded bg-blue-600 text-white cursor-pointer">📦 Commercial Factory Loads</button>
-                    <button onclick="toggleAmmoType('handloads')" id="btn-ammo-handloads" class="px-3 py-1 text-xs font-bold rounded text-gray-400 bg-gray-950 hover:text-white cursor-pointer">🧪 Handloads Bench Log</button>
-                </div>
 
                 <form id="ammo-factory-form" class="ammo-variant-form bg-gray-800 p-6 rounded-lg border border-gray-700 space-y-4 shadow-xl">
                     <div class="flex items-center justify-between">
@@ -1841,7 +1837,7 @@
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <script src="/static/offline-queue.js?v=1"></script>
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=136"></script>
+    <script src="/static/app.js?v=137"></script>
     <script>
       OfflineQueue.init();
       document.querySelector('a[href="/logout"]')?.addEventListener('click', async (e) => {

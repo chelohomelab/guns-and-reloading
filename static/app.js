@@ -997,13 +997,10 @@ function switchAmmoFilter(type) {
     const inactive = "px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer";
     const factBtn = document.getElementById('ammo-btn-factory');
     const muzzBtn = document.getElementById('ammo-btn-muzzleloader');
-    const handBtn = document.getElementById('ammo-btn-handload');
     if (factBtn) factBtn.className = type === 'factory'
         ? "px-3 py-1 rounded bg-gray-800 text-blue-400 cursor-pointer" : inactive;
     if (muzzBtn) muzzBtn.className = type === 'muzzleloader'
         ? "px-3 py-1 rounded bg-gray-800 text-yellow-500 cursor-pointer" : inactive;
-    if (handBtn) handBtn.className = type === 'handload'
-        ? "px-3 py-1 rounded bg-gray-800 text-amber-400 cursor-pointer" : inactive;
     // Send the "+ Add" button straight to the handload form, skipping the Factory/Handload
     // choice entirely — picking "Factory Load" while already looking at Handloads is confusing.
     const addBtn = document.getElementById('ammo-add-btn');
@@ -7457,12 +7454,10 @@ window.onload = () => {
         else if (cat === 'tc-barrel') { switchFormCategory('cat-platforms'); switchAddForm('add-tc-barrel'); }
         else if (cat === 'tc-receiver') { switchFormCategory('cat-platforms'); switchAddForm('add-tc-receiver'); }
         else switchFormCategory('cat-' + cat);
-        // Arrived from the Handloads view specifically — go straight to that form and hide
-        // the Factory/Handload choice entirely, since picking Factory here would be confusing.
-        if (cat === 'ammunition' && p.get('ammotype') === 'handload') {
-            toggleAmmoType('handloads');
-            document.getElementById('ammo-type-toggle')?.classList.add('hidden');
-        }
+        // Arrived from the Handloads view specifically — jump straight to that form. The
+        // general Ammunition add flow has no Factory/Handload toggle to skip anymore (Handloads
+        // moved to its own nav entry/add flow entirely), so this just shows the handload form.
+        if (cat === 'ammunition' && p.get('ammotype') === 'handload') toggleAmmoType('handloads');
     }
     if (p.get('handload') === '1') applyLadderHandoff();
     // Close user-menu dropdown(s) when clicking outside — 'user-menu' is the legacy

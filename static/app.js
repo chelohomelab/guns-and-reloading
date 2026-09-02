@@ -1021,6 +1021,18 @@ function switchAmmoCaliber(cal) {
     loadAmmoInventory(currentAmmoFilter);
 }
 
+let currentHandloadRifleFilter = null, currentHandloadBulletFilter = null;
+
+function switchHandloadRifleFilter(value) {
+    currentHandloadRifleFilter = value || null;
+    loadAmmoInventory('handload');
+}
+
+function switchHandloadBulletFilter(value) {
+    currentHandloadBulletFilter = value || null;
+    loadAmmoInventory('handload');
+}
+
 function switchComponentFilter(type) {
     currentComponentFilter = type;
     ['powders', 'primers', 'bullets', 'casings'].forEach(t => {
@@ -2122,6 +2134,28 @@ async function loadAmmoInventory(type) {
             }
         }
 
+        // Rifle/Bullet dropdown options come only from what's actually on this handloads page
+        // (distinct values already present among the loaded handloads) — not the full firearms/
+        // bullets inventory, most of which would have no handload at all.
+        function buildHandloadExtraFilters(sourceItems) {
+            const row = document.getElementById('handload-extra-filter-row');
+            const rifleSel = document.getElementById('handload-rifle-filter');
+            const bulletSel = document.getElementById('handload-bullet-filter');
+            if (!row || !rifleSel || !bulletSel) return;
+
+            const rifles = [...new Set(sourceItems.map(a => a.rifle_label).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+            const bullets = [...new Set(sourceItems.map(a => a.bullet_type).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+            if (currentHandloadRifleFilter && !rifles.includes(currentHandloadRifleFilter)) currentHandloadRifleFilter = null;
+            if (currentHandloadBulletFilter && !bullets.includes(currentHandloadBulletFilter)) currentHandloadBulletFilter = null;
+
+            row.classList.toggle('hidden', rifles.length === 0 && bullets.length === 0);
+            rifleSel.innerHTML = `<option value="">All Rifles</option>` +
+                rifles.map(r => `<option value="${escHtml(r)}" ${r === currentHandloadRifleFilter ? 'selected' : ''}>${escHtml(r)}</option>`).join('');
+            bulletSel.innerHTML = `<option value="">All Bullets</option>` +
+                bullets.map(b => `<option value="${escHtml(b)}" ${b === currentHandloadBulletFilter ? 'selected' : ''}>${escHtml(b)}</option>`).join('');
+        }
+
         if (type === 'factory') {
             // Reset category selection if the current one has no data
             if (!currentAmmoCategoryFilter || !catGroups[currentAmmoCategoryFilter]) {
@@ -2160,7 +2194,12 @@ async function loadAmmoInventory(type) {
             if (catFilterRow) catFilterRow.classList.add('hidden');
             // Build caliber row from this tab's items, then apply filter
             buildCaliberRow(filtered);
+            if (type === 'handload') buildHandloadExtraFilters(filtered);
             if (currentAmmoCaliberFilter) filtered = filtered.filter(a => a.caliber === currentAmmoCaliberFilter);
+            if (type === 'handload') {
+                if (currentHandloadRifleFilter)  filtered = filtered.filter(a => (a.rifle_label || '') === currentHandloadRifleFilter);
+                if (currentHandloadBulletFilter) filtered = filtered.filter(a => (a.bullet_type || '') === currentHandloadBulletFilter);
+            }
             // Handloads: full cards with caliber sub-groups; muzzleloader: tiles
             if (type === 'handload') {
                 const calGroups = {};

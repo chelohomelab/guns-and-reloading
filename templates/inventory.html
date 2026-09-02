@@ -334,6 +334,14 @@
                 </div>
                 <div id="ammo-cat-filter-row" class="hidden flex flex-wrap gap-2 mb-2"></div>
                 <div id="ammo-cal-filter-row" class="hidden flex flex-wrap gap-1.5 mb-3"></div>
+                <div id="handload-extra-filter-row" class="hidden flex flex-wrap gap-2 mb-3">
+                    <select id="handload-rifle-filter" onchange="switchHandloadRifleFilter(this.value)" class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-amber-500">
+                        <option value="">All Rifles</option>
+                    </select>
+                    <select id="handload-bullet-filter" onchange="switchHandloadBulletFilter(this.value)" class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-amber-500">
+                        <option value="">All Bullets</option>
+                    </select>
+                </div>
                 <div id="ammo-container">
                     <p class="text-gray-400 italic">Loading ammunition...</p>
                 </div>
@@ -416,7 +424,7 @@
     <datalist id="dl-handload-brass"></datalist>
 
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=137"></script>
+    <script src="/static/app.js?v=138"></script>
     <script>
     window.onload = () => {
         fetchInitialLookupData(); applyPreferences(); initCustomAC();

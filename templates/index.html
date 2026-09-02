@@ -523,11 +523,11 @@
         </section>
 
         <section id="shooting-calc-tab" class="hidden space-y-4">
-            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-gray-700 pb-3 gap-3">
+            <div class="flex flex-wrap items-center gap-3 border-b border-gray-700 pb-3">
                 <h2 class="text-2xl font-bold">Shooting Calculator</h2>
-                <div class="flex gap-2">
-                    <button id="sc-btn-trajectory" onclick="switchShootingCalcSubTab('trajectory')" class="px-3 py-1.5 rounded bg-gray-800 text-purple-400 text-sm font-bold cursor-pointer">📈 Trajectory</button>
-                    <button id="sc-btn-mpbr" onclick="switchShootingCalcSubTab('mpbr')" class="px-3 py-1.5 rounded text-gray-400 hover:text-white text-sm font-bold cursor-pointer">🎯 Max Point-Blank Range</button>
+                <div class="flex bg-gray-950 p-0.5 rounded border border-gray-800 text-xs font-bold">
+                    <button id="sc-btn-trajectory" onclick="switchShootingCalcSubTab('trajectory')" class="px-3 py-1 rounded bg-gray-800 text-purple-400 cursor-pointer">📈 Trajectory</button>
+                    <button id="sc-btn-mpbr" onclick="switchShootingCalcSubTab('mpbr')" class="px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer">🎯 Max Point-Blank Range</button>
                 </div>
             </div>
 
@@ -1948,7 +1948,7 @@
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <script src="/static/offline-queue.js?v=1"></script>
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=139"></script>
+    <script src="/static/app.js?v=140"></script>
     <script>
       OfflineQueue.init();
       document.querySelector('a[href="/logout"]')?.addEventListener('click', async (e) => {

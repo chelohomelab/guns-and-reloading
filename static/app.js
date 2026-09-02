@@ -829,14 +829,14 @@ function switchShootingCalcSubTab(sub) {
     document.getElementById('sc-pane-trajectory')?.classList.toggle('hidden', !isTraj);
     document.getElementById('sc-pane-mpbr')?.classList.toggle('hidden', isTraj);
 
-    const inactiveCls = 'px-3 py-1.5 rounded text-gray-400 hover:text-white text-sm font-bold cursor-pointer';
+    const inactiveCls = 'px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer';
     const trajBtn = document.getElementById('sc-btn-trajectory');
     const mpbrBtn = document.getElementById('sc-btn-mpbr');
     if (trajBtn) trajBtn.className = isTraj
-        ? 'px-3 py-1.5 rounded bg-gray-800 text-purple-400 text-sm font-bold cursor-pointer'
+        ? 'px-3 py-1 rounded bg-gray-800 text-purple-400 cursor-pointer'
         : inactiveCls;
     if (mpbrBtn) mpbrBtn.className = !isTraj
-        ? 'px-3 py-1.5 rounded bg-gray-800 text-purple-400 text-sm font-bold cursor-pointer'
+        ? 'px-3 py-1 rounded bg-gray-800 text-purple-400 cursor-pointer'
         : inactiveCls;
 }
 

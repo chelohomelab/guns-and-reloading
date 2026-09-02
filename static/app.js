@@ -1004,6 +1004,11 @@ function switchAmmoFilter(type) {
         ? "px-3 py-1 rounded bg-gray-800 text-yellow-500 cursor-pointer" : inactive;
     if (handBtn) handBtn.className = type === 'handload'
         ? "px-3 py-1 rounded bg-gray-800 text-amber-400 cursor-pointer" : inactive;
+    // Send the "+ Add" button straight to the handload form, skipping the Factory/Handload
+    // choice entirely — picking "Factory Load" while already looking at Handloads is confusing.
+    const addBtn = document.getElementById('ammo-add-btn');
+    if (addBtn) addBtn.href = type === 'handload'
+        ? '/?tab=add-tab&cat=ammunition&ammotype=handload' : '/?tab=add-tab&cat=ammunition';
     loadAmmoInventory(type);
     syncInventoryUrl();
 }
@@ -7452,6 +7457,12 @@ window.onload = () => {
         else if (cat === 'tc-barrel') { switchFormCategory('cat-platforms'); switchAddForm('add-tc-barrel'); }
         else if (cat === 'tc-receiver') { switchFormCategory('cat-platforms'); switchAddForm('add-tc-receiver'); }
         else switchFormCategory('cat-' + cat);
+        // Arrived from the Handloads view specifically — go straight to that form and hide
+        // the Factory/Handload choice entirely, since picking Factory here would be confusing.
+        if (cat === 'ammunition' && p.get('ammotype') === 'handload') {
+            toggleAmmoType('handloads');
+            document.getElementById('ammo-type-toggle')?.classList.add('hidden');
+        }
     }
     if (p.get('handload') === '1') applyLadderHandoff();
     // Close user-menu dropdown(s) when clicking outside — 'user-menu' is the legacy

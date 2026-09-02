@@ -229,9 +229,9 @@
             <!-- Inventory section header + sub-navigation -->
             <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-gray-700 pb-3 gap-3">
                 <div class="flex flex-wrap items-center gap-3">
-                    <h2 class="text-2xl font-bold">Inventory Vault</h2>
+                    <h2 id="inventory-heading" class="text-2xl font-bold">Inventory Vault</h2>
                     <input type="text" id="inventory-search" placeholder="Search..." oninput="applyInventorySearch()" class="bg-gray-800 border border-gray-700 rounded px-3 py-1 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 w-40">
-                    <div class="flex bg-gray-950 p-0.5 rounded border border-gray-800 text-xs font-bold">
+                    <div id="inv-subtabs-row" class="flex bg-gray-950 p-0.5 rounded border border-gray-800 text-xs font-bold">
                         <button id="inv-btn-platforms" onclick="switchInventoryTab('platforms')" class="px-3 py-1 rounded bg-gray-800 text-amber-500 cursor-pointer">🔫 Platforms</button>
                         <button id="inv-btn-optics" onclick="switchInventoryTab('optics')" class="px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer">🔭 Optics</button>
                         <button id="inv-btn-ammo" onclick="switchInventoryTab('ammo')" class="px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer">🧪 Ammunition</button>
@@ -326,7 +326,7 @@
             <!-- Ammunition pane -->
             <div id="inv-pane-ammo" class="hidden mt-4">
                 <div class="flex items-center justify-between gap-3 mb-3">
-                    <div class="flex bg-gray-950 p-0.5 rounded border border-gray-800 text-xs font-bold">
+                    <div id="ammo-filter-row" class="flex bg-gray-950 p-0.5 rounded border border-gray-800 text-xs font-bold">
                         <button id="ammo-btn-factory" onclick="switchAmmoFilter('factory')" class="px-3 py-1 rounded bg-gray-800 text-blue-400 cursor-pointer">Factory Loads</button>
                         <button id="ammo-btn-muzzleloader" onclick="switchAmmoFilter('muzzleloader')" class="px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer">Muzzleloader</button>
                         <button id="ammo-btn-handload" onclick="switchAmmoFilter('handload')" class="px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer">Handloads</button>
@@ -435,6 +435,16 @@
             loadAmmoInventory(p.get('ammofilter') || currentAmmoFilter);
         }
         if (inv === 'components' && p.has('comp')) switchComponentFilter(p.get('comp'));
+
+        // Arrived via the "Handloads" nav shortcut (not just clicking the in-page filter
+        // button) — show a decluttered, single-purpose view instead of the full Inventory
+        // chrome. "Inventory" in the main nav is still the way back to the normal view.
+        if (inv === 'ammo' && p.get('ammofilter') === 'handload') {
+            document.getElementById('inventory-heading').textContent = 'Handloads';
+            document.getElementById('inventory-search')?.classList.add('hidden');
+            document.getElementById('inv-subtabs-row')?.classList.add('hidden');
+            document.getElementById('ammo-filter-row')?.classList.add('hidden');
+        }
     };
     // Re-fetch ammo list when navigating back (browser back button restores stale bfcache state)
     window.addEventListener('pageshow', (e) => {

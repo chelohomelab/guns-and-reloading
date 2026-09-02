@@ -4670,7 +4670,7 @@ async function applyPreferences() {
         if (off('feat_handguns'))  hide('plat-btn-handgun', 'btn-add-handgun');
         if (off('feat_tc'))        hide('plat-btn-tc', 'btn-add-tc-receiver', 'btn-add-tc-barrel');
         if (off('feat_reloading')) hide('inv-btn-components', 'btn-cat-components');
-        if (off('feat_ammo_log'))  hide('inv-btn-ammo', 'btn-cat-ammunition', 'nav-btn-measure', 'topnav-btn-measure', 'nav-btn-measure-mobile');
+        if (off('feat_ammo_log'))  hide('inv-btn-ammo', 'btn-cat-ammunition', 'nav-btn-measure', 'topnav-btn-measure', 'nav-btn-measure-mobile', 'nav-btn-handloads', 'topnav-btn-handloads');
     } catch (_) {}
 }
 

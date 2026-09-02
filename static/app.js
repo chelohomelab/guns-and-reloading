@@ -502,13 +502,28 @@ function toggleScopeInputState() {
 let _hlBullets = [];
 let _hlCasings = [];
 
+let _hlGuns = [], _hlTcBarrels = [];
+
+// Mirrors renderLadderPlatformOptions' use of _buildGunOptionsHTML, minus the "test platforms
+// not in inventory" concept — a handload's rifle should always be a real firearm/TC barrel.
+function renderHandloadRifleOptions() {
+    const sel = document.getElementById('hl-rifle');
+    if (!sel) return;
+    const cal = document.getElementById('hl-caliber')?.value || null;
+    const prevValue = sel.value;
+    sel.innerHTML = _buildGunOptionsHTML(_hlGuns, _hlTcBarrels, '— Select rifle —', cal);
+    if (prevValue && [...sel.options].some(o => o.value === prevValue)) sel.value = prevValue;
+}
+
 async function populateHandloadDropdowns() {
     try {
-        const [powderRes, primerRes, bulletRes, casingRes] = await Promise.all([
+        const [powderRes, primerRes, bulletRes, casingRes, gunsRes, tcRes] = await Promise.all([
             fetch('/components/powders/', { cache: 'no-store' }),
             fetch('/components/primers/', { cache: 'no-store' }),
             fetch('/components/bullets/', { cache: 'no-store' }),
             fetch('/components/casings/', { cache: 'no-store' }),
+            fetch('/catalog/', { cache: 'no-store' }),
+            fetch('/tc-barrels/', { cache: 'no-store' }),
         ]);
         const powders = powderRes.ok ? await powderRes.json() : [];
         const primers = primerRes.ok ? await primerRes.json() : [];
@@ -516,6 +531,9 @@ async function populateHandloadDropdowns() {
         const casings = casingRes.ok ? await casingRes.json() : [];
         _hlBullets = bullets;
         _hlCasings = casings;
+        _hlGuns = gunsRes.ok ? await gunsRes.json() : [];
+        _hlTcBarrels = tcRes.ok ? await tcRes.json() : [];
+        renderHandloadRifleOptions();
 
         const calSel = document.getElementById('hl-caliber');
         if (calSel) {
@@ -646,6 +664,7 @@ function filterHandloadBullets() {
     const casSel = document.getElementById('hl-casing');
     if (bulSel) bulSel.innerHTML = _buildBulletOptionsHTML(_hlBullets, cal);
     if (casSel) casSel.innerHTML = _buildCasingOptionsHTML(_hlCasings, cal);
+    renderHandloadRifleOptions();
 }
 
 function filterLadderBullets() {
@@ -2148,6 +2167,10 @@ async function loadAmmoInventory(type) {
                     if (!calGroups[cal]) calGroups[cal] = [];
                     calGroups[cal].push(a);
                 });
+                // Sort by rifle within each caliber group (issue #50) — loads with no rifle
+                // assigned sort to the end rather than scattering alphabetically among "—".
+                Object.values(calGroups).forEach(loads =>
+                    loads.sort((a, b) => (a.rifle_label || '￿').localeCompare(b.rifle_label || '￿')));
                 const calHtml = Object.entries(calGroups).sort(([a],[b]) => a.localeCompare(b)).map(([cal, loads]) => `
                     <div class="mb-6">
                         <div class="flex items-center gap-3 mb-3">
@@ -2277,10 +2300,12 @@ function renderAmmoCard(ammo) {
     // Handload: no photo — show recipe data
     if (isHandload) {
         const rows = [];
+        if (ammo.rifle_label)   rows.push(['Rifle',   ammo.rifle_label]);
         if (ammo.bullet_type)   rows.push(['Bullet',  ammo.bullet_type]);
         if (line)               rows.push(['Powder',  line]);
         if (ammo.charge_weight) rows.push(['Charge',  `${ammo.charge_weight} gr`]);
         if (ammo.coal)          rows.push(['COAL',    `${ammo.coal}"`]);
+        if (ammo.seating_depth_off_lands != null) rows.push(['Off Lands', `${ammo.seating_depth_off_lands}"`]);
         const qty = (ammo.qty_sealed || 0) * (ammo.rounds_per_box || 20) + (ammo.qty_open || 0);
         return `
         <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}&filter=${currentAmmoFilter}${currentAmmoCaliberFilter ? '&cal='+encodeURIComponent(currentAmmoCaliberFilter) : ''}'"
@@ -4318,6 +4343,10 @@ if (handloadForm) {
         _setBusy(handloadForm, true);
         const formData = new FormData(e.target);
         formData.set('is_handload', 'true');
+        // hl-rifle's <select> value is a firearm id (or a TC barrel id) per _buildGunOptionsHTML —
+        // resolve it to the real barrels.id the backend expects before posting.
+        const resolvedBarrelId = await resolveBarrelIdFromGunSelect(document.getElementById('hl-rifle'));
+        formData.set('barrel_id', resolvedBarrelId || '');
         // Auto-wire deduction IDs from the main dropdowns
         const _getId = id => { const s = document.getElementById(id); const o = s?.options[s.selectedIndex]; return o?.dataset?.id || ''; };
         formData.set('deduct_powder_id',  _getId('hl-powder'));

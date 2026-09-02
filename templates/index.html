@@ -1346,6 +1346,31 @@
                         </div>
                     </div>
 
+                    <div class="border-b border-gray-750 pb-4">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">🎯 Rifle &amp; Chamber Fit</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-xs text-gray-200 font-semibold mb-1">Rifle <span class="text-gray-600 font-normal">(optional)</span></label>
+                                <select id="hl-rifle" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                                    <option value="">— Select rifle —</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-200 font-semibold mb-1">Case Trim Length (in)</label>
+                                <input type="number" step="0.001" name="case_trim_length" placeholder="e.g., 2.015" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-200 font-semibold mb-1">Rifle Max COAL <span class="text-gray-600 font-normal">(touching lands)</span></label>
+                                <input type="number" step="0.001" name="rifle_max_coal" placeholder="e.g., 3.412" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-200 font-semibold mb-1">Seating Depth <span class="text-gray-600 font-normal">(off lands)</span></label>
+                                <input type="number" step="0.001" name="seating_depth_off_lands" placeholder="e.g., 0.020" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
+                            </div>
+                        </div>
+                        <input type="hidden" name="barrel_id" id="hl-barrel-id">
+                    </div>
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="space-y-3">
                             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Propellant & Ignition Architecture</h4>
@@ -1816,7 +1841,7 @@
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <script src="/static/offline-queue.js?v=1"></script>
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=134"></script>
+    <script src="/static/app.js?v=135"></script>
     <script>
       OfflineQueue.init();
       document.querySelector('a[href="/logout"]')?.addEventListener('click', async (e) => {

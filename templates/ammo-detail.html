@@ -331,6 +331,24 @@
                         <label class="block text-xs text-gray-200 font-semibold mb-1">C.O.A.L. (inches)</label>
                         <input type="number" step="0.001" id="ef-coal" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
                     </div>
+                    <div>
+                        <label class="block text-xs text-gray-200 font-semibold mb-1">Rifle</label>
+                        <select id="ef-rifle" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                            <option value="">— Select rifle —</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-200 font-semibold mb-1">Case Trim Length (in)</label>
+                        <input type="number" step="0.001" id="ef-case-trim" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-200 font-semibold mb-1">Rifle Max COAL (in)</label>
+                        <input type="number" step="0.001" id="ef-rifle-coal" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-200 font-semibold mb-1">Seating Depth, Off Lands (in)</label>
+                        <input type="number" step="0.001" id="ef-seating-depth" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-amber-500">
+                    </div>
                 </div>
 
                 <div class="flex justify-between items-center pt-2">
@@ -783,6 +801,10 @@
                 cells += cell('Powder', line);
                 cells += cell('Charge Weight', a.charge_weight ? `${a.charge_weight} gr` : null, 'text-white font-mono');
                 cells += cell('C.O.A.L.', a.coal ? `${a.coal}"` : null, 'text-white font-mono');
+                cells += cell('Rifle', a.rifle_label, 'text-emerald-400');
+                cells += cell('Case Trim Length', a.case_trim_length ? `${a.case_trim_length}"` : null, 'text-white font-mono');
+                cells += cell('Rifle Max COAL', a.rifle_max_coal ? `${a.rifle_max_coal}"` : null, 'text-white font-mono');
+                cells += cell('Seating Depth (off lands)', a.seating_depth_off_lands != null ? `${a.seating_depth_off_lands}"` : null, 'text-white font-mono');
             } else {
                 cells += cell('Product Line', line);
                 cells += cell('Factory Velocity', a.factory_velocity_fps ? `${a.factory_velocity_fps} fps` : null, 'text-white font-mono');
@@ -879,6 +901,24 @@
                 document.getElementById('handload-fields').classList.remove('hidden');
                 document.getElementById('ef-charge').value = a.charge_weight || '';
                 document.getElementById('ef-coal').value = a.coal || '';
+                document.getElementById('ef-case-trim').value = a.case_trim_length || '';
+                document.getElementById('ef-rifle-coal').value = a.rifle_max_coal || '';
+                document.getElementById('ef-seating-depth').value = a.seating_depth_off_lands != null ? a.seating_depth_off_lands : '';
+                // Left unselected on purpose — like every other field here, an untouched
+                // control means "don't change this," so the dropdown doesn't need to (and,
+                // since options carry firearm ids while a.barrel_id is a barrels.id, can't
+                // cheaply) pre-select the current rifle. It's already shown in the read-only
+                // "Rifle" cell above.
+                const efRifle = document.getElementById('ef-rifle');
+                if (efRifle && !efRifle.dataset.loaded) {
+                    efRifle.dataset.loaded = '1';
+                    Promise.all([
+                        fetch('/catalog/', { cache: 'no-store' }).then(r => r.ok ? r.json() : []),
+                        fetch('/tc-barrels/', { cache: 'no-store' }).then(r => r.ok ? r.json() : []),
+                    ]).then(([guns, tcBarrels]) => {
+                        efRifle.innerHTML = _buildGunOptionsHTML(guns, tcBarrels, '— Select rifle (leave blank to keep current) —');
+                    });
+                }
             }
 
             // Hide range sessions for regular shotgun (birdshot/buckshot); keep for slug/all others
@@ -917,6 +957,12 @@
             if (ammoData?.is_handload) {
                 payload.charge_weight = parseFloat(document.getElementById('ef-charge').value) || null;
                 payload.coal = parseFloat(document.getElementById('ef-coal').value) || null;
+                payload.case_trim_length = parseFloat(document.getElementById('ef-case-trim').value) || null;
+                payload.rifle_max_coal = parseFloat(document.getElementById('ef-rifle-coal').value) || null;
+                const seatDepthVal = parseFloat(document.getElementById('ef-seating-depth').value);
+                payload.seating_depth_off_lands = isNaN(seatDepthVal) ? null : seatDepthVal;
+                const resolvedBarrelId = await resolveBarrelIdFromGunSelect(document.getElementById('ef-rifle'));
+                if (resolvedBarrelId) payload.barrel_id = resolvedBarrelId;
             }
             // strip null/empty but always keep ammo_category (send it even if null to reflect intent)
             Object.keys(payload).forEach(k => {
@@ -1169,7 +1215,28 @@
         }
     </script>
 <script>
-// This page doesn't load the shared app.js — small inline copy of its dropdown toggle.
+// This page doesn't load the shared app.js — small inline copies of its dropdown toggle and
+// (below) the gun-select/barrel-resolution helpers used for the handload "Rifle" field.
+function _buildGunOptionsHTML(guns, tcBarrels, placeholder) {
+    const _gunLabel = g => `${g.brand} ${g.model}${g.caliber ? ' (' + g.caliber + ')' : ''}`;
+    let html = `<option value="">${placeholder}</option>`;
+    if (guns.length) html += guns.map(g => `<option value="${g.id}">${_gunLabel(g)}</option>`).join('');
+    if (tcBarrels.length) html += tcBarrels.map(b => `<option value="${b.id}" data-type="tc">${b.tc_platform} ${b.caliber}</option>`).join('');
+    return html;
+}
+async function resolveBarrelIdFromGunSelect(selectEl) {
+    if (!selectEl || !selectEl.value) return null;
+    const opt = selectEl.options[selectEl.selectedIndex];
+    if (opt && opt.dataset.type === 'tc') return parseInt(selectEl.value);
+    try {
+        const res = await fetch(`/firearms/${selectEl.value}`);
+        if (res.ok) {
+            const data = await res.json();
+            return (data.barrels && data.barrels.length > 0) ? data.barrels[0].id : null;
+        }
+    } catch (_) {}
+    return null;
+}
 function toggleUserMenu(id) {
     const menu = document.getElementById(id);
     const arrow = document.getElementById(id + '-arrow');

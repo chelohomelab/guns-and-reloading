@@ -390,6 +390,14 @@ class Ammo(Base):
     lead_free = Column(Boolean, nullable=True)
     case_type = Column(String, nullable=True)
     reloadable = Column(Boolean, nullable=True)
+    # Handload-specific prep/fit data (see issue #50) — which rifle this recipe is developed
+    # for/tested in, plus the chamber-fit measurements that make it reproducible: case length
+    # to trim to, that rifle's own max COAL (touching the lands), and how far off the lands
+    # this particular recipe's coal (above) is seated.
+    barrel_id = Column(Integer, ForeignKey("barrels.id"), nullable=True)
+    case_trim_length = Column(Float, nullable=True)
+    rifle_max_coal = Column(Float, nullable=True)
+    seating_depth_off_lands = Column(Float, nullable=True)
 
     shot_strings = relationship("ShotString", back_populates="ammo")
     purchase_log = relationship("AmmoPurchaseLog", back_populates="ammo", order_by="AmmoPurchaseLog.date")
@@ -584,6 +592,10 @@ def init_db():
         _add_col('ammo', 'lead_free', 'lead_free BOOLEAN')
         _add_col('ammo', 'case_type', 'case_type VARCHAR')
         _add_col('ammo', 'reloadable', 'reloadable BOOLEAN')
+        _add_col('ammo', 'barrel_id', 'barrel_id INTEGER')
+        _add_col('ammo', 'case_trim_length', 'case_trim_length FLOAT')
+        _add_col('ammo', 'rifle_max_coal', 'rifle_max_coal FLOAT')
+        _add_col('ammo', 'seating_depth_off_lands', 'seating_depth_off_lands FLOAT')
 
     if 'upc_cache' in inspector.get_table_names():
         _add_col('upc_cache', 'ammo_category', 'ammo_category VARCHAR')

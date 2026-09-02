@@ -227,7 +227,7 @@
         <main class="flex-1 p-4 lg:overflow-y-scroll lg:min-h-0" style="-webkit-overflow-scrolling: touch;">
 
             <!-- Inventory section header + sub-navigation -->
-            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-gray-700 pb-3 gap-3">
+            <div id="inventory-header-row" class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-gray-700 pb-3 gap-3">
                 <div class="flex flex-wrap items-center gap-3">
                     <h2 id="inventory-heading" class="text-2xl font-bold">Inventory Vault</h2>
                     <input type="text" id="inventory-search" placeholder="Search..." oninput="applyInventorySearch()" class="bg-gray-800 border border-gray-700 rounded px-3 py-1 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 w-40">
@@ -325,7 +325,7 @@
 
             <!-- Ammunition pane -->
             <div id="inv-pane-ammo" class="hidden mt-4">
-                <div class="flex items-center justify-between gap-3 mb-3">
+                <div id="ammo-header-row" class="flex items-center justify-between gap-3 mb-3">
                     <div id="ammo-filter-row" class="flex bg-gray-950 p-0.5 rounded border border-gray-800 text-xs font-bold">
                         <button id="ammo-btn-factory" onclick="switchAmmoFilter('factory')" class="px-3 py-1 rounded bg-gray-800 text-blue-400 cursor-pointer">Factory Loads</button>
                         <button id="ammo-btn-muzzleloader" onclick="switchAmmoFilter('muzzleloader')" class="px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer">Muzzleloader</button>
@@ -335,10 +335,10 @@
                 <div id="ammo-cat-filter-row" class="hidden flex flex-wrap gap-2 mb-2"></div>
                 <div id="ammo-cal-filter-row" class="hidden flex flex-wrap gap-1.5 mb-3"></div>
                 <div id="handload-extra-filter-row" class="hidden flex flex-wrap gap-2 mb-3">
-                    <select id="handload-rifle-filter" onchange="switchHandloadRifleFilter(this.value)" class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-amber-500">
+                    <select id="handload-rifle-filter" onchange="switchHandloadRifleFilter(this.value)" class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-amber-500 lg:text-sm lg:px-3 lg:py-1.5">
                         <option value="">All Rifles</option>
                     </select>
-                    <select id="handload-bullet-filter" onchange="switchHandloadBulletFilter(this.value)" class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-amber-500">
+                    <select id="handload-bullet-filter" onchange="switchHandloadBulletFilter(this.value)" class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-amber-500 lg:text-sm lg:px-3 lg:py-1.5">
                         <option value="">All Bullets</option>
                     </select>
                 </div>
@@ -451,6 +451,15 @@
             document.getElementById('inventory-search')?.classList.add('hidden');
             document.getElementById('inv-subtabs-row')?.classList.add('hidden');
             document.getElementById('ammo-filter-row')?.classList.add('hidden');
+            // Both header rows above were sized for their now-hidden siblings (search/sub-tabs,
+            // Factory/Muzzleloader buttons) — with those gone, their old padding/margins just
+            // look like dead space, so trim them down.
+            document.getElementById('inventory-header-row')?.classList.remove('border-b', 'border-gray-700', 'pb-3');
+            document.getElementById('inventory-header-row')?.classList.add('pb-1');
+            document.getElementById('ammo-header-row')?.classList.remove('mb-3');
+            document.getElementById('ammo-header-row')?.classList.add('mb-1');
+            document.getElementById('inv-pane-ammo')?.classList.remove('mt-4');
+            document.getElementById('inv-pane-ammo')?.classList.add('mt-1');
         }
     };
     // Re-fetch ammo list when navigating back (browser back button restores stale bfcache state)

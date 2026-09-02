@@ -121,6 +121,11 @@
                 <span class="text-lg">🎯</span>
                 <div><div class="text-sm font-bold text-white">Range Session</div><div class="text-[10px] text-blue-400/70">Sessions &amp; ladder tests</div></div>
             </a>
+            <a id="nav-btn-shooting-calc" href="/?tab=shooting-calc-tab" onclick="navClick(event, () => switchTab('shooting-calc-tab'))"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 hover:border-purple-500/40 transition cursor-pointer text-left">
+                <span class="text-lg">🧮</span>
+                <div><div class="text-sm font-bold text-white">Shooting Calculator</div><div class="text-[10px] text-purple-400/70">Trajectory &amp; MPBR</div></div>
+            </a>
             <a id="nav-btn-reload-data" href="/?tab=reload-data-tab" onclick="navClick(event, () => switchTab('reload-data-tab'))"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">📖</span>
@@ -193,6 +198,11 @@
                     class="flex flex-col px-3 py-1.5 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition cursor-pointer">
                     <span class="text-sm font-bold text-white">Range Session</span>
                     <span class="text-[10px] text-blue-400/70">Sessions &amp; ladder tests</span>
+                </a>
+                <a id="topnav-btn-shooting-calc" href="/?tab=shooting-calc-tab" onclick="navClick(event, () => switchTab('shooting-calc-tab'))"
+                    class="flex flex-col px-3 py-1.5 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 hover:border-purple-500/40 transition cursor-pointer">
+                    <span class="text-sm font-bold text-white">Shooting Calculator</span>
+                    <span class="text-[10px] text-purple-400/70">Trajectory &amp; MPBR</span>
                 </a>
                 <a id="topnav-btn-reload-data" href="/?tab=reload-data-tab" onclick="navClick(event, () => switchTab('reload-data-tab'))"
                     class="flex flex-col px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer">
@@ -510,6 +520,107 @@
                 </div>
             </div>
             </div><!-- end range-pane-ladder -->
+        </section>
+
+        <section id="shooting-calc-tab" class="hidden space-y-4">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-gray-700 pb-3 gap-3">
+                <h2 class="text-2xl font-bold">Shooting Calculator</h2>
+                <div class="flex gap-2">
+                    <button id="sc-btn-trajectory" onclick="switchShootingCalcSubTab('trajectory')" class="px-3 py-1.5 rounded bg-gray-800 text-purple-400 text-sm font-bold cursor-pointer">📈 Trajectory</button>
+                    <button id="sc-btn-mpbr" onclick="switchShootingCalcSubTab('mpbr')" class="px-3 py-1.5 rounded text-gray-400 hover:text-white text-sm font-bold cursor-pointer">🎯 Max Point-Blank Range</button>
+                </div>
+            </div>
+
+            <!-- Trajectory Calculator -->
+            <div id="sc-pane-trajectory" class="space-y-4">
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Muzzle Velocity (fps)</label>
+                        <input type="number" id="sc-traj-velocity" step="1" placeholder="e.g. 2700" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Ballistic Coefficient (G1)</label>
+                        <input type="number" id="sc-traj-bc" step="0.001" placeholder="e.g. 0.450" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Weight (gr)</label>
+                        <input type="number" id="sc-traj-weight" step="1" placeholder="e.g. 168" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Sight Height (in)</label>
+                        <input type="number" id="sc-traj-sight-height" step="0.1" value="1.5" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Zero Range (yd)</label>
+                        <input type="number" id="sc-traj-zero" step="1" placeholder="e.g. 200" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Interval (yd)</label>
+                        <input type="number" id="sc-traj-interval" step="1" value="50" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Max Distance (yd)</label>
+                        <input type="number" id="sc-traj-max-distance" step="1" value="500" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="calcTrajectory()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded text-sm transition cursor-pointer">Calculate</button>
+                    </div>
+                </div>
+                <div id="sc-traj-error" class="hidden text-sm text-red-400 bg-red-950/40 border border-red-800/40 rounded-lg px-3 py-2"></div>
+                <div id="sc-traj-results" class="hidden overflow-x-auto bg-gray-800 rounded-lg border border-gray-700 shadow-xl">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-900 text-gray-400 uppercase text-[10px]">
+                            <tr>
+                                <th class="px-3 py-2">Distance (yd)</th>
+                                <th class="px-3 py-2">Bullet Path (in)</th>
+                                <th class="px-3 py-2">Velocity (fps)</th>
+                                <th class="px-3 py-2">Energy (ft-lbs)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sc-traj-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Max Point-Blank Range Calculator -->
+            <div id="sc-pane-mpbr" class="hidden space-y-4">
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Muzzle Velocity (fps)</label>
+                        <input type="number" id="sc-mpbr-velocity" step="1" placeholder="e.g. 2700" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Ballistic Coefficient (G1)</label>
+                        <input type="number" id="sc-mpbr-bc" step="0.001" placeholder="e.g. 0.450" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Sight Height (in)</label>
+                        <input type="number" id="sc-mpbr-sight-height" step="0.1" value="1.5" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Vital Zone Size (in)</label>
+                        <input type="number" id="sc-mpbr-vital-zone" step="0.1" placeholder="e.g. 8" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div class="flex items-end col-span-2 md:col-span-4">
+                        <button onclick="calcMPBR()" class="w-full md:w-auto md:px-8 bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded text-sm transition cursor-pointer">Calculate</button>
+                    </div>
+                </div>
+                <div id="sc-mpbr-error" class="hidden text-sm text-red-400 bg-red-950/40 border border-red-800/40 rounded-lg px-3 py-2"></div>
+                <div id="sc-mpbr-results" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl text-center">
+                        <div class="text-[10px] text-gray-400 uppercase font-semibold mb-1">Recommended Zero</div>
+                        <div id="sc-mpbr-zero" class="text-2xl font-bold text-purple-400">—</div>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl text-center">
+                        <div class="text-[10px] text-gray-400 uppercase font-semibold mb-1">Max Point-Blank Range</div>
+                        <div id="sc-mpbr-range" class="text-2xl font-bold text-emerald-400">—</div>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl text-center">
+                        <div class="text-[10px] text-gray-400 uppercase font-semibold mb-1">Max Rise Above Sight Line</div>
+                        <div id="sc-mpbr-ordinate" class="text-2xl font-bold text-blue-400">—</div>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <section id="reload-data-tab" class="hidden space-y-4">
@@ -1837,7 +1948,7 @@
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <script src="/static/offline-queue.js?v=1"></script>
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=138"></script>
+    <script src="/static/app.js?v=139"></script>
     <script>
       OfflineQueue.init();
       document.querySelector('a[href="/logout"]')?.addEventListener('click', async (e) => {

@@ -765,7 +765,7 @@ function switchTab(tabId) {
     const isLadderAlias = tabId === 'ladder-tab';
     const realTabId = isLadderAlias ? 'measure-tab' : tabId;
 
-    ['landing-tab', 'measure-tab', 'add-tab', 'reload-data-tab'].forEach(id => {
+    ['landing-tab', 'measure-tab', 'add-tab', 'reload-data-tab', 'shooting-calc-tab'].forEach(id => {
         document.getElementById(id)?.classList.add('hidden');
     });
 
@@ -813,6 +813,220 @@ function switchRangeSubTab(sub) {
         document.getElementById('share-btn')?.classList.add('hidden');
         showLadderListView();
     }
+}
+
+// ============================================================================
+// Shooting Calculator — Trajectory & Max Point-Blank Range
+//
+// Pure client-side, no server data. Uses a standard G1 point-mass drag model
+// (numerical integration, forward Euler) — the same approach used by most
+// hobbyist/handheld ballistics calculators. Not a substitute for a chronographed,
+// range-verified load; treat outputs as reference estimates.
+// ============================================================================
+
+function switchShootingCalcSubTab(sub) {
+    const isTraj = sub === 'trajectory';
+    document.getElementById('sc-pane-trajectory')?.classList.toggle('hidden', !isTraj);
+    document.getElementById('sc-pane-mpbr')?.classList.toggle('hidden', isTraj);
+
+    const inactiveCls = 'px-3 py-1.5 rounded text-gray-400 hover:text-white text-sm font-bold cursor-pointer';
+    const trajBtn = document.getElementById('sc-btn-trajectory');
+    const mpbrBtn = document.getElementById('sc-btn-mpbr');
+    if (trajBtn) trajBtn.className = isTraj
+        ? 'px-3 py-1.5 rounded bg-gray-800 text-purple-400 text-sm font-bold cursor-pointer'
+        : inactiveCls;
+    if (mpbrBtn) mpbrBtn.className = !isTraj
+        ? 'px-3 py-1.5 rounded bg-gray-800 text-purple-400 text-sm font-bold cursor-pointer'
+        : inactiveCls;
+}
+
+// Standard G1 drag function (Mach -> Cd), linearly interpolated.
+const _G1_MACH = [0.00,0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50,0.55,0.60,0.65,0.70,0.725,0.75,0.775,0.80,0.825,
+    0.85,0.875,0.90,0.925,0.95,0.975,1.0,1.025,1.05,1.075,1.10,1.125,1.15,1.20,1.25,1.30,1.35,1.40,1.45,1.50,1.55,1.60,
+    1.65,1.70,1.75,1.80,1.85,1.90,1.95,2.00,2.20,2.40,2.60,2.80,3.00,3.20,3.50,4.00,4.50,5.00];
+const _G1_CD = [0.2629,0.2558,0.2487,0.2413,0.2344,0.2278,0.2214,0.2155,0.2104,0.2061,0.2032,0.2020,0.2034,0.2051,0.2075,
+    0.2093,0.2113,0.2141,0.2172,0.2206,0.2242,0.2280,0.2325,0.2378,0.2445,0.2531,0.2712,0.2793,0.2846,0.2872,0.2879,
+    0.2865,0.2834,0.2764,0.2694,0.2629,0.2573,0.2528,0.2489,0.2456,0.2427,0.2400,0.2377,0.2356,0.2336,0.2317,0.2299,
+    0.2282,0.2266,0.2251,0.2210,0.2175,0.2144,0.2116,0.2091,0.2069,0.2040,0.2002,0.1970,0.1943];
+
+function _g1Cd(mach) {
+    const m = Math.abs(mach);
+    if (m <= _G1_MACH[0]) return _G1_CD[0];
+    if (m >= _G1_MACH[_G1_MACH.length - 1]) return _G1_CD[_G1_CD.length - 1];
+    let lo = 0, hi = _G1_MACH.length - 1;
+    while (hi - lo > 1) {
+        const mid = (lo + hi) >> 1;
+        if (_G1_MACH[mid] <= m) lo = mid; else hi = mid;
+    }
+    const t = (m - _G1_MACH[lo]) / (_G1_MACH[hi] - _G1_MACH[lo]);
+    return _G1_CD[lo] + t * (_G1_CD[hi] - _G1_CD[lo]);
+}
+
+const _SPEED_OF_SOUND = 1116.4; // fps, standard atmosphere
+const _GRAVITY = 32.174; // ft/s^2
+// Deceleration constant: 0.5 * rho_air(slug/ft^3) * (pi/576) * g, rho=0.002378 slug/ft^3
+const _DRAG_K = 2.0873e-4;
+
+// Integrates a trajectory from the muzzle at the given launch angle (radians, relative
+// to horizontal) until it travels maxXFt of horizontal distance. Returns an array of
+// {x, y, v} samples (x/y in feet, v in fps); y is height relative to the line of sight
+// (the bore starts sightHeightIn below the line of sight).
+function _simulateTrajectory(v0, bc, sightHeightIn, angleRad, maxXFt) {
+    const dt = 0.0005;
+    let x = 0, y = -sightHeightIn / 12;
+    let vx = v0 * Math.cos(angleRad);
+    let vy = v0 * Math.sin(angleRad);
+    const path = [{ x, y, v: v0 }];
+    let steps = 0;
+    while (x < maxXFt && steps < 40000) {
+        steps++;
+        const v = Math.hypot(vx, vy);
+        const cd = _g1Cd(v / _SPEED_OF_SOUND);
+        const decel = _DRAG_K * cd * v / bc;
+        vx += -decel * vx * dt;
+        vy += (-decel * vy - _GRAVITY) * dt;
+        x += vx * dt;
+        y += vy * dt;
+        path.push({ x, y, v: Math.hypot(vx, vy) });
+    }
+    return path;
+}
+
+function _pathValueAt(path, xFt) {
+    for (let i = 1; i < path.length; i++) {
+        if (path[i - 1].x <= xFt && xFt <= path[i].x) {
+            const a = path[i - 1], b = path[i];
+            const t = (b.x === a.x) ? 0 : (xFt - a.x) / (b.x - a.x);
+            return { y: a.y + t * (b.y - a.y), v: a.v + t * (b.v - a.v) };
+        }
+    }
+    return path[path.length - 1];
+}
+
+// Finds the launch angle (radians) that puts the bullet exactly on the line of sight
+// (y=0) at the given zero distance, via bisection.
+function _findZeroAngle(v0, bc, sightHeightIn, zeroYd) {
+    const zeroFt = zeroYd * 3;
+    let lo = -0.05, hi = 0.05;
+    for (let i = 0; i < 60; i++) {
+        const mid = (lo + hi) / 2;
+        const path = _simulateTrajectory(v0, bc, sightHeightIn, mid, zeroFt + 1);
+        const yz = _pathValueAt(path, zeroFt).y;
+        if (yz < 0) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+}
+
+function calcTrajectory() {
+    const errEl = document.getElementById('sc-traj-error');
+    const resultsEl = document.getElementById('sc-traj-results');
+    errEl.classList.add('hidden');
+    resultsEl.classList.add('hidden');
+
+    const v0 = parseFloat(document.getElementById('sc-traj-velocity').value);
+    const bc = parseFloat(document.getElementById('sc-traj-bc').value);
+    const weight = parseFloat(document.getElementById('sc-traj-weight').value);
+    const sightHeight = parseFloat(document.getElementById('sc-traj-sight-height').value);
+    const zeroYd = parseFloat(document.getElementById('sc-traj-zero').value);
+    const interval = parseFloat(document.getElementById('sc-traj-interval').value);
+    const maxDist = parseFloat(document.getElementById('sc-traj-max-distance').value);
+
+    if (!v0 || !bc || !weight || isNaN(sightHeight) || !zeroYd || !interval || !maxDist) {
+        errEl.textContent = 'Please fill in all fields with valid numbers.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    if (interval <= 0 || maxDist <= 0) {
+        errEl.textContent = 'Interval and max distance must be greater than zero.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const angle = _findZeroAngle(v0, bc, sightHeight, zeroYd);
+    const path = _simulateTrajectory(v0, bc, sightHeight, angle, maxDist * 3 + 10);
+
+    const rows = [];
+    for (let yd = 0; yd <= maxDist + 1e-9; yd += interval) {
+        const { y, v } = _pathValueAt(path, yd * 3);
+        const energy = (weight * v * v) / 450240;
+        rows.push({ yd: Math.round(yd), pathIn: y * 12, v, energy });
+    }
+
+    const tbody = document.getElementById('sc-traj-table-body');
+    tbody.innerHTML = rows.map(r => `
+        <tr class="border-t border-gray-700">
+            <td class="px-3 py-1.5">${r.yd}</td>
+            <td class="px-3 py-1.5 ${Math.abs(r.pathIn) < 0.05 ? 'text-purple-400 font-bold' : ''}">${r.pathIn >= 0 ? '+' : ''}${r.pathIn.toFixed(1)}</td>
+            <td class="px-3 py-1.5">${Math.round(r.v)}</td>
+            <td class="px-3 py-1.5">${Math.round(r.energy)}</td>
+        </tr>
+    `).join('');
+    resultsEl.classList.remove('hidden');
+}
+
+// Finds the zero distance whose max mid-range rise above the line of sight equals the
+// vital-zone radius, then finds where the trajectory falls back to -radius past the zero.
+function _solveMPBR(v0, bc, sightHeightIn, radiusIn) {
+    const radiusFt = radiusIn / 12;
+    let lo = 10, hi = 500; // candidate zero distance, yards
+    let finalAngle = 0, finalZeroYd = hi;
+
+    for (let i = 0; i < 40; i++) {
+        const zeroYd = (lo + hi) / 2;
+        const angle = _findZeroAngle(v0, bc, sightHeightIn, zeroYd);
+        const path = _simulateTrajectory(v0, bc, sightHeightIn, angle, zeroYd * 3 + 1);
+        let maxY = -Infinity;
+        for (const p of path) { if (p.x <= zeroYd * 3 && p.y > maxY) maxY = p.y; }
+        finalAngle = angle;
+        finalZeroYd = zeroYd;
+        if (maxY < radiusFt) lo = zeroYd; else hi = zeroYd;
+    }
+
+    const path = _simulateTrajectory(v0, bc, sightHeightIn, finalAngle, 800 * 3);
+    let maxOrdinateFt = -Infinity;
+    for (const p of path) { if (p.x <= finalZeroYd * 3 && p.y > maxOrdinateFt) maxOrdinateFt = p.y; }
+
+    let mpbrYd = null;
+    for (let i = 1; i < path.length; i++) {
+        if (path[i - 1].x / 3 >= finalZeroYd && path[i - 1].y >= -radiusFt && path[i].y < -radiusFt) {
+            const a = path[i - 1], b = path[i];
+            const t = (b.y === a.y) ? 0 : (-radiusFt - a.y) / (b.y - a.y);
+            mpbrYd = (a.x + t * (b.x - a.x)) / 3;
+            break;
+        }
+    }
+
+    return { zeroYd: finalZeroYd, mpbrYd, maxOrdinateIn: maxOrdinateFt * 12 };
+}
+
+function calcMPBR() {
+    const errEl = document.getElementById('sc-mpbr-error');
+    const resultsEl = document.getElementById('sc-mpbr-results');
+    errEl.classList.add('hidden');
+    resultsEl.classList.add('hidden');
+
+    const v0 = parseFloat(document.getElementById('sc-mpbr-velocity').value);
+    const bc = parseFloat(document.getElementById('sc-mpbr-bc').value);
+    const sightHeight = parseFloat(document.getElementById('sc-mpbr-sight-height').value);
+    const vitalZone = parseFloat(document.getElementById('sc-mpbr-vital-zone').value);
+
+    if (!v0 || !bc || isNaN(sightHeight) || !vitalZone) {
+        errEl.textContent = 'Please fill in all fields with valid numbers.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    if (vitalZone <= 0) {
+        errEl.textContent = 'Vital zone size must be greater than zero.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const result = _solveMPBR(v0, bc, sightHeight, vitalZone / 2);
+
+    document.getElementById('sc-mpbr-zero').textContent = `${Math.round(result.zeroYd)} yd`;
+    document.getElementById('sc-mpbr-range').textContent = result.mpbrYd != null ? `${Math.round(result.mpbrYd)} yd` : '—';
+    document.getElementById('sc-mpbr-ordinate').textContent = `${result.maxOrdinateIn.toFixed(1)} in`;
+    resultsEl.classList.remove('hidden');
 }
 
 function switchInventoryTab(tab) {

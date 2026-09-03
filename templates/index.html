@@ -602,28 +602,36 @@
                 </div>
 
                 <div id="sc-traj-error" class="hidden text-sm text-red-400 bg-red-950/40 border border-red-800/40 rounded-lg px-3 py-2"></div>
-                <div id="sc-traj-results" class="hidden space-y-4">
-                <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-3">
-                    <svg id="sc-traj-chart" class="w-full h-auto" style="aspect-ratio: 600 / 220;"></svg>
+                <div id="sc-traj-results" class="hidden space-y-3">
+                <div class="flex flex-wrap items-center gap-4 text-xs text-gray-300">
+                    <span class="text-gray-500 uppercase font-semibold text-[10px]">Show columns:</span>
+                    <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="sc-traj-toggle-moa" checked onchange="_applyTrajColumnToggles()" class="cursor-pointer"> MOA</label>
+                    <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="sc-traj-toggle-mil" checked onchange="_applyTrajColumnToggles()" class="cursor-pointer"> MIL</label>
+                    <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="sc-traj-toggle-energy" checked onchange="_applyTrajColumnToggles()" class="cursor-pointer"> Energy</label>
+                    <span class="text-gray-500">Positive = dial up / dial right. Negative = dial down / dial left.</span>
                 </div>
-                <div class="overflow-x-auto bg-gray-800 rounded-lg border border-gray-700 shadow-xl">
-                    <table class="w-full text-sm text-left">
-                        <thead class="bg-gray-900 text-gray-400 uppercase text-[10px]">
-                            <tr>
-                                <th class="px-3 py-2">Distance (yd)</th>
-                                <th class="px-3 py-2">Bullet Path (in)</th>
-                                <th class="px-3 py-2">Drop (MOA)</th>
-                                <th class="px-3 py-2">Drop (MIL)</th>
-                                <th class="px-3 py-2">Windage (in)</th>
-                                <th class="px-3 py-2">Windage (MOA)</th>
-                                <th class="px-3 py-2">Windage (MIL)</th>
-                                <th class="px-3 py-2">Velocity (fps)</th>
-                                <th class="px-3 py-2">Energy (ft-lbs)</th>
-                                <th class="px-3 py-2">Time (s)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="sc-traj-table-body"></tbody>
-                    </table>
+                <div class="flex flex-col lg:flex-row lg:items-start gap-4">
+                    <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-3 lg:w-[420px] lg:shrink-0">
+                        <svg id="sc-traj-chart" class="w-full h-auto" style="aspect-ratio: 600 / 220;"></svg>
+                    </div>
+                    <div class="overflow-x-auto bg-gray-800 rounded-lg border border-gray-700 shadow-xl lg:flex-1">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-900 text-gray-400 uppercase text-[10px]">
+                                <tr>
+                                    <th class="px-3 py-2">Distance (yd)</th>
+                                    <th class="px-3 py-2">Bullet Path (in)</th>
+                                    <th class="px-3 py-2 sc-col-moa">Elevation (MOA)</th>
+                                    <th class="px-3 py-2 sc-col-mil">Elevation (MIL)</th>
+                                    <th class="px-3 py-2 sc-col-moa">Windage (MOA)</th>
+                                    <th class="px-3 py-2 sc-col-mil">Windage (MIL)</th>
+                                    <th class="px-3 py-2">Velocity (fps)</th>
+                                    <th class="px-3 py-2 sc-col-energy">Energy (ft-lbs)</th>
+                                    <th class="px-3 py-2">Time (s)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sc-traj-table-body"></tbody>
+                        </table>
+                    </div>
                 </div>
                 </div>
             </div>
@@ -1994,7 +2002,7 @@
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <script src="/static/offline-queue.js?v=1"></script>
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=142"></script>
+    <script src="/static/app.js?v=143"></script>
     <script>
       OfflineQueue.init();
       document.querySelector('a[href="/logout"]')?.addEventListener('click', async (e) => {

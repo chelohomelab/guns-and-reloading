@@ -1062,12 +1062,17 @@ function calcTrajectory() {
         const energy = (weight * v * v) / 450240;
         const pathIn = y * 12;
         const windageIn = z * 12;
+        // Elevation/Windage are the SCOPE DIAL correction — the inverse of the bullet's
+        // physical position. A bullet that lands below the line of sight (negative path)
+        // needs the elevation turret dialed UP (positive) to compensate, and so on.
+        const elevCorrectionIn = -pathIn;
+        const windCorrectionIn = -windageIn;
         rows.push({
-            yd: rYd, pathIn, v, energy, t, windageIn,
-            moa: _inchesToMOA(pathIn, rYd),
-            mil: _inchesToMIL(pathIn, rYd),
-            windMoa: _inchesToMOA(windageIn, rYd),
-            windMil: _inchesToMIL(windageIn, rYd),
+            yd: rYd, pathIn, v, energy, t,
+            moa: _inchesToMOA(elevCorrectionIn, rYd),
+            mil: _inchesToMIL(elevCorrectionIn, rYd),
+            windMoa: _inchesToMOA(windCorrectionIn, rYd),
+            windMil: _inchesToMIL(windCorrectionIn, rYd),
         });
     }
 
@@ -1076,18 +1081,26 @@ function calcTrajectory() {
         <tr class="border-t border-gray-700">
             <td class="px-3 py-1.5">${r.yd}</td>
             <td class="px-3 py-1.5 ${Math.abs(r.pathIn) < 0.05 ? 'text-purple-400 font-bold' : ''}">${r.pathIn >= 0 ? '+' : ''}${r.pathIn.toFixed(1)}</td>
-            <td class="px-3 py-1.5">${r.moa == null ? '—' : (r.moa >= 0 ? '+' : '') + r.moa.toFixed(1)}</td>
-            <td class="px-3 py-1.5">${r.mil == null ? '—' : (r.mil >= 0 ? '+' : '') + r.mil.toFixed(1)}</td>
-            <td class="px-3 py-1.5">${r.windageIn >= 0 ? '+' : ''}${r.windageIn.toFixed(1)}</td>
-            <td class="px-3 py-1.5">${r.windMoa == null ? '—' : (r.windMoa >= 0 ? '+' : '') + r.windMoa.toFixed(1)}</td>
-            <td class="px-3 py-1.5">${r.windMil == null ? '—' : (r.windMil >= 0 ? '+' : '') + r.windMil.toFixed(1)}</td>
+            <td class="px-3 py-1.5 sc-col-moa">${r.moa == null ? '—' : (r.moa >= 0 ? '+' : '') + r.moa.toFixed(1)}</td>
+            <td class="px-3 py-1.5 sc-col-mil">${r.mil == null ? '—' : (r.mil >= 0 ? '+' : '') + r.mil.toFixed(1)}</td>
+            <td class="px-3 py-1.5 sc-col-moa">${r.windMoa == null ? '—' : (r.windMoa >= 0 ? '+' : '') + r.windMoa.toFixed(1)}</td>
+            <td class="px-3 py-1.5 sc-col-mil">${r.windMil == null ? '—' : (r.windMil >= 0 ? '+' : '') + r.windMil.toFixed(1)}</td>
             <td class="px-3 py-1.5">${Math.round(r.v)}</td>
-            <td class="px-3 py-1.5">${Math.round(r.energy)}</td>
+            <td class="px-3 py-1.5 sc-col-energy">${Math.round(r.energy)}</td>
             <td class="px-3 py-1.5">${r.t.toFixed(3)}</td>
         </tr>
     `).join('');
     resultsEl.classList.remove('hidden');
+    _applyTrajColumnToggles();
     _drawTrajectoryChart(rows);
+}
+
+function _applyTrajColumnToggles() {
+    ['moa', 'mil', 'energy'].forEach(kind => {
+        const cb = document.getElementById(`sc-traj-toggle-${kind}`);
+        const show = cb ? cb.checked : true;
+        document.querySelectorAll(`.sc-col-${kind}`).forEach(el => el.classList.toggle('hidden', !show));
+    });
 }
 
 // Finds the zero distance whose max mid-range rise above the line of sight equals the

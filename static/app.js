@@ -869,25 +869,34 @@ const _DRAG_K = 2.0873e-4;
 
 // Integrates a trajectory from the muzzle at the given launch angle (radians, relative
 // to horizontal) until it travels maxXFt of horizontal distance. Returns an array of
-// {x, y, v} samples (x/y in feet, v in fps); y is height relative to the line of sight
-// (the bore starts sightHeightIn below the line of sight).
-function _simulateTrajectory(v0, bc, sightHeightIn, angleRad, maxXFt) {
+// {t, x, y, z, v} samples (x/y/z in feet, v in fps, t in seconds); y is height relative
+// to the line of sight (the bore starts sightHeightIn below it), z is lateral drift.
+// opts: { windAirX, windAirZ } — the wind's own velocity components in fps (not the
+// bullet's) — and { densityRatio } — local air density / standard sea-level air density.
+function _simulateTrajectory(v0, bc, sightHeightIn, angleRad, maxXFt, opts) {
+    const { windAirX = 0, windAirZ = 0, densityRatio = 1 } = opts || {};
     const dt = 0.0005;
-    let x = 0, y = -sightHeightIn / 12;
+    let t = 0, x = 0, y = -sightHeightIn / 12, z = 0;
     let vx = v0 * Math.cos(angleRad);
     let vy = v0 * Math.sin(angleRad);
-    const path = [{ x, y, v: v0 }];
+    let vz = 0;
+    const path = [{ t, x, y, z, v: v0 }];
     let steps = 0;
     while (x < maxXFt && steps < 40000) {
         steps++;
-        const v = Math.hypot(vx, vy);
-        const cd = _g1Cd(v / _SPEED_OF_SOUND);
-        const decel = _DRAG_K * cd * v / bc;
-        vx += -decel * vx * dt;
-        vy += (-decel * vy - _GRAVITY) * dt;
+        // Drag acts on velocity relative to the air mass, not relative to the ground.
+        const vrx = vx - windAirX, vry = vy, vrz = vz - windAirZ;
+        const vrel = Math.hypot(vrx, vry, vrz);
+        const cd = _g1Cd(vrel / _SPEED_OF_SOUND);
+        const decel = _DRAG_K * densityRatio * cd * vrel / bc;
+        vx += -decel * vrx * dt;
+        vy += (-decel * vry - _GRAVITY) * dt;
+        vz += -decel * vrz * dt;
         x += vx * dt;
         y += vy * dt;
-        path.push({ x, y, v: Math.hypot(vx, vy) });
+        z += vz * dt;
+        t += dt;
+        path.push({ t, x, y, z, v: Math.hypot(vx, vy, vz) });
     }
     return path;
 }
@@ -896,21 +905,25 @@ function _pathValueAt(path, xFt) {
     for (let i = 1; i < path.length; i++) {
         if (path[i - 1].x <= xFt && xFt <= path[i].x) {
             const a = path[i - 1], b = path[i];
-            const t = (b.x === a.x) ? 0 : (xFt - a.x) / (b.x - a.x);
-            return { y: a.y + t * (b.y - a.y), v: a.v + t * (b.v - a.v) };
+            const f = (b.x === a.x) ? 0 : (xFt - a.x) / (b.x - a.x);
+            return {
+                t: a.t + f * (b.t - a.t), y: a.y + f * (b.y - a.y),
+                z: a.z + f * (b.z - a.z), v: a.v + f * (b.v - a.v),
+            };
         }
     }
     return path[path.length - 1];
 }
 
 // Finds the launch angle (radians) that puts the bullet exactly on the line of sight
-// (y=0) at the given zero distance, via bisection.
-function _findZeroAngle(v0, bc, sightHeightIn, zeroYd) {
+// (y=0) at the given zero distance, via bisection. Zeroing is assumed done on a calm
+// day — wind isn't a factor here, only the density ratio (today's air) is.
+function _findZeroAngle(v0, bc, sightHeightIn, zeroYd, densityRatio) {
     const zeroFt = zeroYd * 3;
     let lo = -0.05, hi = 0.05;
     for (let i = 0; i < 60; i++) {
         const mid = (lo + hi) / 2;
-        const path = _simulateTrajectory(v0, bc, sightHeightIn, mid, zeroFt + 1);
+        const path = _simulateTrajectory(v0, bc, sightHeightIn, mid, zeroFt + 1, { densityRatio });
         const yz = _pathValueAt(path, zeroFt).y;
         if (yz < 0) lo = mid; else hi = mid;
     }
@@ -928,6 +941,71 @@ function _inchesToMIL(inches, yards) {
     return inches / (3.6 * (yards / 100));
 }
 
+// Wind's own velocity components (fps), clock convention: 0°=headwind (12 o'clock,
+// blows toward the shooter, opposing the bullet), 90°=full crosswind from the shooter's
+// right (3 o'clock), 180°=tailwind (6 o'clock), 270°=full crosswind from the left (9
+// o'clock). airX>0 aids the bullet (tailwind); airZ follows the same clock — positive
+// drift in the table means the bullet drifted toward the shooter's right.
+function _windComponentsFps(speedMph, angleDeg) {
+    const speedFps = speedMph * 1.46667;
+    const angleRad = angleDeg * Math.PI / 180;
+    return { airX: -speedFps * Math.cos(angleRad), airZ: -speedFps * Math.sin(angleRad) };
+}
+
+// Local-air-density / standard-sea-level-air-density, from actual field conditions.
+// Standard atmosphere (59F, 29.92inHg, 0% humidity, sea level) returns ~1.0 — matches
+// the reference the base drag constant was derived against, so leaving these fields at
+// their defaults makes zero change to the existing (validated) trajectory numbers.
+// Humid air is *less* dense than dry air at the same temp/pressure (water vapor is
+// lighter than N2/O2), so higher humidity flattens the trajectory slightly, same as heat
+// or altitude. Pressure defaults to the standard-atmosphere pressure at the given
+// altitude if left blank; an entered station pressure always wins (it's an actual
+// reading vs. a modeled standard-day estimate).
+function _densityRatio(tempF, pressureInHg, humidityPct, altitudeFt) {
+    if (pressureInHg == null || isNaN(pressureInHg)) {
+        pressureInHg = 29.9213 * Math.pow(1 - 6.8756e-6 * (altitudeFt || 0), 5.2559);
+    }
+    const tC = (tempF - 32) * 5 / 9;
+    const tK = tC + 273.15;
+    const pTotalPa = pressureInHg * 3386.39;
+    const pSatPa = 611.21 * Math.exp((18.678 - tC / 234.5) * (tC / (257.14 + tC)));
+    const pVaporPa = (humidityPct / 100) * pSatPa;
+    const pDryPa = pTotalPa - pVaporPa;
+    const rhoKgM3 = pDryPa / (287.05 * tK) + pVaporPa / (461.495 * tK);
+    const rhoSlugFt3 = rhoKgM3 * 0.00194032;
+    return rhoSlugFt3 / 0.0023769;
+}
+
+function _drawTrajectoryChart(rows) {
+    const svg = document.getElementById('sc-traj-chart');
+    if (!svg || rows.length < 2) return;
+    const W = 600, H = 220, padL = 40, padR = 12, padT = 12, padB = 24;
+    const xs = rows.map(r => r.yd), ys = rows.map(r => r.pathIn);
+    const xMin = 0, xMax = Math.max(...xs) || 1;
+    const yMin = Math.min(0, ...ys), yMax = Math.max(0, ...ys);
+    const yPad = (yMax - yMin) * 0.1 || 1;
+    const yLo = yMin - yPad, yHi = yMax + yPad;
+    const toX = x => padL + (x - xMin) / (xMax - xMin) * (W - padL - padR);
+    const toY = y => padT + (1 - (y - yLo) / (yHi - yLo)) * (H - padT - padB);
+
+    const linePts = rows.map(r => `${toX(r.yd).toFixed(1)},${toY(r.pathIn).toFixed(1)}`).join(' ');
+    const zeroY = toY(0).toFixed(1);
+
+    let svgInner = `
+        <line x1="${padL}" y1="${zeroY}" x2="${W - padR}" y2="${zeroY}" stroke="#4b5563" stroke-dasharray="4,3" stroke-width="1"/>
+        <polyline points="${linePts}" fill="none" stroke="#c084fc" stroke-width="2"/>
+    `;
+    rows.forEach(r => {
+        svgInner += `<circle cx="${toX(r.yd).toFixed(1)}" cy="${toY(r.pathIn).toFixed(1)}" r="2.5" fill="#c084fc"/>`;
+    });
+    svgInner += `<text x="${padL}" y="${(H - 6)}" font-size="9" fill="#9ca3af">0</text>`;
+    svgInner += `<text x="${(W - padR - 24)}" y="${(H - 6)}" font-size="9" fill="#9ca3af">${xMax} yd</text>`;
+    svgInner += `<text x="2" y="${(parseFloat(zeroY) + 3)}" font-size="9" fill="#9ca3af">0"</text>`;
+
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML = svgInner;
+}
+
 function calcTrajectory() {
     const errEl = document.getElementById('sc-traj-error');
     const resultsEl = document.getElementById('sc-traj-results');
@@ -942,6 +1020,17 @@ function calcTrajectory() {
     const interval = parseFloat(document.getElementById('sc-traj-interval').value);
     const maxDist = parseFloat(document.getElementById('sc-traj-max-distance').value);
 
+    // Optional environment fields — all default to "no effect" when left blank.
+    const windSpeed = parseFloat(document.getElementById('sc-traj-wind-speed').value) || 0;
+    const windAngle = parseFloat(document.getElementById('sc-traj-wind-angle').value) || 0;
+    const shootAngleDeg = parseFloat(document.getElementById('sc-traj-shoot-angle').value) || 0;
+    const altitudeFt = parseFloat(document.getElementById('sc-traj-altitude').value) || 0;
+    const tempFRaw = document.getElementById('sc-traj-temp').value;
+    const tempF = tempFRaw === '' ? 59 : parseFloat(tempFRaw);
+    const pressureRaw = document.getElementById('sc-traj-pressure').value;
+    const pressureInHg = pressureRaw === '' ? null : parseFloat(pressureRaw);
+    const humidity = parseFloat(document.getElementById('sc-traj-humidity').value) || 0;
+
     if (!v0 || !bc || !weight || isNaN(sightHeight) || !zeroYd || !interval || !maxDist) {
         errEl.textContent = 'Please fill in all fields with valid numbers.';
         errEl.classList.remove('hidden');
@@ -953,19 +1042,32 @@ function calcTrajectory() {
         return;
     }
 
-    const angle = _findZeroAngle(v0, bc, sightHeight, zeroYd);
-    const path = _simulateTrajectory(v0, bc, sightHeight, angle, maxDist * 3 + 10);
+    const densityRatio = _densityRatio(tempF, pressureInHg, humidity, altitudeFt);
+    const { airX, airZ } = _windComponentsFps(windSpeed, windAngle);
+    const inclineRad = shootAngleDeg * Math.PI / 180;
+    const inclineCos = Math.cos(inclineRad) || 1;
+
+    const angle = _findZeroAngle(v0, bc, sightHeight, zeroYd, densityRatio);
+    const path = _simulateTrajectory(v0, bc, sightHeight, angle, maxDist * 3 + 10, { windAirX: airX, windAirZ: airZ, densityRatio });
 
     const rows = [];
     for (let yd = 0; yd <= maxDist + 1e-9; yd += interval) {
-        const { y, v } = _pathValueAt(path, yd * 3);
+        const rYd = Math.round(yd);
+        // Rifleman's Rule: at an incline, the actual drop at slant distance R matches the
+        // level-fire drop at the shorter horizontal-equivalent distance R*cos(angle) — so
+        // look up the flat trajectory there, but still label the row with the real
+        // (rangefinder) slant distance.
+        const effYd = rYd * inclineCos;
+        const { y, z, v, t } = _pathValueAt(path, effYd * 3);
         const energy = (weight * v * v) / 450240;
         const pathIn = y * 12;
-        const rYd = Math.round(yd);
+        const windageIn = z * 12;
         rows.push({
-            yd: rYd, pathIn, v, energy,
+            yd: rYd, pathIn, v, energy, t, windageIn,
             moa: _inchesToMOA(pathIn, rYd),
             mil: _inchesToMIL(pathIn, rYd),
+            windMoa: _inchesToMOA(windageIn, rYd),
+            windMil: _inchesToMIL(windageIn, rYd),
         });
     }
 
@@ -976,11 +1078,16 @@ function calcTrajectory() {
             <td class="px-3 py-1.5 ${Math.abs(r.pathIn) < 0.05 ? 'text-purple-400 font-bold' : ''}">${r.pathIn >= 0 ? '+' : ''}${r.pathIn.toFixed(1)}</td>
             <td class="px-3 py-1.5">${r.moa == null ? '—' : (r.moa >= 0 ? '+' : '') + r.moa.toFixed(1)}</td>
             <td class="px-3 py-1.5">${r.mil == null ? '—' : (r.mil >= 0 ? '+' : '') + r.mil.toFixed(1)}</td>
+            <td class="px-3 py-1.5">${r.windageIn >= 0 ? '+' : ''}${r.windageIn.toFixed(1)}</td>
+            <td class="px-3 py-1.5">${r.windMoa == null ? '—' : (r.windMoa >= 0 ? '+' : '') + r.windMoa.toFixed(1)}</td>
+            <td class="px-3 py-1.5">${r.windMil == null ? '—' : (r.windMil >= 0 ? '+' : '') + r.windMil.toFixed(1)}</td>
             <td class="px-3 py-1.5">${Math.round(r.v)}</td>
             <td class="px-3 py-1.5">${Math.round(r.energy)}</td>
+            <td class="px-3 py-1.5">${r.t.toFixed(3)}</td>
         </tr>
     `).join('');
     resultsEl.classList.remove('hidden');
+    _drawTrajectoryChart(rows);
 }
 
 // Finds the zero distance whose max mid-range rise above the line of sight equals the

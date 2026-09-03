@@ -917,6 +917,17 @@ function _findZeroAngle(v0, bc, sightHeightIn, zeroYd) {
     return (lo + hi) / 2;
 }
 
+// Angular drop, converted from linear inches at a given range. 1 MOA subtends
+// 1.047in at 100yd; 1 MIL subtends 3.6in at 100yd — both scale linearly with range.
+function _inchesToMOA(inches, yards) {
+    if (!yards) return null;
+    return inches / (1.047 * (yards / 100));
+}
+function _inchesToMIL(inches, yards) {
+    if (!yards) return null;
+    return inches / (3.6 * (yards / 100));
+}
+
 function calcTrajectory() {
     const errEl = document.getElementById('sc-traj-error');
     const resultsEl = document.getElementById('sc-traj-results');
@@ -949,7 +960,13 @@ function calcTrajectory() {
     for (let yd = 0; yd <= maxDist + 1e-9; yd += interval) {
         const { y, v } = _pathValueAt(path, yd * 3);
         const energy = (weight * v * v) / 450240;
-        rows.push({ yd: Math.round(yd), pathIn: y * 12, v, energy });
+        const pathIn = y * 12;
+        const rYd = Math.round(yd);
+        rows.push({
+            yd: rYd, pathIn, v, energy,
+            moa: _inchesToMOA(pathIn, rYd),
+            mil: _inchesToMIL(pathIn, rYd),
+        });
     }
 
     const tbody = document.getElementById('sc-traj-table-body');
@@ -957,6 +974,8 @@ function calcTrajectory() {
         <tr class="border-t border-gray-700">
             <td class="px-3 py-1.5">${r.yd}</td>
             <td class="px-3 py-1.5 ${Math.abs(r.pathIn) < 0.05 ? 'text-purple-400 font-bold' : ''}">${r.pathIn >= 0 ? '+' : ''}${r.pathIn.toFixed(1)}</td>
+            <td class="px-3 py-1.5">${r.moa == null ? '—' : (r.moa >= 0 ? '+' : '') + r.moa.toFixed(1)}</td>
+            <td class="px-3 py-1.5">${r.mil == null ? '—' : (r.mil >= 0 ? '+' : '') + r.mil.toFixed(1)}</td>
             <td class="px-3 py-1.5">${Math.round(r.v)}</td>
             <td class="px-3 py-1.5">${Math.round(r.energy)}</td>
         </tr>

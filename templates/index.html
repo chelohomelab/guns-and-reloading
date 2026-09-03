@@ -666,7 +666,7 @@
                     </div>
                 </div>
                 <div id="sc-mpbr-error" class="hidden text-sm text-red-400 bg-red-950/40 border border-red-800/40 rounded-lg px-3 py-2"></div>
-                <div id="sc-mpbr-results" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div id="sc-mpbr-results" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl text-center">
                         <div class="text-[10px] text-gray-400 uppercase font-semibold mb-1">Recommended Zero</div>
                         <div id="sc-mpbr-zero" class="text-2xl font-bold text-purple-400">—</div>
@@ -678,6 +678,10 @@
                     <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl text-center">
                         <div class="text-[10px] text-gray-400 uppercase font-semibold mb-1">Max Rise Above Sight Line</div>
                         <div id="sc-mpbr-ordinate" class="text-2xl font-bold text-blue-400">—</div>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl text-center">
+                        <div class="text-[10px] text-gray-400 uppercase font-semibold mb-1">Path at 100 yd</div>
+                        <div id="sc-mpbr-100yd" class="text-2xl font-bold text-amber-400">—</div>
                     </div>
                 </div>
             </div>
@@ -2008,7 +2012,7 @@
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <script src="/static/offline-queue.js?v=1"></script>
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=145"></script>
+    <script src="/static/app.js?v=146"></script>
     <script>
       OfflineQueue.init();
       document.querySelector('a[href="/logout"]')?.addEventListener('click', async (e) => {

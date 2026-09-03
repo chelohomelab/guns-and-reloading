@@ -1142,7 +1142,9 @@ function _solveMPBR(v0, bc, sightHeightIn, radiusIn) {
         }
     }
 
-    return { zeroYd: finalZeroYd, mpbrYd, maxOrdinateIn: maxOrdinateFt * 12 };
+    const path100 = _pathValueAt(path, 100 * 3);
+
+    return { zeroYd: finalZeroYd, mpbrYd, maxOrdinateIn: maxOrdinateFt * 12, pathAt100In: path100.y * 12 };
 }
 
 function calcMPBR() {
@@ -1172,6 +1174,7 @@ function calcMPBR() {
     document.getElementById('sc-mpbr-zero').textContent = `${Math.round(result.zeroYd)} yd`;
     document.getElementById('sc-mpbr-range').textContent = result.mpbrYd != null ? `${Math.round(result.mpbrYd)} yd` : '—';
     document.getElementById('sc-mpbr-ordinate').textContent = `${result.maxOrdinateIn.toFixed(1)} in`;
+    document.getElementById('sc-mpbr-100yd').textContent = `${result.pathAt100In >= 0 ? '+' : ''}${result.pathAt100In.toFixed(1)} in`;
     resultsEl.classList.remove('hidden');
 }
 

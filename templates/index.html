@@ -604,8 +604,14 @@
                 <div id="sc-traj-error" class="hidden text-sm text-red-400 bg-red-950/40 border border-red-800/40 rounded-lg px-3 py-2"></div>
                 <div id="sc-traj-results" class="hidden space-y-3">
                 <div class="space-y-4">
-                    <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-3 max-w-lg mx-auto">
-                        <svg id="sc-traj-chart" class="w-full h-auto" style="aspect-ratio: 600 / 220;"></svg>
+                    <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl">
+                        <button onclick="_toggleTrajChart()" class="w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold text-gray-300 hover:text-white cursor-pointer">
+                            <span>📈 Trajectory Chart</span>
+                            <span id="sc-traj-chart-arrow" class="text-gray-500">▼</span>
+                        </button>
+                        <div id="sc-traj-chart-wrap" class="hidden p-3 pt-0">
+                            <svg id="sc-traj-chart" class="w-full h-auto" style="aspect-ratio: 600 / 220;"></svg>
+                        </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-4 text-xs text-gray-300 bg-gray-800 rounded-lg border border-gray-700 shadow-xl px-3 py-2.5">
                         <span class="text-gray-400 uppercase font-semibold text-[10px]">Show columns:</span>
@@ -2002,7 +2008,7 @@
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <script src="/static/offline-queue.js?v=1"></script>
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=143"></script>
+    <script src="/static/app.js?v=145"></script>
     <script>
       OfflineQueue.init();
       document.querySelector('a[href="/logout"]')?.addEventListener('click', async (e) => {

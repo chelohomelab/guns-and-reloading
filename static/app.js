@@ -976,6 +976,13 @@ function _densityRatio(tempF, pressureInHg, humidityPct, altitudeFt) {
     return rhoSlugFt3 / 0.0023769;
 }
 
+function _toggleTrajChart() {
+    const wrap = document.getElementById('sc-traj-chart-wrap');
+    const arrow = document.getElementById('sc-traj-chart-arrow');
+    const isHidden = wrap?.classList.toggle('hidden');
+    if (arrow) arrow.textContent = isHidden ? '▼' : '▲';
+}
+
 function _drawTrajectoryChart(rows) {
     const svg = document.getElementById('sc-traj-chart');
     if (!svg || rows.length < 2) return;

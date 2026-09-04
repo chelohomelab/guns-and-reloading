@@ -78,6 +78,11 @@ async def wishlist_page(request: Request):
     return templates.TemplateResponse("wishlist.html", {"request": request, "user": request.state.user})
 
 
+@router.get("/hunting", response_class=HTMLResponse)
+async def hunting_page(request: Request):
+    return templates.TemplateResponse("hunting.html", {"request": request, "user": request.state.user})
+
+
 @router.get("/admin/scanner", response_class=HTMLResponse)
 async def scanner_page(request: Request):
     return templates.TemplateResponse("scanner.html", {"request": request, "user": request.state.user})

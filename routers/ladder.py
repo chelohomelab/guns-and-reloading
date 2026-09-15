@@ -95,6 +95,7 @@ def _ladder_test_summary(t: models.LadderTest) -> dict:
         "barrel_id": t.barrel_id,
         "platform_id": t.platform_id,
         "platform_label": _platform_label(t),
+        "is_draft": t.is_draft,
         "has_winner": any(s.is_winner for s in t.steps),
         "date_started": t.date_started,
         "created_at": t.created_at,
@@ -194,12 +195,44 @@ def create_ladder_test(payload: LadderTestPayload, db: Session = Depends(get_db)
         db.refresh(step)
 
     # The rounds for every generated step were loaded (and their components used) right now, at
-    # creation — not later when velocities get recorded. See _deduct_for_ladder_rounds.
+    # creation — not later when velocities get recorded. See _deduct_for_ladder_rounds. A draft
+    # test is a plan only (e.g. "how many rounds would this range even use") — steps are created
+    # exactly the same way, but nothing is deducted until it's explicitly submitted.
     warnings = []
-    for step in new_steps:
-        warnings.extend(_deduct_for_ladder_rounds(db, t, step, payload.rounds_per_step or 0))
+    if not t.is_draft:
+        for step in new_steps:
+            warnings.extend(_deduct_for_ladder_rounds(db, t, step, payload.rounds_per_step or 0))
+        warnings = _dedupe_warnings_keep_last(warnings)
+
+    result = _ladder_test_detail(t)
+    result["warnings"] = warnings
+    return result
+
+
+@router.post("/ladder-tests/{test_id}/submit")
+def submit_ladder_test(test_id: int, db: Session = Depends(get_db)):
+    # Turns a draft plan into the real thing: deducts every existing step's components (exactly
+    # like create_ladder_test/add_ladder_step would have, had this not been a draft) and clears
+    # the draft flag. One-way — there's no "un-submit" back into a draft.
+    t = (
+        db.query(models.LadderTest)
+        .options(joinedload(models.LadderTest.steps))
+        .filter(models.LadderTest.id == test_id)
+        .first()
+    )
+    if not t:
+        raise HTTPException(404, "Ladder test not found")
+    if not t.is_draft:
+        raise HTTPException(400, "This ladder test isn't a draft — it's already been submitted")
+
+    warnings = []
+    for step in t.steps:
+        warnings.extend(_deduct_for_ladder_rounds(db, t, step, step.rounds_fired if step.rounds_fired is not None else (t.rounds_per_step or 0)))
     warnings = _dedupe_warnings_keep_last(warnings)
 
+    t.is_draft = False
+    db.commit()
+    db.refresh(t)
     result = _ladder_test_detail(t)
     result["warnings"] = warnings
     return result
@@ -269,8 +302,9 @@ def add_ladder_step(test_id: int, payload: LadderTestStepPayload, db: Session = 
     db.commit()
     db.refresh(step)
     # A manually-added extra charge step is loaded and fired in one go (charge + velocities
-    # submitted together), so its full rounds_fired is newly-used rounds — deduct now.
-    warnings = _deduct_for_ladder_rounds(db, t, step, step.rounds_fired or 0)
+    # submitted together), so its full rounds_fired is newly-used rounds — deduct now, unless
+    # this whole test is still a draft (see create_ladder_test).
+    warnings = [] if t.is_draft else _deduct_for_ladder_rounds(db, t, step, step.rounds_fired or 0)
     result = _ladder_step_dict(step)
     result["warnings"] = warnings
     return result

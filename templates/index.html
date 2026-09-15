@@ -468,6 +468,12 @@
                     <p id="lt-charge-preview" class="text-[11px] text-purple-300 mt-1.5 font-mono"></p>
                     <p class="text-[11px] text-gray-500 mt-1.5">Leave all four blank to start with no steps and add charges manually instead. Rounds/Step defaults to 1 — raise it only if you're loading more than one round per charge. Components are deducted from inventory now, for all rounds in the ladder — not later when you record velocities.</p>
                 </div>
+                <div class="flex items-start gap-2 bg-gray-850 border border-gray-700 rounded p-3">
+                    <input type="checkbox" id="lt-is-draft" onchange="updateLadderChargePreview()" class="mt-0.5 w-4 h-4 accent-amber-500 cursor-pointer">
+                    <label for="lt-is-draft" class="text-xs text-gray-300 cursor-pointer">
+                        <span class="font-semibold text-gray-100">📝 Save as draft</span> — just plan it out (see the round count) without deducting any powder, bullets, primers, or brass yet. You can submit it later from the detail view whenever you actually load these rounds.
+                    </label>
+                </div>
                 <div>
                     <label class="block text-xs text-gray-200 font-semibold mb-1">Notes</label>
                     <input type="text" id="lt-notes" placeholder="Optional notes" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none">
@@ -484,6 +490,11 @@
                     <div>
                         <h3 id="ladder-detail-title" class="text-lg font-bold text-white"></h3>
                         <p id="ladder-detail-recipe" class="text-xs text-gray-400 mt-1"></p>
+                        <div id="ladder-draft-banner" class="hidden mt-2 flex flex-wrap items-center gap-2">
+                            <span class="text-[10px] bg-yellow-900/60 text-yellow-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wide shrink-0">📝 Draft</span>
+                            <span class="text-xs text-gray-400">Nothing's been deducted from inventory yet.</span>
+                            <button onclick="submitLadderTest()" class="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded transition cursor-pointer">✅ Submit &amp; Deduct Components</button>
+                        </div>
                     </div>
                     <button onclick="deleteLadderTestConfirm()" class="text-gray-500 hover:text-red-400 text-xs shrink-0 cursor-pointer">🗑️ Delete Test</button>
                 </div>
@@ -2024,7 +2035,7 @@
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <script src="/static/offline-queue.js?v=1"></script>
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=146"></script>
+    <script src="/static/app.js?v=147"></script>
     <script>
       OfflineQueue.init();
       document.querySelector('a[href="/logout"]')?.addEventListener('click', async (e) => {

@@ -145,6 +145,7 @@ class LadderTestPayload(BaseModel):
     primer_inv_id: Optional[int] = None
     casing_inv_id: Optional[int] = None
     rounds_per_step: Optional[int] = None
+    is_draft: Optional[bool] = False
 
 
 class LadderTestPatch(BaseModel):
@@ -166,6 +167,7 @@ class LadderTestPatch(BaseModel):
     primer_inv_id: Optional[int] = None
     casing_inv_id: Optional[int] = None
     rounds_per_step: Optional[int] = None
+    is_draft: Optional[bool] = None
 
 
 class TestPlatformPayload(BaseModel):

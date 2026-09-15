@@ -5700,6 +5700,8 @@ function showLadderCreateForm() {
     // think about — still editable for the rare group-testing ladder that loads more per step.
     const roundsEl = document.getElementById('lt-rounds-per-step');
     if (roundsEl) roundsEl.value = '1';
+    const draftEl = document.getElementById('lt-is-draft');
+    if (draftEl) draftEl.checked = false;
     cancelNewLadderPlatform();
     populateLadderDropdowns();
     populateLadderPlatformSelect();
@@ -5740,11 +5742,15 @@ function updateLadderChargePreview() {
         el.textContent = `⚠ That range/increment produces ${stepCount} steps — widen the increment (max 50).`;
         return;
     }
+    const isDraft = document.getElementById('lt-is-draft')?.checked;
     let text = `→ ${stepCount} step${stepCount === 1 ? '' : 's'} (${start}–${end}gr, every ${increment}gr)`;
     if (Number.isFinite(roundsPerStep) && roundsPerStep > 0) {
-        text += ` × ${roundsPerStep} round${roundsPerStep === 1 ? '' : 's'}/step = ${stepCount * roundsPerStep} total rounds deducted on create.`;
+        const total = stepCount * roundsPerStep;
+        text += isDraft
+            ? ` × ${roundsPerStep} round${roundsPerStep === 1 ? '' : 's'}/step = ${total} total rounds planned (draft — nothing deducted).`
+            : ` × ${roundsPerStep} round${roundsPerStep === 1 ? '' : 's'}/step = ${total} total rounds deducted on create.`;
     } else {
-        text += ' — enter Rounds/Step (required) to see total rounds deducted.';
+        text += isDraft ? ' — enter Rounds/Step (required) to see total rounds planned.' : ' — enter Rounds/Step (required) to see total rounds deducted.';
     }
     el.textContent = text;
 }
@@ -5818,7 +5824,10 @@ async function loadLadderTests() {
             <div onclick="openLadderTest(${t.id})" class="bg-gray-800 p-4 rounded-lg border border-gray-700 hover:border-purple-500/50 shadow-xl cursor-pointer transition">
                 <div class="flex justify-between items-start gap-2">
                     <h4 class="text-sm font-bold text-white">${escHtml(t.name)}</h4>
-                    ${t.has_winner ? '<span class="text-[10px] bg-amber-900/60 text-amber-400 px-1.5 py-0.5 rounded font-bold shrink-0">★ WINNER SET</span>' : ''}
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        ${t.is_draft ? '<span class="text-[10px] bg-yellow-900/60 text-yellow-400 px-1.5 py-0.5 rounded font-bold uppercase">📝 Draft</span>' : ''}
+                        ${t.has_winner ? '<span class="text-[10px] bg-amber-900/60 text-amber-400 px-1.5 py-0.5 rounded font-bold">★ WINNER SET</span>' : ''}
+                    </div>
                 </div>
                 <p class="text-xs text-gray-400 mt-1">${escHtml(t.bullet_label)} · ${escHtml(t.powder_name)}</p>
                 <p class="text-[11px] text-gray-500 mt-1">${t.step_count} step${t.step_count === 1 ? '' : 's'}${t.charge_min !== null ? ` · ${t.charge_min}–${t.charge_max}gr` : ''}${t.platform_label ? ` · 🔫 ${escHtml(t.platform_label)}` : ''}</p>
@@ -5859,6 +5868,7 @@ async function submitNewLadderTest() {
     const chargeEnd = document.getElementById('lt-charge-end')?.value;
     const chargeIncrement = document.getElementById('lt-charge-increment')?.value;
     const roundsPerStep = document.getElementById('lt-rounds-per-step')?.value;
+    const isDraft = document.getElementById('lt-is-draft')?.checked || false;
 
     if (!name || !caliber || !bulletId || !powder) {
         showToast('Name, caliber, bullet, and powder are required', 'error');
@@ -5895,6 +5905,7 @@ async function submitNewLadderTest() {
                 powder_inv_id: powderInvId ? parseInt(powderInvId) : null,
                 primer_inv_id: primerInvId ? parseInt(primerInvId) : null,
                 casing_inv_id: casingInvId ? parseInt(casingInvId) : null,
+                is_draft: isDraft,
             }),
         });
         if (res.status === 400) {
@@ -5905,7 +5916,7 @@ async function submitNewLadderTest() {
         if (!res.ok) { showToast('Failed to create ladder test', 'error'); return; }
         _currentLadderTest = await res.json();
         (_currentLadderTest.warnings || []).forEach(w => showToast(w, 'error'));
-        showToast('Ladder test created', 'success');
+        showToast(isDraft ? 'Draft ladder test saved — nothing deducted yet' : 'Ladder test created', 'success');
         showLadderDetailView();
         renderLadderDetail();
     } catch (err) { showToast('Failed to create ladder test', 'error'); }
@@ -5942,6 +5953,9 @@ function renderLadderDetail() {
         if (t.platform_label) line += ` · 🔫 ${t.platform_label}`;
         recipe.textContent = line;
     }
+
+    const draftBanner = document.getElementById('ladder-draft-banner');
+    if (draftBanner) draftBanner.classList.toggle('hidden', !t.is_draft);
 
     const chartContainer = document.getElementById('ladder-chart');
     if (chartContainer) chartContainer.innerHTML = buildLadderChartSVG(t.steps);
@@ -6135,6 +6149,25 @@ async function deleteLadderTestConfirm() {
         showToast('Ladder test deleted', 'success');
         showLadderListView();
     } catch (err) { showToast('Failed to delete ladder test', 'error'); }
+}
+
+async function submitLadderTest() {
+    const t = _currentLadderTest;
+    if (!t) return;
+    const totalRounds = t.steps.reduce((sum, s) => sum + (s.rounds_fired ?? t.rounds_per_step ?? 0), 0);
+    if (!confirm(`Submit "${t.name}"? This deducts components for ${totalRounds} round${totalRounds === 1 ? '' : 's'} from inventory now — there's no undo.`)) return;
+    try {
+        const res = await fetch(`/ladder-tests/${t.id}/submit`, { method: 'POST' });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            showToast(err.detail || 'Failed to submit ladder test', 'error');
+            return;
+        }
+        _currentLadderTest = await res.json();
+        (_currentLadderTest.warnings || []).forEach(w => showToast(w, 'error'));
+        showToast('Submitted — components deducted', 'success');
+        renderLadderDetail();
+    } catch (err) { showToast('Failed to submit ladder test', 'error'); }
 }
 
 function buildLadderChartSVG(steps) {

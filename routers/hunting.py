@@ -6,7 +6,7 @@ from dependencies import get_db
 
 router = APIRouter()
 
-GAME_TYPES = ["Deer", "Black Bear", "Turkey", "Upland Birds", "Small Game", "Migratory Birds", "Trapping"]
+GAME_TYPES = ["Deer", "Black Bear", "Elk", "Turkey", "Upland Birds", "Small Game", "Migratory Birds", "Trapping"]
 
 
 def _state_dict(s: models.HuntingState) -> dict:

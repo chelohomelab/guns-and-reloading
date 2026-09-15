@@ -172,24 +172,10 @@
 
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-700 pb-3 mb-4">
                 <h2 class="text-2xl font-bold">🦌 Hunting</h2>
-                <button onclick="toggleAddStateForm()" class="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 rounded-lg text-white text-sm font-bold transition cursor-pointer">+ Add State</button>
-            </div>
-
-            <div id="hunting-add-state-form" class="hidden bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-3 mb-4 flex flex-wrap items-end gap-3">
-                <div>
-                    <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">State Name</label>
-                    <input type="text" id="hunting-new-state-name" placeholder="e.g. New Jersey" class="bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-orange-500">
-                </div>
-                <div>
-                    <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Abbreviation</label>
-                    <input type="text" id="hunting-new-state-abbr" placeholder="e.g. NJ" maxlength="2" class="w-20 bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-orange-500 uppercase">
-                </div>
-                <button onclick="submitAddState()" class="px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded text-white text-sm font-bold transition cursor-pointer">Add</button>
-                <button onclick="toggleAddStateForm()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 text-sm font-bold transition cursor-pointer">Cancel</button>
             </div>
 
             <div id="hunting-empty" class="hidden text-center text-gray-500 text-sm py-16">
-                No states added yet. Click <span class="text-orange-400 font-bold">+ Add State</span> to get started.
+                No states yet — an admin can add hunting data from <a href="/admin/hunting" class="text-orange-400 font-bold hover:underline">Add Hunting Data</a>.
             </div>
 
             <div id="hunting-content" class="hidden space-y-4">
@@ -228,6 +214,6 @@
         </main>
     </div>
 
-    <script src="/static/hunting.js?v=2"></script>
+    <script src="/static/hunting.js?v=3"></script>
 </body>
 </html>

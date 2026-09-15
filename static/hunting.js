@@ -76,26 +76,6 @@ function renderStateTabs() {
     `;
 }
 
-function toggleAddStateForm() {
-    document.getElementById('hunting-add-state-form').classList.toggle('hidden');
-}
-
-async function submitAddState() {
-    const name = document.getElementById('hunting-new-state-name').value.trim();
-    const abbr = document.getElementById('hunting-new-state-abbr').value.trim();
-    if (!name) return;
-    const formData = new FormData();
-    formData.set('name', name);
-    formData.set('abbreviation', abbr);
-    const res = await fetch('/hunting/states', { method: 'POST', body: formData });
-    const state = await res.json();
-    document.getElementById('hunting-new-state-name').value = '';
-    document.getElementById('hunting-new-state-abbr').value = '';
-    toggleAddStateForm();
-    await fetchHuntingStates();
-    selectState(state.id);
-}
-
 async function removeCurrentState() {
     if (!currentStateId) return;
     const state = huntingStates.find(s => s.id === currentStateId);

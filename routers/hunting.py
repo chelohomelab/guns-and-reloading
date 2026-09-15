@@ -1,7 +1,7 @@
 import subprocess
 import sys
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
@@ -61,19 +61,6 @@ def list_hunting_states(db: Session = Depends(get_db)):
     states = db.query(models.HuntingState).order_by(models.HuntingState.display_order, models.HuntingState.name).all()
     return [_state_dict(s) for s in states]
 
-
-@router.post("/hunting/states")
-def add_hunting_state(
-    name: str = Form(...),
-    abbreviation: str = Form(None),
-    db: Session = Depends(get_db),
-):
-    max_order = db.query(models.HuntingState).count()
-    state = models.HuntingState(name=name.strip(), abbreviation=(abbreviation or "").strip() or None, display_order=max_order)
-    db.add(state)
-    db.commit()
-    db.refresh(state)
-    return _state_dict(state)
 
 
 @router.delete("/hunting/states/{state_id}")

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hunting — Guns &amp; Reloading</title>
+    <link rel="icon" type="image/png" href="/static/images/app-icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0f0f0f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+      }
+    </script>
+    <style>
+      body { background-color: transparent !important; }
+      #bg-layer { position: fixed; inset: 0; z-index: -1; background-image: url('/static/images/phone-background.png'); background-size: cover; background-position: center; background-color: #0f0f0f; }
+      @media (min-width: 1024px) { #bg-layer { background-image: url('/static/images/background-widescreen.png'); background-size: cover; background-repeat: no-repeat; background-position: center; } }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 font-sans antialiased select-none flex min-h-dvh lg:h-dvh lg:overflow-hidden">
+
+<div id="bg-layer"></div>
+
+    <!-- Left Sidebar — mobile only (lg+ uses the top bar inside #main-bg instead) -->
+    <aside id="sidebar" class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 z-40 hidden">
+        <a href="/" class="block p-4 border-b border-gray-800 text-center cursor-pointer hover:bg-gray-800/40 transition">
+            <img src="/static/images/logo.png" alt="G&R" class="h-10 w-auto mx-auto mb-1.5 drop-shadow-lg">
+            <h1 class="text-lg font-black text-amber-500 tracking-wide leading-tight">Guns &amp; Reloading</h1>
+            <p class="text-[10px] text-gray-500 mt-0.5 tracking-widest uppercase">Vault</p>
+        </a>
+        <div class="flex-1 overflow-y-auto">
+        <nav class="p-2.5 space-y-1 border-b border-gray-800">
+            <a href="/inventory"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700/50 hover:border-amber-500/40 transition text-left">
+                <span class="text-lg">📦</span>
+                <div><div class="text-sm font-bold text-white">Inventory</div><div class="text-[10px] text-gray-500">Browse your vault</div></div>
+            </a>
+            <a href="/?tab=measure-tab"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition cursor-pointer text-left">
+                <span class="text-lg">🎯</span>
+                <div><div class="text-sm font-bold text-white">Range Session</div><div class="text-[10px] text-blue-400/70">Sessions &amp; ladder tests</div></div>
+            </a>
+            <a href="/?tab=shooting-calc-tab"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 hover:border-purple-500/40 transition cursor-pointer text-left">
+                <span class="text-lg">🧮</span>
+                <div><div class="text-sm font-bold text-white">Shooting Calculator</div><div class="text-[10px] text-purple-400/70">Trajectory &amp; MPBR</div></div>
+            </a>
+            <a href="/hunting"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/40 transition text-left">
+                <span class="text-lg">🦌</span>
+                <div><div class="text-sm font-bold text-orange-400">Hunting</div><div class="text-[10px] text-orange-500/60">Seasons &amp; regulations</div></div>
+            </a>
+            <a href="/?tab=reload-data-tab"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer text-left">
+                <span class="text-lg">📖</span>
+                <div><div class="text-sm font-bold text-white">Reloading Data Center</div><div class="text-[10px] text-rose-400/70">6 manufacturers</div></div>
+            </a>
+            <a href="/inventory?inv=ammo&ammofilter=handload"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/40 hover:border-emerald-500/40 transition cursor-pointer text-left">
+                <span class="text-lg">🧪</span>
+                <div><div class="text-sm font-bold text-white">Handloads</div><div class="text-[10px] text-emerald-400/70">Your custom loads</div></div>
+            </a>
+        </nav>
+        </div>
+    </aside>
+
+    <div id="sidebar-overlay" onclick="closeSidebar()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 hidden lg:hidden"></div>
+
+    <div id="main-bg" class="flex-1 flex flex-col min-w-0 lg:min-h-0 lg:overflow-hidden">
+
+        <!-- Mobile top bar -->
+        <header class="lg:hidden flex items-center justify-between gap-3 p-3 bg-gray-900/95 border-b border-gray-800 shrink-0 z-20">
+            <div class="flex items-center gap-3">
+                <button onclick="openSidebar()" class="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 cursor-pointer" aria-label="Open menu">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+                <img src="/static/images/logo.png" alt="G&R" class="h-7 w-auto">
+                <span class="text-orange-400 font-bold text-sm">Hunting</span>
+            </div>
+            <div class="relative">
+                <button onclick="toggleUserMenu('mobile-user-menu')" class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg hover:bg-gray-800 transition cursor-pointer">
+                    <span class="text-sm">⚙️</span>
+                    <span class="text-sm font-medium text-gray-300">{{ user.username }}</span>
+                    <span id="mobile-user-menu-arrow" class="text-gray-500 text-xs transition-transform duration-200">▼</span>
+                </button>
+                <div id="mobile-user-menu" class="hidden absolute top-full right-0 mt-1 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
+                    <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
+                    <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Desktop top bar -->
+        <header class="hidden lg:flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800 shrink-0 z-20">
+            <div class="flex items-center gap-1.5">
+                <a href="/" class="flex items-center gap-2 pr-4 mr-1.5 border-r border-gray-700 cursor-pointer">
+                    <img src="/static/images/logo.png" alt="G&R" class="h-8 w-auto drop-shadow-lg">
+                    <span class="text-amber-500 font-black text-lg tracking-wide">Guns &amp; Reloading</span>
+                </a>
+                <a href="/inventory"
+                    class="flex flex-col px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700/50 hover:border-amber-500/40 transition">
+                    <span class="text-sm font-bold text-white">Inventory</span>
+                    <span class="text-[10px] text-gray-500">Browse your vault</span>
+                </a>
+                <a href="/?tab=measure-tab"
+                    class="flex flex-col px-3 py-1.5 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition cursor-pointer">
+                    <span class="text-sm font-bold text-white">Range Session</span>
+                    <span class="text-[10px] text-blue-400/70">Sessions &amp; ladder tests</span>
+                </a>
+                <a href="/?tab=shooting-calc-tab"
+                    class="flex flex-col px-3 py-1.5 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 hover:border-purple-500/40 transition cursor-pointer">
+                    <span class="text-sm font-bold text-white">Shooting Calculator</span>
+                    <span class="text-[10px] text-purple-400/70">Trajectory &amp; MPBR</span>
+                </a>
+                <a href="/hunting"
+                    class="flex flex-col px-3 py-1.5 rounded-lg bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/40 transition">
+                    <span class="text-sm font-bold text-orange-400">Hunting</span>
+                    <span class="text-[10px] text-orange-500/60">Seasons &amp; regulations</span>
+                </a>
+                <a href="/?tab=reload-data-tab"
+                    class="flex flex-col px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer">
+                    <span class="text-sm font-bold text-white">Reloading Data Center</span>
+                    <span class="text-[10px] text-rose-400/70">6 manufacturers</span>
+                </a>
+                <a href="/inventory?inv=ammo&ammofilter=handload"
+                    class="flex flex-col px-3 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/40 hover:border-emerald-500/40 transition cursor-pointer">
+                    <span class="text-sm font-bold text-white">Handloads</span>
+                    <span class="text-[10px] text-emerald-400/70">Your custom loads</span>
+                </a>
+            </div>
+            <div class="relative">
+                <button onclick="toggleUserMenu('desktop-user-menu')" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 transition cursor-pointer">
+                    <span class="text-sm">⚙️</span>
+                    <span class="text-sm font-medium text-gray-300">{{ user.username }}</span>
+                    <span id="desktop-user-menu-arrow" class="text-gray-500 text-xs transition-transform duration-200">▼</span>
+                </button>
+                <div id="desktop-user-menu" class="hidden absolute top-full right-0 mt-1 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
+                    <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
+                    <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 p-4 lg:overflow-y-scroll lg:min-h-0" style="-webkit-overflow-scrolling: touch;">
+
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-700 pb-3 mb-4">
+                <h2 class="text-2xl font-bold">🦌 Hunting</h2>
+                <button onclick="toggleAddStateForm()" class="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 rounded-lg text-white text-sm font-bold transition cursor-pointer">+ Add State</button>
+            </div>
+
+            <div id="hunting-add-state-form" class="hidden bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-3 mb-4 flex flex-wrap items-end gap-3">
+                <div>
+                    <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">State Name</label>
+                    <input type="text" id="hunting-new-state-name" placeholder="e.g. New Jersey" class="bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-orange-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Abbreviation</label>
+                    <input type="text" id="hunting-new-state-abbr" placeholder="e.g. NJ" maxlength="2" class="w-20 bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-orange-500 uppercase">
+                </div>
+                <button onclick="submitAddState()" class="px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded text-white text-sm font-bold transition cursor-pointer">Add</button>
+                <button onclick="toggleAddStateForm()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 text-sm font-bold transition cursor-pointer">Cancel</button>
+            </div>
+
+            <div id="hunting-empty" class="hidden text-center text-gray-500 text-sm py-16">
+                No states added yet. Click <span class="text-orange-400 font-bold">+ Add State</span> to get started.
+            </div>
+
+            <div id="hunting-content" class="hidden space-y-4">
+                <div id="hunting-state-tabs" class="flex flex-wrap gap-2"></div>
+
+                <div class="flex bg-gray-950 p-0.5 rounded border border-gray-800 text-xs font-bold w-fit">
+                    <button id="hunting-subtab-btn-regulations" onclick="switchHuntingSubTab('regulations')" class="px-3 py-1 rounded bg-gray-800 text-orange-400 cursor-pointer">Regulations</button>
+                    <button id="hunting-subtab-btn-dates" onclick="switchHuntingSubTab('dates')" class="px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer">Dates</button>
+                </div>
+
+                <!-- Regulations pane -->
+                <div id="hunting-pane-regulations" class="space-y-3">
+                    <div id="hunting-reg-gametype-tabs" class="flex flex-wrap gap-2 text-xs"></div>
+                    <div id="hunting-reg-list" class="space-y-3"></div>
+                    <div id="hunting-reg-empty" class="hidden text-center text-gray-500 text-sm py-10">No regulation notes for this game type yet.</div>
+                </div>
+
+                <!-- Dates pane -->
+                <div id="hunting-pane-dates" class="hidden space-y-3">
+                    <div id="hunting-dates-gametype-tabs" class="flex flex-wrap gap-2 text-xs"></div>
+                    <div id="hunting-dates-empty" class="hidden text-center text-gray-500 text-sm py-10">No season dates for this game type yet.</div>
+                    <div id="hunting-cal-wrap" class="hidden bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-3">
+                        <div class="flex items-center justify-between mb-3">
+                            <button onclick="huntingCalNav(-1)" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-white text-sm cursor-pointer">◀</button>
+                            <div id="hunting-cal-label" class="text-sm font-bold text-gray-200"></div>
+                            <button onclick="huntingCalNav(1)" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-white text-sm cursor-pointer">▶</button>
+                        </div>
+                        <div class="grid grid-cols-7 gap-1 text-center text-[10px] text-gray-500 font-bold uppercase mb-1">
+                            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                        </div>
+                        <div id="hunting-cal-grid" class="grid grid-cols-7 gap-1"></div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="/static/hunting.js?v=1"></script>
+</body>
+</html>

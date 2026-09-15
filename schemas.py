@@ -43,6 +43,10 @@ class AmmoPatchPayload(BaseModel):
     lead_free: Optional[bool] = None
     case_type: Optional[str] = None
     reloadable: Optional[bool] = None
+    barrel_id: Optional[int] = None
+    case_trim_length: Optional[float] = None
+    rifle_max_coal: Optional[float] = None
+    seating_depth_off_lands: Optional[float] = None
 
 
 class PowderPatch(BaseModel):

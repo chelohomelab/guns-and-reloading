@@ -390,6 +390,14 @@ class Ammo(Base):
     lead_free = Column(Boolean, nullable=True)
     case_type = Column(String, nullable=True)
     reloadable = Column(Boolean, nullable=True)
+    # Handload-specific prep/fit data (see issue #50) — which rifle this recipe is developed
+    # for/tested in, plus the chamber-fit measurements that make it reproducible: case length
+    # to trim to, that rifle's own max COAL (touching the lands), and how far off the lands
+    # this particular recipe's coal (above) is seated.
+    barrel_id = Column(Integer, ForeignKey("barrels.id"), nullable=True)
+    case_trim_length = Column(Float, nullable=True)
+    rifle_max_coal = Column(Float, nullable=True)
+    seating_depth_off_lands = Column(Float, nullable=True)
 
     shot_strings = relationship("ShotString", back_populates="ammo")
     purchase_log = relationship("AmmoPurchaseLog", back_populates="ammo", order_by="AmmoPurchaseLog.date")
@@ -556,6 +564,60 @@ class ScannerEntry(Base):
     is_reviewed = Column(Boolean, default=False)
     source_url = Column(String, nullable=True)    # retailer page this was imported from, if any
 
+class HuntingState(Base):
+    # One row per state the user has added to the Hunting page. Standalone reference library —
+    # not tied to any other table — populated by hand (or by Claude, reading a regs PDF with the
+    # user) rather than an automated importer. See project memory on this feature's design.
+    __tablename__ = "hunting_states"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)          # e.g. "New Jersey"
+    abbreviation = Column(String, nullable=True)    # e.g. "NJ"
+    display_order = Column(Integer, default=0)
+
+    season_entries = relationship("HuntingSeasonEntry", back_populates="state", cascade="all, delete-orphan")
+    regulation_notes = relationship("HuntingRegulationNote", back_populates="state", cascade="all, delete-orphan")
+
+
+class HuntingSeasonEntry(Base):
+    # Powers the Dates tab. Stored as a compact date RANGE per weapon/season, not one row per
+    # calendar day — the calendar grid is reconstructed at render time by expanding every entry
+    # that overlaps the viewed month back out day-by-day. weekday_filter lets a single entry cover
+    # a recurring weekly exception (e.g. NJ's "Sundays: Crossbow only, private land only" rule)
+    # instead of needing ~20 duplicated rows for one month.
+    __tablename__ = "hunting_season_entries"
+    id = Column(Integer, primary_key=True, index=True)
+    state_id = Column(Integer, ForeignKey("hunting_states.id"), nullable=False)
+    season_year_label = Column(String, nullable=False)   # e.g. "2026-27"
+    game_type = Column(String, nullable=False)           # Deer, Black Bear, Turkey, Upland Birds, Small Game, Migratory Birds, Trapping
+    species = Column(String, nullable=True)               # e.g. "Bobwhite Quail" within Upland Birds; null when game_type is specific enough on its own
+    season_label = Column(String, nullable=False)         # e.g. "Permit Muzzleloader", "Segment A", "Fall Bow"
+    weapon = Column(String, nullable=True)                 # e.g. "Muzzleloader", "Shotgun", "Crossbow"
+    zone_or_area = Column(String, nullable=True)           # e.g. "Regulation Set High", "North Zone"
+    start_date = Column(String, nullable=False)            # ISO YYYY-MM-DD
+    end_date = Column(String, nullable=False)              # ISO YYYY-MM-DD
+    weekday_filter = Column(String, nullable=True)          # e.g. "Sunday" — entry applies only on this weekday within the range
+    bag_limit = Column(String, nullable=True)
+    notes = Column(String, nullable=True)
+    display_order = Column(Integer, default=0)
+
+    state = relationship("HuntingState", back_populates="season_entries")
+
+
+class HuntingRegulationNote(Base):
+    # Powers the Regulations tab — free-text reference content (license/permit requirements,
+    # legal weapons, general rules) since that's how regs PDFs actually present this material,
+    # unlike season dates which are naturally tabular (see HuntingSeasonEntry above).
+    __tablename__ = "hunting_regulation_notes"
+    id = Column(Integer, primary_key=True, index=True)
+    state_id = Column(Integer, ForeignKey("hunting_states.id"), nullable=False)
+    game_type = Column(String, nullable=True)   # null = general/statewide, not tied to one game type
+    title = Column(String, nullable=False)
+    body = Column(String, nullable=False)
+    display_order = Column(Integer, default=0)
+
+    state = relationship("HuntingState", back_populates="regulation_notes")
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     from sqlalchemy import text, inspect as sa_inspect
@@ -584,6 +646,10 @@ def init_db():
         _add_col('ammo', 'lead_free', 'lead_free BOOLEAN')
         _add_col('ammo', 'case_type', 'case_type VARCHAR')
         _add_col('ammo', 'reloadable', 'reloadable BOOLEAN')
+        _add_col('ammo', 'barrel_id', 'barrel_id INTEGER')
+        _add_col('ammo', 'case_trim_length', 'case_trim_length FLOAT')
+        _add_col('ammo', 'rifle_max_coal', 'rifle_max_coal FLOAT')
+        _add_col('ammo', 'seating_depth_off_lands', 'seating_depth_off_lands FLOAT')
 
     if 'upc_cache' in inspector.get_table_names():
         _add_col('upc_cache', 'ammo_category', 'ammo_category VARCHAR')

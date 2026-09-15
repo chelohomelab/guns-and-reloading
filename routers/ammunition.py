@@ -32,7 +32,45 @@ def _deduct_ammo_rounds(ammo, rounds: int):
 router = APIRouter()
 
 
-def _ammo_dict(a: models.Ammo) -> dict:
+def _build_barrel_label_map(db: Session) -> dict:
+    """barrels.id -> a human label ("Bergara B14 (6.5 Creedmoor)" / "TC Encore (30-30 Winchester)"),
+    built in two flat queries rather than one per handload — used by the list endpoint, which
+    would otherwise be N+1 across every handload's barrel_id."""
+    barrels = db.query(models.Barrel).all()
+    firearms_by_id = {f.id: f for f in db.query(models.Firearm).all()}
+    labels = {}
+    for b in barrels:
+        if b.firearm_id and b.firearm_id in firearms_by_id:
+            fw = firearms_by_id[b.firearm_id]
+            labels[b.id] = f"{fw.brand} {fw.model}"
+        elif b.tc_platform:
+            labels[b.id] = f"TC {b.tc_platform}" + (f" ({b.caliber})" if b.caliber else "")
+        else:
+            labels[b.id] = b.name or f"Barrel #{b.id}"
+    return labels
+
+
+def _barrel_label_for(db: Session, barrel_id: int) -> str | None:
+    barrel = db.query(models.Barrel).filter(models.Barrel.id == barrel_id).first()
+    if not barrel:
+        return None
+    if barrel.firearm_id:
+        fw = db.query(models.Firearm).filter(models.Firearm.id == barrel.firearm_id).first()
+        if fw:
+            return f"{fw.brand} {fw.model}"
+    if barrel.tc_platform:
+        return f"TC {barrel.tc_platform}" + (f" ({barrel.caliber})" if barrel.caliber else "")
+    return barrel.name or f"Barrel #{barrel.id}"
+
+
+def _ammo_dict(a: models.Ammo, db: Session = None, barrel_labels: dict = None) -> dict:
+    rifle_label = None
+    barrel_id = getattr(a, "barrel_id", None)
+    if barrel_id:
+        if barrel_labels is not None:
+            rifle_label = barrel_labels.get(barrel_id)
+        elif db is not None:
+            rifle_label = _barrel_label_for(db, barrel_id)
     return {
         "id": a.id,
         "is_handload": a.is_handload,
@@ -59,6 +97,11 @@ def _ammo_dict(a: models.Ammo) -> dict:
         "lead_free": getattr(a, "lead_free", None),
         "case_type": getattr(a, "case_type", None),
         "reloadable": getattr(a, "reloadable", None),
+        "barrel_id": barrel_id,
+        "rifle_label": rifle_label,
+        "case_trim_length": getattr(a, "case_trim_length", None),
+        "rifle_max_coal": getattr(a, "rifle_max_coal", None),
+        "seating_depth_off_lands": getattr(a, "seating_depth_off_lands", None),
     }
 
 
@@ -89,6 +132,10 @@ async def add_ammo(
     case_type: str = Form(None),
     lead_free: str = Form(None),
     reloadable: str = Form(None),
+    barrel_id: int = Form(None),
+    case_trim_length: float = Form(None),
+    rifle_max_coal: float = Form(None),
+    seating_depth_off_lands: float = Form(None),
     image: UploadFile = File(None),
     image_2: UploadFile = File(None),
     db: Session = Depends(get_db),
@@ -126,6 +173,10 @@ async def add_ammo(
         case_type=case_type,
         lead_free=lead_free_val,
         reloadable=reloadable_val,
+        barrel_id=barrel_id,
+        case_trim_length=case_trim_length,
+        rifle_max_coal=rifle_max_coal,
+        seating_depth_off_lands=seating_depth_off_lands,
     )
     db.add(a)
     db.commit()
@@ -142,7 +193,7 @@ async def add_ammo(
         price_val = price_paid if (price_paid and price_paid > 0) else None
         _upsert_purchase_log(db, a.id, date.today().isoformat(), qty_sealed, qty_open, price_val)
         db.commit()
-    return _ammo_dict(a)
+    return _ammo_dict(a, db=db)
 
 
 @router.post("/ammo/{ammo_id}/use-rounds/")
@@ -153,7 +204,7 @@ def use_ammo_rounds(ammo_id: int, payload: UseRoundsPayload, db: Session = Depen
     _deduct_ammo_rounds(a, payload.rounds)
     db.commit()
     db.refresh(a)
-    return _ammo_dict(a)
+    return _ammo_dict(a, db=db)
 
 
 @router.post("/ammo/{ammo_id}/update-photo/")
@@ -164,7 +215,7 @@ async def update_ammo_photo(ammo_id: int, slot: int = Form(1), image: UploadFile
     if slot == 2: a.image_path_2 = path
     else: a.image_path = path
     db.commit()
-    return _ammo_dict(a)
+    return _ammo_dict(a, db=db)
 
 @router.post("/ammo/{ammo_id}/rotate-photo/")
 async def rotate_ammo_photo(ammo_id: int, slot: int = Form(1), db: Session = Depends(get_db)):
@@ -194,7 +245,7 @@ async def rotate_ammo_photo(ammo_id: int, slot: int = Form(1), db: Session = Dep
     db.refresh(a)
     try: os.remove(old_full)
     except Exception: pass
-    return _ammo_dict(a)
+    return _ammo_dict(a, db=db)
 
 @router.post("/ammo/{ammo_id}/swap-photos/")
 def swap_ammo_photos(ammo_id: int, db: Session = Depends(get_db)):
@@ -204,7 +255,7 @@ def swap_ammo_photos(ammo_id: int, db: Session = Depends(get_db)):
     a.image_path = a.image_path_2
     a.image_path_2 = tmp
     db.commit()
-    return _ammo_dict(a)
+    return _ammo_dict(a, db=db)
 
 
 @router.delete("/ammo/{ammo_id}/photos/{slot}")
@@ -220,7 +271,7 @@ def delete_ammo_photo(ammo_id: int, slot: int, db: Session = Depends(get_db)):
         a.image_path = a.image_path_2
         a.image_path_2 = None
     db.commit()
-    return _ammo_dict(a)
+    return _ammo_dict(a, db=db)
 
 
 @router.get("/ammo/by-upc")
@@ -231,14 +282,15 @@ def get_ammo_by_upc(upc: str, db: Session = Depends(get_db)):
     ).first()
     if not a:
         return {"found": False}
-    result = _ammo_dict(a)
+    result = _ammo_dict(a, db=db)
     result["found"] = True
     return result
 
 
 @router.get("/ammo/")
 def list_ammo(db: Session = Depends(get_db)):
-    return [_ammo_dict(a) for a in db.query(models.Ammo).all()]
+    barrel_labels = _build_barrel_label_map(db)
+    return [_ammo_dict(a, barrel_labels=barrel_labels) for a in db.query(models.Ammo).all()]
 
 
 @router.get("/ammo/{ammo_id}")
@@ -247,7 +299,7 @@ def get_ammo(ammo_id: int, db: Session = Depends(get_db)):
     if not a:
         raise HTTPException(status_code=404, detail="Ammo not found")
     usage = db.query(models.ShotString).filter(models.ShotString.ammo_id == ammo_id).count()
-    result = _ammo_dict(a)
+    result = _ammo_dict(a, db=db)
     result["usage_count"] = usage
     return result
 
@@ -267,7 +319,7 @@ def patch_ammo(ammo_id: int, payload: AmmoPatchPayload, db: Session = Depends(ge
         ).update({"price_per_box": update["price_paid"]})
     db.commit()
     db.refresh(a)
-    return _ammo_dict(a)
+    return _ammo_dict(a, db=db)
 
 
 def _upsert_purchase_log(db, ammo_id: int, entry_date: str,
@@ -320,7 +372,7 @@ def add_stock(ammo_id: int, payload: dict, db: Session = Depends(get_db)):
                          price if (price and price > 0) else None)
     db.commit()
     db.refresh(a)
-    return _ammo_dict(a)
+    return _ammo_dict(a, db=db)
 
 
 @router.patch("/ammo/{ammo_id}/purchase-log/{entry_id}")

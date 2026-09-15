@@ -502,13 +502,28 @@ function toggleScopeInputState() {
 let _hlBullets = [];
 let _hlCasings = [];
 
+let _hlGuns = [], _hlTcBarrels = [];
+
+// Mirrors renderLadderPlatformOptions' use of _buildGunOptionsHTML, minus the "test platforms
+// not in inventory" concept — a handload's rifle should always be a real firearm/TC barrel.
+function renderHandloadRifleOptions() {
+    const sel = document.getElementById('hl-rifle');
+    if (!sel) return;
+    const cal = document.getElementById('hl-caliber')?.value || null;
+    const prevValue = sel.value;
+    sel.innerHTML = _buildGunOptionsHTML(_hlGuns, _hlTcBarrels, '— Select rifle —', cal);
+    if (prevValue && [...sel.options].some(o => o.value === prevValue)) sel.value = prevValue;
+}
+
 async function populateHandloadDropdowns() {
     try {
-        const [powderRes, primerRes, bulletRes, casingRes] = await Promise.all([
+        const [powderRes, primerRes, bulletRes, casingRes, gunsRes, tcRes] = await Promise.all([
             fetch('/components/powders/', { cache: 'no-store' }),
             fetch('/components/primers/', { cache: 'no-store' }),
             fetch('/components/bullets/', { cache: 'no-store' }),
             fetch('/components/casings/', { cache: 'no-store' }),
+            fetch('/catalog/', { cache: 'no-store' }),
+            fetch('/tc-barrels/', { cache: 'no-store' }),
         ]);
         const powders = powderRes.ok ? await powderRes.json() : [];
         const primers = primerRes.ok ? await primerRes.json() : [];
@@ -516,6 +531,9 @@ async function populateHandloadDropdowns() {
         const casings = casingRes.ok ? await casingRes.json() : [];
         _hlBullets = bullets;
         _hlCasings = casings;
+        _hlGuns = gunsRes.ok ? await gunsRes.json() : [];
+        _hlTcBarrels = tcRes.ok ? await tcRes.json() : [];
+        renderHandloadRifleOptions();
 
         const calSel = document.getElementById('hl-caliber');
         if (calSel) {
@@ -646,6 +664,7 @@ function filterHandloadBullets() {
     const casSel = document.getElementById('hl-casing');
     if (bulSel) bulSel.innerHTML = _buildBulletOptionsHTML(_hlBullets, cal);
     if (casSel) casSel.innerHTML = _buildCasingOptionsHTML(_hlCasings, cal);
+    renderHandloadRifleOptions();
 }
 
 function filterLadderBullets() {
@@ -746,7 +765,7 @@ function switchTab(tabId) {
     const isLadderAlias = tabId === 'ladder-tab';
     const realTabId = isLadderAlias ? 'measure-tab' : tabId;
 
-    ['landing-tab', 'measure-tab', 'add-tab', 'reload-data-tab'].forEach(id => {
+    ['landing-tab', 'measure-tab', 'add-tab', 'reload-data-tab', 'shooting-calc-tab'].forEach(id => {
         document.getElementById(id)?.classList.add('hidden');
     });
 
@@ -794,6 +813,369 @@ function switchRangeSubTab(sub) {
         document.getElementById('share-btn')?.classList.add('hidden');
         showLadderListView();
     }
+}
+
+// ============================================================================
+// Shooting Calculator — Trajectory & Max Point-Blank Range
+//
+// Pure client-side, no server data. Uses a standard G1 point-mass drag model
+// (numerical integration, forward Euler) — the same approach used by most
+// hobbyist/handheld ballistics calculators. Not a substitute for a chronographed,
+// range-verified load; treat outputs as reference estimates.
+// ============================================================================
+
+function switchShootingCalcSubTab(sub) {
+    const isTraj = sub === 'trajectory';
+    document.getElementById('sc-pane-trajectory')?.classList.toggle('hidden', !isTraj);
+    document.getElementById('sc-pane-mpbr')?.classList.toggle('hidden', isTraj);
+
+    const inactiveCls = 'px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer';
+    const trajBtn = document.getElementById('sc-btn-trajectory');
+    const mpbrBtn = document.getElementById('sc-btn-mpbr');
+    if (trajBtn) trajBtn.className = isTraj
+        ? 'px-3 py-1 rounded bg-gray-800 text-purple-400 cursor-pointer'
+        : inactiveCls;
+    if (mpbrBtn) mpbrBtn.className = !isTraj
+        ? 'px-3 py-1 rounded bg-gray-800 text-purple-400 cursor-pointer'
+        : inactiveCls;
+}
+
+// Standard G1 drag function (Mach -> Cd), linearly interpolated.
+const _G1_MACH = [0.00,0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50,0.55,0.60,0.65,0.70,0.725,0.75,0.775,0.80,0.825,
+    0.85,0.875,0.90,0.925,0.95,0.975,1.0,1.025,1.05,1.075,1.10,1.125,1.15,1.20,1.25,1.30,1.35,1.40,1.45,1.50,1.55,1.60,
+    1.65,1.70,1.75,1.80,1.85,1.90,1.95,2.00,2.20,2.40,2.60,2.80,3.00,3.20,3.50,4.00,4.50,5.00];
+const _G1_CD = [0.2629,0.2558,0.2487,0.2413,0.2344,0.2278,0.2214,0.2155,0.2104,0.2061,0.2032,0.2020,0.2034,0.2051,0.2075,
+    0.2093,0.2113,0.2141,0.2172,0.2206,0.2242,0.2280,0.2325,0.2378,0.2445,0.2531,0.2712,0.2793,0.2846,0.2872,0.2879,
+    0.2865,0.2834,0.2764,0.2694,0.2629,0.2573,0.2528,0.2489,0.2456,0.2427,0.2400,0.2377,0.2356,0.2336,0.2317,0.2299,
+    0.2282,0.2266,0.2251,0.2210,0.2175,0.2144,0.2116,0.2091,0.2069,0.2040,0.2002,0.1970,0.1943];
+
+function _g1Cd(mach) {
+    const m = Math.abs(mach);
+    if (m <= _G1_MACH[0]) return _G1_CD[0];
+    if (m >= _G1_MACH[_G1_MACH.length - 1]) return _G1_CD[_G1_CD.length - 1];
+    let lo = 0, hi = _G1_MACH.length - 1;
+    while (hi - lo > 1) {
+        const mid = (lo + hi) >> 1;
+        if (_G1_MACH[mid] <= m) lo = mid; else hi = mid;
+    }
+    const t = (m - _G1_MACH[lo]) / (_G1_MACH[hi] - _G1_MACH[lo]);
+    return _G1_CD[lo] + t * (_G1_CD[hi] - _G1_CD[lo]);
+}
+
+const _SPEED_OF_SOUND = 1116.4; // fps, standard atmosphere
+const _GRAVITY = 32.174; // ft/s^2
+// Deceleration constant: 0.5 * rho_air(slug/ft^3) * (pi/576) * g, rho=0.002378 slug/ft^3
+const _DRAG_K = 2.0873e-4;
+
+// Integrates a trajectory from the muzzle at the given launch angle (radians, relative
+// to horizontal) until it travels maxXFt of horizontal distance. Returns an array of
+// {t, x, y, z, v} samples (x/y/z in feet, v in fps, t in seconds); y is height relative
+// to the line of sight (the bore starts sightHeightIn below it), z is lateral drift.
+// opts: { windAirX, windAirZ } — the wind's own velocity components in fps (not the
+// bullet's) — and { densityRatio } — local air density / standard sea-level air density.
+function _simulateTrajectory(v0, bc, sightHeightIn, angleRad, maxXFt, opts) {
+    const { windAirX = 0, windAirZ = 0, densityRatio = 1 } = opts || {};
+    const dt = 0.0005;
+    let t = 0, x = 0, y = -sightHeightIn / 12, z = 0;
+    let vx = v0 * Math.cos(angleRad);
+    let vy = v0 * Math.sin(angleRad);
+    let vz = 0;
+    const path = [{ t, x, y, z, v: v0 }];
+    let steps = 0;
+    while (x < maxXFt && steps < 40000) {
+        steps++;
+        // Drag acts on velocity relative to the air mass, not relative to the ground.
+        const vrx = vx - windAirX, vry = vy, vrz = vz - windAirZ;
+        const vrel = Math.hypot(vrx, vry, vrz);
+        const cd = _g1Cd(vrel / _SPEED_OF_SOUND);
+        const decel = _DRAG_K * densityRatio * cd * vrel / bc;
+        vx += -decel * vrx * dt;
+        vy += (-decel * vry - _GRAVITY) * dt;
+        vz += -decel * vrz * dt;
+        x += vx * dt;
+        y += vy * dt;
+        z += vz * dt;
+        t += dt;
+        path.push({ t, x, y, z, v: Math.hypot(vx, vy, vz) });
+    }
+    return path;
+}
+
+function _pathValueAt(path, xFt) {
+    for (let i = 1; i < path.length; i++) {
+        if (path[i - 1].x <= xFt && xFt <= path[i].x) {
+            const a = path[i - 1], b = path[i];
+            const f = (b.x === a.x) ? 0 : (xFt - a.x) / (b.x - a.x);
+            return {
+                t: a.t + f * (b.t - a.t), y: a.y + f * (b.y - a.y),
+                z: a.z + f * (b.z - a.z), v: a.v + f * (b.v - a.v),
+            };
+        }
+    }
+    return path[path.length - 1];
+}
+
+// Finds the launch angle (radians) that puts the bullet exactly on the line of sight
+// (y=0) at the given zero distance, via bisection. Zeroing is assumed done on a calm
+// day — wind isn't a factor here, only the density ratio (today's air) is.
+function _findZeroAngle(v0, bc, sightHeightIn, zeroYd, densityRatio) {
+    const zeroFt = zeroYd * 3;
+    let lo = -0.05, hi = 0.05;
+    for (let i = 0; i < 60; i++) {
+        const mid = (lo + hi) / 2;
+        const path = _simulateTrajectory(v0, bc, sightHeightIn, mid, zeroFt + 1, { densityRatio });
+        const yz = _pathValueAt(path, zeroFt).y;
+        if (yz < 0) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+}
+
+// Angular drop, converted from linear inches at a given range. 1 MOA subtends
+// 1.047in at 100yd; 1 MIL subtends 3.6in at 100yd — both scale linearly with range.
+function _inchesToMOA(inches, yards) {
+    if (!yards) return null;
+    return inches / (1.047 * (yards / 100));
+}
+function _inchesToMIL(inches, yards) {
+    if (!yards) return null;
+    return inches / (3.6 * (yards / 100));
+}
+
+// Wind's own velocity components (fps), clock convention: 0°=headwind (12 o'clock,
+// blows toward the shooter, opposing the bullet), 90°=full crosswind from the shooter's
+// right (3 o'clock), 180°=tailwind (6 o'clock), 270°=full crosswind from the left (9
+// o'clock). airX>0 aids the bullet (tailwind); airZ follows the same clock — positive
+// drift in the table means the bullet drifted toward the shooter's right.
+function _windComponentsFps(speedMph, angleDeg) {
+    const speedFps = speedMph * 1.46667;
+    const angleRad = angleDeg * Math.PI / 180;
+    return { airX: -speedFps * Math.cos(angleRad), airZ: -speedFps * Math.sin(angleRad) };
+}
+
+// Local-air-density / standard-sea-level-air-density, from actual field conditions.
+// Standard atmosphere (59F, 29.92inHg, 0% humidity, sea level) returns ~1.0 — matches
+// the reference the base drag constant was derived against, so leaving these fields at
+// their defaults makes zero change to the existing (validated) trajectory numbers.
+// Humid air is *less* dense than dry air at the same temp/pressure (water vapor is
+// lighter than N2/O2), so higher humidity flattens the trajectory slightly, same as heat
+// or altitude. Pressure defaults to the standard-atmosphere pressure at the given
+// altitude if left blank; an entered station pressure always wins (it's an actual
+// reading vs. a modeled standard-day estimate).
+function _densityRatio(tempF, pressureInHg, humidityPct, altitudeFt) {
+    if (pressureInHg == null || isNaN(pressureInHg)) {
+        pressureInHg = 29.9213 * Math.pow(1 - 6.8756e-6 * (altitudeFt || 0), 5.2559);
+    }
+    const tC = (tempF - 32) * 5 / 9;
+    const tK = tC + 273.15;
+    const pTotalPa = pressureInHg * 3386.39;
+    const pSatPa = 611.21 * Math.exp((18.678 - tC / 234.5) * (tC / (257.14 + tC)));
+    const pVaporPa = (humidityPct / 100) * pSatPa;
+    const pDryPa = pTotalPa - pVaporPa;
+    const rhoKgM3 = pDryPa / (287.05 * tK) + pVaporPa / (461.495 * tK);
+    const rhoSlugFt3 = rhoKgM3 * 0.00194032;
+    return rhoSlugFt3 / 0.0023769;
+}
+
+function _toggleTrajChart() {
+    const wrap = document.getElementById('sc-traj-chart-wrap');
+    const arrow = document.getElementById('sc-traj-chart-arrow');
+    const isHidden = wrap?.classList.toggle('hidden');
+    if (arrow) arrow.textContent = isHidden ? '▼' : '▲';
+}
+
+function _drawTrajectoryChart(rows) {
+    const svg = document.getElementById('sc-traj-chart');
+    if (!svg || rows.length < 2) return;
+    const W = 600, H = 220, padL = 40, padR = 12, padT = 12, padB = 24;
+    const xs = rows.map(r => r.yd), ys = rows.map(r => r.pathIn);
+    const xMin = 0, xMax = Math.max(...xs) || 1;
+    const yMin = Math.min(0, ...ys), yMax = Math.max(0, ...ys);
+    const yPad = (yMax - yMin) * 0.1 || 1;
+    const yLo = yMin - yPad, yHi = yMax + yPad;
+    const toX = x => padL + (x - xMin) / (xMax - xMin) * (W - padL - padR);
+    const toY = y => padT + (1 - (y - yLo) / (yHi - yLo)) * (H - padT - padB);
+
+    const linePts = rows.map(r => `${toX(r.yd).toFixed(1)},${toY(r.pathIn).toFixed(1)}`).join(' ');
+    const zeroY = toY(0).toFixed(1);
+
+    let svgInner = `
+        <line x1="${padL}" y1="${zeroY}" x2="${W - padR}" y2="${zeroY}" stroke="#4b5563" stroke-dasharray="4,3" stroke-width="1"/>
+        <polyline points="${linePts}" fill="none" stroke="#c084fc" stroke-width="2"/>
+    `;
+    rows.forEach(r => {
+        svgInner += `<circle cx="${toX(r.yd).toFixed(1)}" cy="${toY(r.pathIn).toFixed(1)}" r="2.5" fill="#c084fc"/>`;
+    });
+    svgInner += `<text x="${padL}" y="${(H - 6)}" font-size="9" fill="#9ca3af">0</text>`;
+    svgInner += `<text x="${(W - padR - 24)}" y="${(H - 6)}" font-size="9" fill="#9ca3af">${xMax} yd</text>`;
+    svgInner += `<text x="2" y="${(parseFloat(zeroY) + 3)}" font-size="9" fill="#9ca3af">0"</text>`;
+
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML = svgInner;
+}
+
+function calcTrajectory() {
+    const errEl = document.getElementById('sc-traj-error');
+    const resultsEl = document.getElementById('sc-traj-results');
+    errEl.classList.add('hidden');
+    resultsEl.classList.add('hidden');
+
+    const v0 = parseFloat(document.getElementById('sc-traj-velocity').value);
+    const bc = parseFloat(document.getElementById('sc-traj-bc').value);
+    const weight = parseFloat(document.getElementById('sc-traj-weight').value);
+    const sightHeight = parseFloat(document.getElementById('sc-traj-sight-height').value);
+    const zeroYd = parseFloat(document.getElementById('sc-traj-zero').value);
+    const interval = parseFloat(document.getElementById('sc-traj-interval').value);
+    const maxDist = parseFloat(document.getElementById('sc-traj-max-distance').value);
+
+    // Optional environment fields — all default to "no effect" when left blank.
+    const windSpeed = parseFloat(document.getElementById('sc-traj-wind-speed').value) || 0;
+    const windAngle = parseFloat(document.getElementById('sc-traj-wind-angle').value) || 0;
+    const shootAngleDeg = parseFloat(document.getElementById('sc-traj-shoot-angle').value) || 0;
+    const altitudeFt = parseFloat(document.getElementById('sc-traj-altitude').value) || 0;
+    const tempFRaw = document.getElementById('sc-traj-temp').value;
+    const tempF = tempFRaw === '' ? 59 : parseFloat(tempFRaw);
+    const pressureRaw = document.getElementById('sc-traj-pressure').value;
+    const pressureInHg = pressureRaw === '' ? null : parseFloat(pressureRaw);
+    const humidity = parseFloat(document.getElementById('sc-traj-humidity').value) || 0;
+
+    if (!v0 || !bc || !weight || isNaN(sightHeight) || !zeroYd || !interval || !maxDist) {
+        errEl.textContent = 'Please fill in all fields with valid numbers.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    if (interval <= 0 || maxDist <= 0) {
+        errEl.textContent = 'Interval and max distance must be greater than zero.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const densityRatio = _densityRatio(tempF, pressureInHg, humidity, altitudeFt);
+    const { airX, airZ } = _windComponentsFps(windSpeed, windAngle);
+    const inclineRad = shootAngleDeg * Math.PI / 180;
+    const inclineCos = Math.cos(inclineRad) || 1;
+
+    const angle = _findZeroAngle(v0, bc, sightHeight, zeroYd, densityRatio);
+    const path = _simulateTrajectory(v0, bc, sightHeight, angle, maxDist * 3 + 10, { windAirX: airX, windAirZ: airZ, densityRatio });
+
+    const rows = [];
+    for (let yd = 0; yd <= maxDist + 1e-9; yd += interval) {
+        const rYd = Math.round(yd);
+        // Rifleman's Rule: at an incline, the actual drop at slant distance R matches the
+        // level-fire drop at the shorter horizontal-equivalent distance R*cos(angle) — so
+        // look up the flat trajectory there, but still label the row with the real
+        // (rangefinder) slant distance.
+        const effYd = rYd * inclineCos;
+        const { y, z, v, t } = _pathValueAt(path, effYd * 3);
+        const energy = (weight * v * v) / 450240;
+        const pathIn = y * 12;
+        const windageIn = z * 12;
+        // Elevation/Windage are the SCOPE DIAL correction — the inverse of the bullet's
+        // physical position. A bullet that lands below the line of sight (negative path)
+        // needs the elevation turret dialed UP (positive) to compensate, and so on.
+        const elevCorrectionIn = -pathIn;
+        const windCorrectionIn = -windageIn;
+        rows.push({
+            yd: rYd, pathIn, v, energy, t,
+            moa: _inchesToMOA(elevCorrectionIn, rYd),
+            mil: _inchesToMIL(elevCorrectionIn, rYd),
+            windMoa: _inchesToMOA(windCorrectionIn, rYd),
+            windMil: _inchesToMIL(windCorrectionIn, rYd),
+        });
+    }
+
+    const tbody = document.getElementById('sc-traj-table-body');
+    tbody.innerHTML = rows.map(r => `
+        <tr class="border-t border-gray-700">
+            <td class="px-3 py-1.5">${r.yd}</td>
+            <td class="px-3 py-1.5 ${Math.abs(r.pathIn) < 0.05 ? 'text-purple-400 font-bold' : ''}">${r.pathIn >= 0 ? '+' : ''}${r.pathIn.toFixed(1)}</td>
+            <td class="px-3 py-1.5 sc-col-moa">${r.moa == null ? '—' : (r.moa >= 0 ? '+' : '') + r.moa.toFixed(1)}</td>
+            <td class="px-3 py-1.5 sc-col-mil">${r.mil == null ? '—' : (r.mil >= 0 ? '+' : '') + r.mil.toFixed(1)}</td>
+            <td class="px-3 py-1.5 sc-col-moa">${r.windMoa == null ? '—' : (r.windMoa >= 0 ? '+' : '') + r.windMoa.toFixed(1)}</td>
+            <td class="px-3 py-1.5 sc-col-mil">${r.windMil == null ? '—' : (r.windMil >= 0 ? '+' : '') + r.windMil.toFixed(1)}</td>
+            <td class="px-3 py-1.5">${Math.round(r.v)}</td>
+            <td class="px-3 py-1.5 sc-col-energy">${Math.round(r.energy)}</td>
+            <td class="px-3 py-1.5">${r.t.toFixed(3)}</td>
+        </tr>
+    `).join('');
+    resultsEl.classList.remove('hidden');
+    _applyTrajColumnToggles();
+    _drawTrajectoryChart(rows);
+}
+
+function _applyTrajColumnToggles() {
+    ['moa', 'mil', 'energy'].forEach(kind => {
+        const cb = document.getElementById(`sc-traj-toggle-${kind}`);
+        const show = cb ? cb.checked : true;
+        document.querySelectorAll(`.sc-col-${kind}`).forEach(el => el.classList.toggle('hidden', !show));
+    });
+}
+
+// Finds the zero distance whose max mid-range rise above the line of sight equals the
+// vital-zone radius, then finds where the trajectory falls back to -radius past the zero.
+function _solveMPBR(v0, bc, sightHeightIn, radiusIn) {
+    const radiusFt = radiusIn / 12;
+    let lo = 10, hi = 500; // candidate zero distance, yards
+    let finalAngle = 0, finalZeroYd = hi;
+
+    for (let i = 0; i < 40; i++) {
+        const zeroYd = (lo + hi) / 2;
+        const angle = _findZeroAngle(v0, bc, sightHeightIn, zeroYd);
+        const path = _simulateTrajectory(v0, bc, sightHeightIn, angle, zeroYd * 3 + 1);
+        let maxY = -Infinity;
+        for (const p of path) { if (p.x <= zeroYd * 3 && p.y > maxY) maxY = p.y; }
+        finalAngle = angle;
+        finalZeroYd = zeroYd;
+        if (maxY < radiusFt) lo = zeroYd; else hi = zeroYd;
+    }
+
+    const path = _simulateTrajectory(v0, bc, sightHeightIn, finalAngle, 800 * 3);
+    let maxOrdinateFt = -Infinity;
+    for (const p of path) { if (p.x <= finalZeroYd * 3 && p.y > maxOrdinateFt) maxOrdinateFt = p.y; }
+
+    let mpbrYd = null;
+    for (let i = 1; i < path.length; i++) {
+        if (path[i - 1].x / 3 >= finalZeroYd && path[i - 1].y >= -radiusFt && path[i].y < -radiusFt) {
+            const a = path[i - 1], b = path[i];
+            const t = (b.y === a.y) ? 0 : (-radiusFt - a.y) / (b.y - a.y);
+            mpbrYd = (a.x + t * (b.x - a.x)) / 3;
+            break;
+        }
+    }
+
+    const path100 = _pathValueAt(path, 100 * 3);
+
+    return { zeroYd: finalZeroYd, mpbrYd, maxOrdinateIn: maxOrdinateFt * 12, pathAt100In: path100.y * 12 };
+}
+
+function calcMPBR() {
+    const errEl = document.getElementById('sc-mpbr-error');
+    const resultsEl = document.getElementById('sc-mpbr-results');
+    errEl.classList.add('hidden');
+    resultsEl.classList.add('hidden');
+
+    const v0 = parseFloat(document.getElementById('sc-mpbr-velocity').value);
+    const bc = parseFloat(document.getElementById('sc-mpbr-bc').value);
+    const sightHeight = parseFloat(document.getElementById('sc-mpbr-sight-height').value);
+    const vitalZone = parseFloat(document.getElementById('sc-mpbr-vital-zone').value);
+
+    if (!v0 || !bc || isNaN(sightHeight) || !vitalZone) {
+        errEl.textContent = 'Please fill in all fields with valid numbers.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    if (vitalZone <= 0) {
+        errEl.textContent = 'Vital zone size must be greater than zero.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const result = _solveMPBR(v0, bc, sightHeight, vitalZone / 2);
+
+    document.getElementById('sc-mpbr-zero').textContent = `${Math.round(result.zeroYd)} yd`;
+    document.getElementById('sc-mpbr-range').textContent = result.mpbrYd != null ? `${Math.round(result.mpbrYd)} yd` : '—';
+    document.getElementById('sc-mpbr-ordinate').textContent = `${result.maxOrdinateIn.toFixed(1)} in`;
+    document.getElementById('sc-mpbr-100yd').textContent = `${result.pathAt100In >= 0 ? '+' : ''}${result.pathAt100In.toFixed(1)} in`;
+    resultsEl.classList.remove('hidden');
 }
 
 function switchInventoryTab(tab) {
@@ -978,13 +1360,15 @@ function switchAmmoFilter(type) {
     const inactive = "px-3 py-1 rounded text-gray-200 hover:text-white cursor-pointer";
     const factBtn = document.getElementById('ammo-btn-factory');
     const muzzBtn = document.getElementById('ammo-btn-muzzleloader');
-    const handBtn = document.getElementById('ammo-btn-handload');
     if (factBtn) factBtn.className = type === 'factory'
         ? "px-3 py-1 rounded bg-gray-800 text-blue-400 cursor-pointer" : inactive;
     if (muzzBtn) muzzBtn.className = type === 'muzzleloader'
         ? "px-3 py-1 rounded bg-gray-800 text-yellow-500 cursor-pointer" : inactive;
-    if (handBtn) handBtn.className = type === 'handload'
-        ? "px-3 py-1 rounded bg-gray-800 text-amber-400 cursor-pointer" : inactive;
+    // Send the "+ Add" button straight to the handload form, skipping the Factory/Handload
+    // choice entirely — picking "Factory Load" while already looking at Handloads is confusing.
+    const addBtn = document.getElementById('ammo-add-btn');
+    if (addBtn) addBtn.href = type === 'handload'
+        ? '/?tab=add-tab&cat=ammunition&ammotype=handload' : '/?tab=add-tab&cat=ammunition';
     loadAmmoInventory(type);
     syncInventoryUrl();
 }
@@ -998,6 +1382,18 @@ function switchAmmoCategory(cat) {
 function switchAmmoCaliber(cal) {
     currentAmmoCaliberFilter = cal || null;
     loadAmmoInventory(currentAmmoFilter);
+}
+
+let currentHandloadRifleFilter = null, currentHandloadBulletFilter = null;
+
+function switchHandloadRifleFilter(value) {
+    currentHandloadRifleFilter = value || null;
+    loadAmmoInventory('handload');
+}
+
+function switchHandloadBulletFilter(value) {
+    currentHandloadBulletFilter = value || null;
+    loadAmmoInventory('handload');
 }
 
 function switchComponentFilter(type) {
@@ -2101,6 +2497,28 @@ async function loadAmmoInventory(type) {
             }
         }
 
+        // Rifle/Bullet dropdown options come only from what's actually on this handloads page
+        // (distinct values already present among the loaded handloads) — not the full firearms/
+        // bullets inventory, most of which would have no handload at all.
+        function buildHandloadExtraFilters(sourceItems) {
+            const row = document.getElementById('handload-extra-filter-row');
+            const rifleSel = document.getElementById('handload-rifle-filter');
+            const bulletSel = document.getElementById('handload-bullet-filter');
+            if (!row || !rifleSel || !bulletSel) return;
+
+            const rifles = [...new Set(sourceItems.map(a => a.rifle_label).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+            const bullets = [...new Set(sourceItems.map(a => a.bullet_type).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+            if (currentHandloadRifleFilter && !rifles.includes(currentHandloadRifleFilter)) currentHandloadRifleFilter = null;
+            if (currentHandloadBulletFilter && !bullets.includes(currentHandloadBulletFilter)) currentHandloadBulletFilter = null;
+
+            row.classList.toggle('hidden', rifles.length === 0 && bullets.length === 0);
+            rifleSel.innerHTML = `<option value="">All Rifles</option>` +
+                rifles.map(r => `<option value="${escHtml(r)}" ${r === currentHandloadRifleFilter ? 'selected' : ''}>${escHtml(r)}</option>`).join('');
+            bulletSel.innerHTML = `<option value="">All Bullets</option>` +
+                bullets.map(b => `<option value="${escHtml(b)}" ${b === currentHandloadBulletFilter ? 'selected' : ''}>${escHtml(b)}</option>`).join('');
+        }
+
         if (type === 'factory') {
             // Reset category selection if the current one has no data
             if (!currentAmmoCategoryFilter || !catGroups[currentAmmoCategoryFilter]) {
@@ -2139,7 +2557,12 @@ async function loadAmmoInventory(type) {
             if (catFilterRow) catFilterRow.classList.add('hidden');
             // Build caliber row from this tab's items, then apply filter
             buildCaliberRow(filtered);
+            if (type === 'handload') buildHandloadExtraFilters(filtered);
             if (currentAmmoCaliberFilter) filtered = filtered.filter(a => a.caliber === currentAmmoCaliberFilter);
+            if (type === 'handload') {
+                if (currentHandloadRifleFilter)  filtered = filtered.filter(a => (a.rifle_label || '') === currentHandloadRifleFilter);
+                if (currentHandloadBulletFilter) filtered = filtered.filter(a => (a.bullet_type || '') === currentHandloadBulletFilter);
+            }
             // Handloads: full cards with caliber sub-groups; muzzleloader: tiles
             if (type === 'handload') {
                 const calGroups = {};
@@ -2148,6 +2571,10 @@ async function loadAmmoInventory(type) {
                     if (!calGroups[cal]) calGroups[cal] = [];
                     calGroups[cal].push(a);
                 });
+                // Sort by rifle within each caliber group (issue #50) — loads with no rifle
+                // assigned sort to the end rather than scattering alphabetically among "—".
+                Object.values(calGroups).forEach(loads =>
+                    loads.sort((a, b) => (a.rifle_label || '￿').localeCompare(b.rifle_label || '￿')));
                 const calHtml = Object.entries(calGroups).sort(([a],[b]) => a.localeCompare(b)).map(([cal, loads]) => `
                     <div class="mb-6">
                         <div class="flex items-center gap-3 mb-3">
@@ -2277,10 +2704,12 @@ function renderAmmoCard(ammo) {
     // Handload: no photo — show recipe data
     if (isHandload) {
         const rows = [];
+        if (ammo.rifle_label)   rows.push(['Rifle',   ammo.rifle_label]);
         if (ammo.bullet_type)   rows.push(['Bullet',  ammo.bullet_type]);
         if (line)               rows.push(['Powder',  line]);
         if (ammo.charge_weight) rows.push(['Charge',  `${ammo.charge_weight} gr`]);
         if (ammo.coal)          rows.push(['COAL',    `${ammo.coal}"`]);
+        if (ammo.seating_depth_off_lands != null) rows.push(['Off Lands', `${ammo.seating_depth_off_lands}"`]);
         const qty = (ammo.qty_sealed || 0) * (ammo.rounds_per_box || 20) + (ammo.qty_open || 0);
         return `
         <div onclick="window.location.href='ammo-detail.html?id=${ammo.id}&filter=${currentAmmoFilter}${currentAmmoCaliberFilter ? '&cal='+encodeURIComponent(currentAmmoCaliberFilter) : ''}'"
@@ -4318,6 +4747,10 @@ if (handloadForm) {
         _setBusy(handloadForm, true);
         const formData = new FormData(e.target);
         formData.set('is_handload', 'true');
+        // hl-rifle's <select> value is a firearm id (or a TC barrel id) per _buildGunOptionsHTML —
+        // resolve it to the real barrels.id the backend expects before posting.
+        const resolvedBarrelId = await resolveBarrelIdFromGunSelect(document.getElementById('hl-rifle'));
+        formData.set('barrel_id', resolvedBarrelId || '');
         // Auto-wire deduction IDs from the main dropdowns
         const _getId = id => { const s = document.getElementById(id); const o = s?.options[s.selectedIndex]; return o?.dataset?.id || ''; };
         formData.set('deduct_powder_id',  _getId('hl-powder'));
@@ -7423,6 +7856,10 @@ window.onload = () => {
         else if (cat === 'tc-barrel') { switchFormCategory('cat-platforms'); switchAddForm('add-tc-barrel'); }
         else if (cat === 'tc-receiver') { switchFormCategory('cat-platforms'); switchAddForm('add-tc-receiver'); }
         else switchFormCategory('cat-' + cat);
+        // Arrived from the Handloads view specifically — jump straight to that form. The
+        // general Ammunition add flow has no Factory/Handload toggle to skip anymore (Handloads
+        // moved to its own nav entry/add flow entirely), so this just shows the handload form.
+        if (cat === 'ammunition' && p.get('ammotype') === 'handload') toggleAmmoType('handloads');
     }
     if (p.get('handload') === '1') applyLadderHandoff();
     // Close user-menu dropdown(s) when clicking outside — 'user-menu' is the legacy

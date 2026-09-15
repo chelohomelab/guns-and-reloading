@@ -370,6 +370,7 @@
       {% if upgrade_available %}<a href="/admin/upgrade" class="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-900/30 transition">🚀 Upgrade</a>{% endif %}
       <a href="/admin/phone-setup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-300 hover:bg-purple-900/30 transition">📱 Phone/Tablet Setup</a>
       <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Add Reload Data</a>
+      <a href="/admin/hunting" class="flex items-center gap-2 px-4 py-2.5 text-sm text-orange-300 hover:bg-orange-900/30 transition">🌲 Add Hunting Data</a>
       {% endif %}
       <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
       <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
@@ -425,6 +426,9 @@
       </a>
       <a href="/admin/reload-data" class="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg bg-rose-950/50 hover:bg-rose-900/50 border border-rose-700/40 transition text-sm font-bold text-rose-300">
         <span>📖</span> Add Reload Data
+      </a>
+      <a href="/admin/hunting" class="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg bg-orange-950/50 hover:bg-orange-900/50 border border-orange-700/40 transition text-sm font-bold text-orange-300">
+        <span>🌲</span> Add Hunting Data
       </a>
     </div>
     {% endif %}
@@ -496,6 +500,7 @@
         {% if upgrade_available %}<a href="/admin/upgrade" class="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-900/30 transition">🚀 Upgrade</a>{% endif %}
         <a href="/admin/phone-setup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-300 hover:bg-purple-900/30 transition">📱 Phone/Tablet Setup</a>
         <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Add Reload Data</a>
+        <a href="/admin/hunting" class="flex items-center gap-2 px-4 py-2.5 text-sm text-orange-300 hover:bg-orange-900/30 transition">🌲 Add Hunting Data</a>
         {% endif %}
         <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
         <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
@@ -819,7 +824,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=146"></script>
+<script src="/static/app.js?v=147"></script>
 <script>
 // ============================================================
 // STATE

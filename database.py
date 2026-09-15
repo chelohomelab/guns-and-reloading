@@ -324,6 +324,7 @@ class LadderTest(Base):
     primer_inv_id = Column(Integer, ForeignKey("primer_inventory.id"), nullable=True)
     casing_inv_id = Column(Integer, ForeignKey("casing_inventory.id"), nullable=True)
     rounds_per_step = Column(Integer, nullable=True)
+    is_draft = Column(Boolean, default=False)
 
     bullet = relationship("BulletInventory", back_populates="ladder_tests")
     barrel = relationship("Barrel")
@@ -794,6 +795,7 @@ def init_db():
         _add_col('ladder_tests', 'primer_inv_id',    'primer_inv_id INTEGER')
         _add_col('ladder_tests', 'casing_inv_id',    'casing_inv_id INTEGER')
         _add_col('ladder_tests', 'rounds_per_step',  'rounds_per_step INTEGER')
+        _add_col('ladder_tests', 'is_draft',         'is_draft BOOLEAN DEFAULT FALSE')
 
     # Seed default threshold settings if they don't exist
     _defaults = {

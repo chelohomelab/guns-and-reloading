@@ -89,6 +89,17 @@
                     <span id="mobile-user-menu-arrow" class="text-gray-500 text-xs transition-transform duration-200">▼</span>
                 </button>
                 <div id="mobile-user-menu" class="hidden absolute top-full right-0 mt-1 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
+                    {% if user.is_admin %}
+                    <a href="/admin/users" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">👤 Users</a>
+                    <a href="/wishlist" class="flex items-center gap-2 px-4 py-2.5 text-sm text-amber-300 hover:bg-amber-900/30 transition">⭐ Wishlist</a>
+                    <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
+                    <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
+                    <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
+                    {% if upgrade_available %}<a href="/admin/upgrade" class="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-900/30 transition">🚀 Upgrade</a>{% endif %}
+                    <a href="/admin/phone-setup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-300 hover:bg-purple-900/30 transition">📱 Phone/Tablet Setup</a>
+                    <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Add Reload Data</a>
+                    <a href="/admin/hunting" class="flex items-center gap-2 px-4 py-2.5 text-sm text-orange-300 hover:bg-orange-900/30 transition">🌲 Add Hunting Data</a>
+                    {% endif %}
                     <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
                     <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
                 </div>
@@ -140,6 +151,17 @@
                     <span id="desktop-user-menu-arrow" class="text-gray-500 text-xs transition-transform duration-200">▼</span>
                 </button>
                 <div id="desktop-user-menu" class="hidden absolute top-full right-0 mt-1 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
+                    {% if user.is_admin %}
+                    <a href="/admin/users" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">👤 Users</a>
+                    <a href="/wishlist" class="flex items-center gap-2 px-4 py-2.5 text-sm text-amber-300 hover:bg-amber-900/30 transition">⭐ Wishlist</a>
+                    <a href="/admin/trash" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🗑️ Trash</a>
+                    <a href="/admin/scanner" class="flex items-center gap-2 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-900/30 transition">📡 Scanner</a>
+                    <a href="/admin/backup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-300 hover:bg-green-900/30 transition">💾 Backup</a>
+                    {% if upgrade_available %}<a href="/admin/upgrade" class="flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-900/30 transition">🚀 Upgrade</a>{% endif %}
+                    <a href="/admin/phone-setup" class="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-300 hover:bg-purple-900/30 transition">📱 Phone/Tablet Setup</a>
+                    <a href="/admin/reload-data" class="flex items-center gap-2 px-4 py-2.5 text-sm text-rose-300 hover:bg-rose-900/30 transition">📖 Add Reload Data</a>
+                    <a href="/admin/hunting" class="flex items-center gap-2 px-4 py-2.5 text-sm text-orange-300 hover:bg-orange-900/30 transition">🌲 Add Hunting Data</a>
+                    {% endif %}
                     <a href="/profile/" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 transition">🛠️ Profile</a>
                     <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/40 transition">🚪 Sign Out</a>
                 </div>
@@ -150,24 +172,10 @@
 
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-700 pb-3 mb-4">
                 <h2 class="text-2xl font-bold">🦌 Hunting</h2>
-                <button onclick="toggleAddStateForm()" class="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 rounded-lg text-white text-sm font-bold transition cursor-pointer">+ Add State</button>
-            </div>
-
-            <div id="hunting-add-state-form" class="hidden bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-3 mb-4 flex flex-wrap items-end gap-3">
-                <div>
-                    <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">State Name</label>
-                    <input type="text" id="hunting-new-state-name" placeholder="e.g. New Jersey" class="bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-orange-500">
-                </div>
-                <div>
-                    <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Abbreviation</label>
-                    <input type="text" id="hunting-new-state-abbr" placeholder="e.g. NJ" maxlength="2" class="w-20 bg-gray-700 border border-gray-600 rounded p-2 text-sm text-white focus:outline-none focus:border-orange-500 uppercase">
-                </div>
-                <button onclick="submitAddState()" class="px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded text-white text-sm font-bold transition cursor-pointer">Add</button>
-                <button onclick="toggleAddStateForm()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 text-sm font-bold transition cursor-pointer">Cancel</button>
             </div>
 
             <div id="hunting-empty" class="hidden text-center text-gray-500 text-sm py-16">
-                No states added yet. Click <span class="text-orange-400 font-bold">+ Add State</span> to get started.
+                No states yet — an admin can add hunting data from <a href="/admin/hunting" class="text-orange-400 font-bold hover:underline">Add Hunting Data</a>.
             </div>
 
             <div id="hunting-content" class="hidden space-y-4">
@@ -206,6 +214,6 @@
         </main>
     </div>
 
-    <script src="/static/hunting.js?v=1"></script>
+    <script src="/static/hunting.js?v=3"></script>
 </body>
 </html>

@@ -45,12 +45,16 @@ def _casing_dict(c: models.CasingInventory) -> dict:
             "image_path": c.image_path, "image_path_2": c.image_path_2}
 
 def _get_thresholds(db: Session) -> dict:
-    rows = {s.key: float(s.value) for s in db.query(models.Setting).all()}
+    # Setting is a generic key/value table shared by unrelated features (e.g. the bookmarklet
+    # importer's import_token) — only cast the handful of keys this function actually owns,
+    # rather than every row, so an unrelated non-numeric setting can't break this.
+    keys = ["low_stock_powder_lbs", "low_stock_primers", "low_stock_bullets", "low_stock_casings"]
+    rows = {s.key: s.value for s in db.query(models.Setting).filter(models.Setting.key.in_(keys)).all()}
     return {
-        "powder_lbs": rows.get("low_stock_powder_lbs", 0.5),
-        "primers":    rows.get("low_stock_primers", 200),
-        "bullets":    rows.get("low_stock_bullets", 100),
-        "casings":    rows.get("low_stock_casings", 50),
+        "powder_lbs": float(rows.get("low_stock_powder_lbs", 0.5)),
+        "primers":    float(rows.get("low_stock_primers", 200)),
+        "bullets":    float(rows.get("low_stock_bullets", 100)),
+        "casings":    float(rows.get("low_stock_casings", 50)),
     }
 
 

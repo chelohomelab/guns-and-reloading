@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phone/Tablet Setup — Guns & Reloading</title>
+    <title>Add Hunting Data — Guns & Reloading</title>
     <link rel="icon" type="image/png" href="/static/images/app-icon.png">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#0f0f0f">
     <meta name="mobile-web-app-capable" content="yes">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/davidshimjs-qrcodejs@0.0.2/qrcode.min.js"></script>
     <style>
       body { background-color: transparent !important; }
       #bg-layer { position: fixed; inset: 0; z-index: -1; background-image: url('/static/images/phone-background.png'); background-size: cover; background-position: center; background-color: #0f0f0f; }
@@ -40,10 +39,25 @@
             <span class="text-lg">🎯</span>
             <div><div class="text-sm font-bold text-white">Range Session</div><div class="text-[10px] text-blue-400/70">Sessions &amp; ladder tests</div></div>
         </a>
+        <a href="/?tab=shooting-calc-tab"
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 hover:border-purple-500/40 transition cursor-pointer text-left">
+            <span class="text-lg">🧮</span>
+            <div><div class="text-sm font-bold text-white">Shooting Calculator</div><div class="text-[10px] text-purple-400/70">Trajectory &amp; MPBR</div></div>
+        </a>
+        <a href="/hunting"
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-orange-950/60 hover:bg-orange-900/60 border border-orange-800/40 hover:border-orange-500/40 transition cursor-pointer text-left">
+            <span class="text-lg">🦌</span>
+            <div><div class="text-sm font-bold text-white">Hunting</div><div class="text-[10px] text-orange-400/70">Seasons &amp; regulations</div></div>
+        </a>
         <a href="/?tab=reload-data-tab"
             class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer text-left">
             <span class="text-lg">📖</span>
             <div><div class="text-sm font-bold text-white">Reloading Data Center</div><div class="text-[10px] text-rose-400/70">6 manufacturers</div></div>
+        </a>
+        <a href="/inventory?inv=ammo&ammofilter=handload"
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/40 hover:border-emerald-500/40 transition cursor-pointer text-left">
+            <span class="text-lg">🧪</span>
+            <div><div class="text-sm font-bold text-white">Handloads</div><div class="text-[10px] text-emerald-400/70">Your custom loads</div></div>
         </a>
     </nav>
 </aside>
@@ -100,27 +114,27 @@
             <span class="text-sm font-bold text-white">Inventory</span>
             <span class="text-[10px] text-gray-500">Browse your vault</span>
         </a>
-        <a id="topnav-btn-measure" href="/?tab=measure-tab"
+        <a href="/?tab=measure-tab"
             class="flex flex-col px-3 py-1.5 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/40 hover:border-blue-500/40 transition cursor-pointer">
             <span class="text-sm font-bold text-white">Range Session</span>
             <span class="text-[10px] text-blue-400/70">Sessions &amp; ladder tests</span>
         </a>
-        <a id="topnav-btn-shooting-calc" href="/?tab=shooting-calc-tab"
+        <a href="/?tab=shooting-calc-tab"
             class="flex flex-col px-3 py-1.5 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 hover:border-purple-500/40 transition cursor-pointer">
             <span class="text-sm font-bold text-white">Shooting Calculator</span>
             <span class="text-[10px] text-purple-400/70">Trajectory &amp; MPBR</span>
         </a>
-        <a id="topnav-btn-hunting" href="/hunting"
+        <a href="/hunting"
             class="flex flex-col px-3 py-1.5 rounded-lg bg-orange-950/60 hover:bg-orange-900/60 border border-orange-800/40 hover:border-orange-500/40 transition cursor-pointer">
             <span class="text-sm font-bold text-white">Hunting</span>
             <span class="text-[10px] text-orange-400/70">Seasons &amp; regulations</span>
         </a>
-        <a id="topnav-btn-reload-data" href="/?tab=reload-data-tab"
+        <a href="/?tab=reload-data-tab"
             class="flex flex-col px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer">
             <span class="text-sm font-bold text-white">Reloading Data Center</span>
             <span class="text-[10px] text-rose-400/70">6 manufacturers</span>
         </a>
-        <a id="topnav-btn-handloads" href="/inventory?inv=ammo&ammofilter=handload"
+        <a href="/inventory?inv=ammo&ammofilter=handload"
             class="flex flex-col px-3 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/40 hover:border-emerald-500/40 transition cursor-pointer">
             <span class="text-sm font-bold text-white">Handloads</span>
             <span class="text-[10px] text-emerald-400/70">Your custom loads</span>
@@ -150,154 +164,138 @@
     </div>
 </header>
 
-<main class="container mx-auto p-4 max-w-3xl space-y-6">
+<main class="container mx-auto p-4 max-w-lg space-y-5">
 
     <!-- Header -->
     <div class="bg-gray-900/70 rounded-xl p-4">
-        <h1 class="text-2xl font-bold text-amber-400">📱 Phone/Tablet Setup</h1>
-        <p class="text-sm text-gray-300 mt-1">
-            Offline features (browsing your inventory and logging range sessions with zero signal)
-            need a secure connection to work at all — plain "not secure" browsing silently disables
-            them. This server already has one, generated locally with no internet involved. Each
-            phone/tablet just needs a one-time, one-tap step to trust it.
-        </p>
+        <h1 class="text-2xl font-bold text-amber-400">🌲 Add Hunting Data</h1>
+        <p class="text-sm text-gray-300 mt-1">Each button runs that state's hand-transcribed seed script and loads its season dates &amp; regulation notes into the database. Safe to re-run — it wipes and re-inserts only that state's rows.</p>
     </div>
 
-    <!-- Before you start: what to expect -->
-    <div class="bg-gray-800 border border-amber-800/50 rounded-xl p-5 space-y-3">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-amber-400">❓ Before you scan: what's about to happen</h2>
-        <p class="text-sm text-gray-300">
-            When you scan the QR code below and install the certificate, your phone
-            <strong class="text-gray-200">will</strong> show a warning that looks something like
-            <em>"A third party or your organization can monitor your online activity, including
-            emails, apps, and secure websites."</em> That's expected — don't let it stop you. It's a
-            generic warning Android/iOS shows for trusting <strong class="text-gray-200">any</strong>
-            certificate authority, not something specific to this app. Here's exactly what it does
-            and doesn't do:
-        </p>
-        <ul class="text-sm text-gray-300 space-y-2 list-disc list-inside">
-            <li><strong class="text-gray-200">What it actually does:</strong> lets your phone verify
-                "yes, this is genuinely my own server" instead of showing a security warning every time
-                you open the app. That's the only thing it does.</li>
-            <li><strong class="text-gray-200">What it doesn't do:</strong> it isn't spyware, isn't a VPN
-                profile, doesn't route your traffic anywhere, and gives this app — or us — no new
-                ability to see your phone's data, your browsing on other sites, your location, or
-                anything else. No code runs on your phone because of this; it's a cryptographic trust
-                decision, nothing more.</li>
-            <li><strong class="text-gray-200">Where the actual key lives:</strong> the private key that
-                makes this certificate work exists only on this server, generated here, never uploaded
-                anywhere, never touching your phone. Only someone with physical or remote access to
-                <em>this specific machine</em> could ever misuse it — and if that ever happened, it'd be
-                a compromise of your own server, not something this feature itself enables.</li>
-            <li>Your phone already trusts roughly 100 certificate authorities out of the box (Let's
-                Encrypt, DigiCert, and so on) without ever asking you. This is the same kind of trust
-                decision, scoped to one more authority — specifically, your own.</li>
-        </ul>
-    </div>
-
-    <!-- Step 1: scan or visit -->
-    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-amber-400">Step 1 — On the phone, scan this or visit the link</h2>
-        <div class="flex flex-col sm:flex-row items-center gap-5">
-            <div id="qr-code" class="bg-white p-3 rounded-lg shrink-0"></div>
-            <div class="space-y-2 text-sm text-gray-300 min-w-0">
-                <p>Make sure the phone is on the same WiFi network as this server, then either:</p>
-                <ul class="list-disc list-inside space-y-1 text-gray-400">
-                    <li>Scan the QR code with the phone's camera, or</li>
-                    <li>Open this address in the phone's browser:
-                        <div id="ca-url" class="font-mono text-amber-400 break-all mt-1"></div>
-                    </li>
-                </ul>
-                <p class="text-xs text-gray-500">This downloads one small file — the certificate that proves this specific server is really this server, nothing more.</p>
+    <div class="space-y-3">
+        {% for slug, name in seed_states.items() %}
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 space-y-2" data-slug="{{ slug }}">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-base font-bold text-white">{{ name }}</div>
+                    <div id="status-{{ slug }}" class="text-xs text-gray-500 italic">Checking…</div>
+                </div>
+                <button id="btn-{{ slug }}" onclick="runSeed('{{ slug }}', '{{ name }}')"
+                    class="px-4 py-2 bg-orange-700 hover:bg-orange-600 text-white text-sm font-bold rounded-lg transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                    Seed {{ name }}
+                </button>
             </div>
+            <pre id="log-{{ slug }}" class="hidden bg-gray-900 rounded-lg p-3 text-[11px] font-mono whitespace-pre-wrap max-h-48 overflow-y-auto"></pre>
         </div>
-    </div>
-
-    <!-- Step 2: install -->
-    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-blue-400">Step 2 — Install it on the phone</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div class="bg-gray-900/60 rounded-lg p-4 space-y-2">
-                <p class="font-bold text-gray-200">Android</p>
-                <ol class="list-decimal list-inside space-y-1 text-gray-400">
-                    <li>Don't tap the downloaded file directly — Android blocks installing a CA certificate that way. Instead, search Settings for "certificate" and choose <strong class="text-gray-200">Install a certificate</strong></li>
-                    <li>Choose <strong class="text-gray-200">CA certificate</strong> specifically (not "VPN & app user certificate")</li>
-                    <li>Pick the downloaded file from Downloads. You'll see the warning described above — that's expected</li>
-                    <li>If it still shows "not secure" afterward, fully force-stop Chrome (Settings → Apps → Chrome → Force stop) and reopen it — Chrome can hang onto a stale "untrusted" result from before you installed the certificate</li>
-                </ol>
-            </div>
-            <div class="bg-gray-900/60 rounded-lg p-4 space-y-2">
-                <p class="font-bold text-gray-200">iPhone / iPad</p>
-                <ol class="list-decimal list-inside space-y-1 text-gray-400">
-                    <li>Safari will show a "Profile Downloaded" popup — tap Close. <strong class="text-gray-200">That's not the install</strong>, just a download confirmation.</li>
-                    <li><strong class="text-amber-400">Leave Safari and open the Settings app.</strong> Near the top, right below your name, you'll see a "Profile Downloaded" row (or find it under General → VPN &amp; Device Management on some iOS versions) — tap it, then tap <strong class="text-gray-200">Install</strong> (top right), enter your passcode, then tap Install again to confirm</li>
-                    <li><strong class="text-amber-400">Then, a separate step</strong>: Settings → General → About → Certificate Trust Settings → turn on full trust for it (easy to miss — it won't work without this last step)</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-
-    <!-- Step 3: confirm -->
-    <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-emerald-400">Step 3 — Open the app</h2>
-        <div class="flex flex-col sm:flex-row items-center gap-5">
-            <div id="qr-code-app" class="bg-white p-3 rounded-lg shrink-0"></div>
-            <div class="space-y-2 text-sm text-gray-300 min-w-0">
-                <p>Scan this to go straight to the app, or open this address:</p>
-                <div id="app-url" class="font-mono text-amber-400 break-all"></div>
-                <p class="text-xs text-gray-500">
-                    The address bar should show a lock icon with no warning this time. Repeat this
-                    whole process once per device — it's a one-time setup per phone/tablet, not
-                    something you need to redo later.
-                </p>
-            </div>
-        </div>
+        {% endfor %}
     </div>
 
 </main>
 
 <script>
-    const caUrl = window.location.origin + '/static/uploads/ca.crt';
-    document.getElementById('ca-url').textContent = caUrl;
-    const appUrl = window.location.origin + '/';
-    document.getElementById('app-url').textContent = appUrl;
-    if (window.QRCode) {
-        new QRCode(document.getElementById('qr-code'), { text: caUrl, width: 176, height: 176 });
-        new QRCode(document.getElementById('qr-code-app'), { text: appUrl, width: 176, height: 176 });
-    } else {
-        const fallback = '<p class="text-xs text-gray-800 p-4">QR code library failed to load — use the link instead.</p>';
-        document.getElementById('qr-code').innerHTML = fallback;
-        document.getElementById('qr-code-app').innerHTML = fallback;
+    const SEED_STATES = {{ seed_states | tojson }};
+
+    function showToast(msg, type = 'success') {
+        const c = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = `pointer-events-auto px-4 py-3 rounded-lg shadow-xl text-sm font-semibold border ${
+            type === 'error' ? 'bg-red-900 border-red-700 text-red-200' : 'bg-gray-800 border-gray-600 text-gray-100'
+        }`;
+        t.textContent = msg;
+        c.appendChild(t);
+        setTimeout(() => t.remove(), 5000);
     }
+
+    async function loadStatus() {
+        let states = [];
+        try {
+            const res = await fetch('/hunting/states');
+            states = await res.json();
+        } catch {
+            return;
+        }
+        const byName = {};
+        states.forEach(s => { byName[s.name] = true; });
+        for (const [slug, name] of Object.entries(SEED_STATES)) {
+            const badge = document.getElementById(`status-${slug}`);
+            if (!badge) continue;
+            if (byName[name]) {
+                badge.textContent = '✓ Seeded';
+                badge.className = 'text-xs text-green-400 font-semibold';
+            } else {
+                badge.textContent = 'Not seeded yet';
+                badge.className = 'text-xs text-gray-500';
+            }
+        }
+    }
+
+    async function runSeed(slug, name) {
+        const statusEl = document.getElementById(`status-${slug}`);
+        const alreadySeeded = statusEl && statusEl.textContent.startsWith('✓');
+        if (alreadySeeded && !confirm(`${name} already has data. Re-run the seed script? This wipes and re-inserts ${name}'s rows.`)) return;
+
+        const btn = document.getElementById(`btn-${slug}`);
+        const log = document.getElementById(`log-${slug}`);
+        const originalLabel = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Running…';
+        log.classList.add('hidden');
+
+        try {
+            const res = await fetch(`/admin/hunting/seed/${slug}`, { method: 'POST' });
+            const d = await res.json();
+            log.classList.remove('hidden');
+            if (res.ok && d.ok) {
+                log.className = 'bg-gray-900 rounded-lg p-3 text-[11px] font-mono whitespace-pre-wrap max-h-48 overflow-y-auto text-green-400';
+                log.textContent = d.stdout || '(no output)';
+                showToast(`✓ ${name} seeded`);
+            } else {
+                log.className = 'bg-gray-900 rounded-lg p-3 text-[11px] font-mono whitespace-pre-wrap max-h-48 overflow-y-auto text-red-400';
+                log.textContent = (d.stderr || d.detail || 'Unknown error');
+                showToast(`${name} failed — see details below`, 'error');
+            }
+        } catch (e) {
+            log.classList.remove('hidden');
+            log.className = 'bg-gray-900 rounded-lg p-3 text-[11px] font-mono whitespace-pre-wrap max-h-48 overflow-y-auto text-red-400';
+            log.textContent = `Request failed: ${e}`;
+            showToast('Request failed', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = originalLabel;
+            loadStatus();
+        }
+    }
+
+    loadStatus();
+
+    function openSidebar() {
+        document.getElementById('sidebar').classList.remove('hidden');
+        document.getElementById('sidebar-overlay').classList.remove('hidden');
+    }
+    function closeSidebar() {
+        document.getElementById('sidebar').classList.add('hidden');
+        document.getElementById('sidebar-overlay').classList.add('hidden');
+    }
+    function toggleUserMenu(id) {
+        const menu = document.getElementById(id);
+        const arrow = document.getElementById(id + '-arrow');
+        if (!menu) return;
+        const isOpen = !menu.classList.contains('hidden');
+        menu.classList.toggle('hidden');
+        if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+    }
+    ['desktop-user-menu', 'mobile-user-menu'].forEach(id => {
+        const menu = document.getElementById(id);
+        if (!menu) return;
+        document.addEventListener('click', e => {
+            if (!menu.classList.contains('hidden') && !menu.parentElement.contains(e.target)) {
+                menu.classList.add('hidden');
+                const arrow = document.getElementById(id + '-arrow');
+                if (arrow) arrow.style.transform = '';
+            }
+        });
+    });
 </script>
 
-<script>
-// This page doesn't load the shared app.js — small inline copy of its dropdown toggle.
-function openSidebar() {
-    document.getElementById('sidebar').classList.remove('hidden');
-    document.getElementById('sidebar-overlay').classList.remove('hidden');
-}
-function closeSidebar() {
-    document.getElementById('sidebar').classList.add('hidden');
-    document.getElementById('sidebar-overlay').classList.add('hidden');
-}
-function toggleUserMenu(id) {
-    const menu = document.getElementById(id);
-    const arrow = document.getElementById(id + '-arrow');
-    if (!menu) return;
-    const isOpen = !menu.classList.contains('hidden');
-    menu.classList.toggle('hidden');
-    if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
-}
-['desktop-user-menu', 'mobile-user-menu'].forEach(id => {
-    const menu = document.getElementById(id);
-    if (!menu) return;
-    document.addEventListener('click', e => {
-        if (!menu.classList.contains('hidden') && !menu.parentElement.contains(e.target)) {
-            menu.classList.add('hidden');
-        }
-    });
-});
-</script>
 </body>
 </html>

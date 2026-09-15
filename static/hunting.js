@@ -24,6 +24,17 @@ function toggleUserMenu(id) {
     menu.classList.toggle('hidden');
     if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
 }
+['desktop-user-menu', 'mobile-user-menu'].forEach(id => {
+    const menu = document.getElementById(id);
+    if (!menu) return;
+    document.addEventListener('click', e => {
+        if (!menu.classList.contains('hidden') && !menu.parentElement.contains(e.target)) {
+            menu.classList.add('hidden');
+            const arrow = document.getElementById(id + '-arrow');
+            if (arrow) arrow.style.transform = '';
+        }
+    });
+});
 
 let huntingStates = [];
 let currentStateId = null;

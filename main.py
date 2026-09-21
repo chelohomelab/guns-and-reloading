@@ -9,7 +9,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import database as models
 from config import UPLOAD_DIR, templates
 from paths import BASE_DIR
-from routers import auth, pages, firearms, scopes, tc, ammunition, components, settings, profile, admin, performance, barcode, wishlist, scanner, backup, export, ladder, product_import, reload_data, upgrade, hunting
+from routers import auth, pages, firearms, scopes, tc, ammunition, components, settings, profile, admin, performance, barcode, wishlist, scanner, backup, export, ladder, product_import, reload_data, upgrade
 
 app = FastAPI(title="Homelab Modular Firearm Catalog")
 
@@ -102,7 +102,6 @@ app.include_router(export.router)
 app.include_router(product_import.router)
 app.include_router(reload_data.router)
 app.include_router(upgrade.router)
-app.include_router(hunting.router)
 
 # Global (not per-request context) — every template rendered through this Jinja2Templates
 # instance sees it automatically, so the 4 nav templates can gate the "Upgrade" link without

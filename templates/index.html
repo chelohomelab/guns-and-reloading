@@ -129,7 +129,7 @@
             <a id="nav-btn-reload-data" href="/?tab=reload-data-tab" onclick="navClick(event, () => switchTab('reload-data-tab'))"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer text-left">
                 <span class="text-lg">📖</span>
-                <div><div class="text-sm font-bold text-white">Reloading Data Center</div><div class="text-[10px] text-rose-400/70">6 manufacturers</div></div>
+                <div><div class="text-sm font-bold text-white">Reloading Data Center</div><div class="text-[10px] text-rose-400/70">7 manufacturers</div></div>
             </a>
             <a id="nav-btn-handloads" href="/inventory?inv=ammo&ammofilter=handload"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/40 hover:border-emerald-500/40 transition cursor-pointer text-left">
@@ -207,7 +207,7 @@
                 <a id="topnav-btn-reload-data" href="/?tab=reload-data-tab" onclick="navClick(event, () => switchTab('reload-data-tab'))"
                     class="flex flex-col px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer">
                     <span class="text-sm font-bold text-white">Reloading Data Center</span>
-                    <span class="text-[10px] text-rose-400/70">6 manufacturers</span>
+                    <span class="text-[10px] text-rose-400/70">7 manufacturers</span>
                 </a>
                 <a id="topnav-btn-handloads" href="/inventory?inv=ammo&ammofilter=handload"
                     class="flex flex-col px-3 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/40 hover:border-emerald-500/40 transition cursor-pointer">
@@ -707,6 +707,7 @@
                     <button id="rd-mfr-tab-btn-Speer" onclick="switchReloadDataManufacturerTab('Speer')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Speer</button>
                     <button id="rd-mfr-tab-btn-Sierra" onclick="switchReloadDataManufacturerTab('Sierra')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Sierra</button>
                     <button id="rd-mfr-tab-btn-Barnes" onclick="switchReloadDataManufacturerTab('Barnes')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Barnes</button>
+                    <button id="rd-mfr-tab-btn-Vihtavuori" onclick="switchReloadDataManufacturerTab('Vihtavuori')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Vihtavuori</button>
                     <button id="rd-mfr-tab-btn-Hornady" onclick="switchReloadDataManufacturerTab('Hornady')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Hornady</button>
                     <button id="rd-mfr-tab-btn-Lyman" onclick="switchReloadDataManufacturerTab('Lyman')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Lyman</button>
                     <button id="rd-mfr-tab-btn-Lee" onclick="switchReloadDataManufacturerTab('Lee')" class="px-3 py-1 rounded text-gray-300 hover:text-white cursor-pointer">Lee</button>
@@ -922,6 +923,52 @@
 
                     <div id="rd-barnes-results" class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-4 overflow-x-auto">
                         <p class="text-xs text-gray-500 italic">Pick a caliber and bullet weight to search.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vihtavuori pane — same shape as Hodgdon's (flat row per bullet+powder combo, real
+                 start/max range + velocity, no candidate-bullet fan-out), so it reuses Hodgdon's
+                 own shared renderReloadDataResults() for its results grid rather than a bespoke
+                 render function — only the filter-bar element ids and search/filter-loading glue
+                 are Vihtavuori-specific (see registerReloadDataFilterLoader('Vihtavuori', ...) in
+                 app.js). No case diagram (Vihtavuori's PDFs only embed their logo, not a real
+                 diagram) and no manufacturer auto-detect (no brand text in the file's text layer,
+                 same as Barnes) — the upload dropdown always needs an explicit override. -->
+            <div id="rd-mfr-pane-Vihtavuori" class="hidden space-y-4">
+                <div id="rd-viht-list-view" class="space-y-4">
+                    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-xl grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Caliber</label>
+                            <input type="text" id="rd-viht-filter-caliber" list="rd-viht-caliber-options" oninput="onVihtavuoriCaliberInput()" placeholder="Start typing…" autocomplete="off" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                            <datalist id="rd-viht-caliber-options"></datalist>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Weight (gr)</label>
+                            <select id="rd-viht-filter-weight" onchange="searchVihtavuoriData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Bullet Brand</label>
+                            <select id="rd-viht-filter-bullet-brand" onchange="searchVihtavuoriData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-400 font-semibold mb-1 uppercase">Powder</label>
+                            <select id="rd-viht-filter-powder-name" onchange="searchVihtavuoriData()" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <option value="">Any</option>
+                            </select>
+                        </div>
+                        <label class="col-span-2 md:col-span-5 flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                            <input type="checkbox" id="rd-viht-filter-in-stock" onchange="searchVihtavuoriData()" class="cursor-pointer">
+                            In stock only (bullet or powder matches your inventory)
+                        </label>
+                    </div>
+
+                    <div id="rd-viht-results" class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-4 overflow-x-auto">
+                        <p class="text-xs text-gray-500 italic">Pick a caliber to search.</p>
                     </div>
                 </div>
             </div>
@@ -2023,7 +2070,7 @@
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <script src="/static/offline-queue.js?v=1"></script>
     <script src="/static/price-blur.js"></script>
-    <script src="/static/app.js?v=147"></script>
+    <script src="/static/app.js?v=148"></script>
     <script>
       OfflineQueue.init();
       document.querySelector('a[href="/logout"]')?.addEventListener('click', async (e) => {

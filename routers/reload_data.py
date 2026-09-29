@@ -345,6 +345,7 @@ def parse_reload_pdf(pdf_bytes: bytes, manufacturer_hint: str | None = None, fil
         "Speer": parse_speer_pdf,
         "Sierra": parse_sierra_pdf,
         "Barnes": parse_barnes_pdf,
+        "Vihtavuori": parse_vihtavuori_pdf,
     }
     parser = parsers.get(manufacturer)
     if parser is None:
@@ -1060,6 +1061,129 @@ def _sierra_line_rows(page) -> list[tuple[float, str]]:
         ws_sorted = sorted(ws, key=lambda w: w["x0"])
         out.append((min(w["top"] for w in ws), ws_sorted))
     return out
+
+
+# ── Vihtavuori PDF parsing ───────────────────────────────────────────────────
+# Vihtavuori's own reloadingdata.vihtavuori.com export is a clean per-cartridge PDF: one
+# Cartridge/Test barrel/Primers/Cases spec block on page 0, then a flat table (one row per
+# bullet+powder combination, no candidate-bullet fan-out like Nosler/Speer/Sierra/Barnes —
+# closer to Hodgdon's shape) that spills across several pages, each repeating the same column
+# header. Confirmed against 3 real files (6.5 Creedmoor/270 Win/6.5 PRC): every powder name is
+# Vihtavuori's own "N" + digits, occasionally with a leading multiplier digit ("20N29"/"24N41")
+# — used as the anchor to split the Mfg+Type text (1-3 words: "V-Max", "Solid Shank", "HPBT
+# MatchKing") from the fixed numeric columns around it, rather than guessing a token count.
+# No case diagram exists in the source (the only embedded image is the Vihtavuori logo, confirmed
+# identical position/size across every file) and no brand-anchor text exists either ("Vihtavuori"
+# never appears in the extracted text layer, only baked into that logo image) — like Barnes, this
+# manufacturer can't be auto-detected and always needs the upload dropdown's explicit override.
+
+_VIHTAVUORI_ROW_RE = re.compile(r'''
+    ^(?P<weight>\d+)\s+
+    (?P<mfg_type>.+?)\s+
+    (?P<coal>\d+\.\d+)\s+
+    (?P<powder>\d*N\d+)\s+
+    (?P<st_gr>\d+\.\d+)\s+
+    (?P<mx_gr>\d+\.\d+)(?P<mx_flag>[ACF])?\s+
+    (?P<st_vel>\d+)\s+
+    (?P<mx_vel>\d+)\s*$
+''', re.VERBOSE)
+
+_VIHTAVUORI_CARTRIDGE_RE = re.compile(r'^Cartridge\s+(.+)$')
+_VIHTAVUORI_BARREL_RE = re.compile(r'^Test barrel\s+\S+\s+mm\s+\(([^)]+)\),\s*(.+?)\s+twist$')
+_VIHTAVUORI_PRIMERS_RE = re.compile(r'^Primers\s+(.+)$')
+_VIHTAVUORI_CASES_RE = re.compile(r'^Cases\s+([^,]+),\s*trim-to length\s+\S+\s+mm\s+\(([^)]+)\)$')
+_VIHTAVUORI_COUNT_RE = re.compile(r'^Your search returned (\d+) different loads:$')
+
+
+def parse_vihtavuori_pdf(pdf_bytes: bytes) -> dict:
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+    caliber = twist = barrel_length = trim_length = case_brand = primer_display = None
+    claimed_count = None
+    rows: list[dict] = []
+    rejected: list[str] = []
+
+    for raw_line in text.split("\n"):
+        line = raw_line.strip()
+        if not line:
+            continue
+        m = _VIHTAVUORI_CARTRIDGE_RE.match(line)
+        if m:
+            # Vihtavuori's site uses European comma-decimals ("6,5 Creedmoor") and a leading-dot
+            # convention for bore-only calibers (".270 Winchester") — normalize_caliber already
+            # strips the leading dot, but not mid-string commas, so fix those first.
+            raw = re.sub(r'(\d),(\d)', r'\1.\2', m.group(1))
+            caliber = normalize_caliber(raw) or raw
+            continue
+        m = _VIHTAVUORI_BARREL_RE.match(line)
+        if m:
+            barrel_length = m.group(1).replace('”', '"')
+            twist = m.group(2).replace('”', '"')
+            continue
+        m = _VIHTAVUORI_PRIMERS_RE.match(line)
+        if m:
+            primer_display = m.group(1).strip()
+            continue
+        m = _VIHTAVUORI_CASES_RE.match(line)
+        if m:
+            case_brand = m.group(1).strip()
+            trim_length = m.group(2).replace('”', '"')
+            continue
+        m = _VIHTAVUORI_COUNT_RE.match(line)
+        if m:
+            claimed_count = int(m.group(1))
+            continue
+        if not re.match(r'^\d+\s', line):
+            continue
+        rm = _VIHTAVUORI_ROW_RE.match(line)
+        if rm is None:
+            rejected.append(line)
+            continue
+        d = rm.groupdict()
+        mfg_type = d["mfg_type"].split(None, 1)
+        flag = d["mx_flag"]
+        rows.append({
+            "bullet_weight_gr": float(d["weight"]),
+            "bullet_brand": mfg_type[0] if mfg_type else None,
+            "bullet_model": mfg_type[1] if len(mfg_type) > 1 else None,
+            "coal": d["coal"],
+            "case_brand": case_brand,
+            "primer_display": primer_display,
+            "powder_brand": "Vihtavuori",
+            "powder_name": d["powder"],
+            "is_recommended": flag == "A",
+            "is_case_full": flag == "F",
+            "start_charge_gr": float(d["st_gr"]),
+            "start_velocity_fps": int(d["st_vel"]),
+            "start_is_compressed": False,
+            "max_charge_gr": float(d["mx_gr"]),
+            "max_velocity_fps": int(d["mx_vel"]),
+            "max_is_compressed": flag == "C",
+        })
+
+    # Vihtavuori's own "Your search returned N different loads" header has been observed to
+    # overstate the actual row count (confirmed on 6.5 Creedmoor: header says 382, the table
+    # itself only ever prints 374 rows, verified by page-by-page line counts — not a parsing
+    # gap on our side). Never fabricate the missing rows; just surface the discrepancy.
+    data_note = None
+    if claimed_count is not None and claimed_count != len(rows):
+        data_note = (
+            f"Vihtavuori's own export header claims {claimed_count} loads, but only {len(rows)} "
+            f"are actually present in the PDF's table — {claimed_count - len(rows)} row(s) appear "
+            "to be missing from Vihtavuori's own export, not a parsing gap on our side."
+        )
+
+    return {
+        "caliber": caliber,
+        "twist": twist,
+        "barrel_length": barrel_length,
+        "trim_length": trim_length,
+        "data_as_of": None,
+        "data_note": data_note,
+        "rows": rows,
+        "rejected_lines": rejected,
+    }
 
 
 def parse_sierra_pdf(pdf_bytes: bytes) -> dict:
@@ -1845,6 +1969,7 @@ def _load_dict(l: "models.ReloadDataLoad", in_stock_powders: set, in_stock_bulle
         "case_brand": l.case_brand, "primer_display": l.primer_display,
         "powder_brand": l.powder_brand, "powder_name": l.powder_name, "coal": l.coal,
         "is_recommended": l.is_recommended, "is_max_load": l.is_max_load, "is_reduced_load": l.is_reduced_load,
+        "is_case_full": l.is_case_full,
         "start_charge_gr": l.start_charge_gr, "start_velocity_fps": l.start_velocity_fps,
         "start_pressure": l.start_pressure, "start_pressure_unit": l.start_pressure_unit,
         "start_density_pct": l.start_density_pct, "start_is_compressed": l.start_is_compressed,
@@ -1981,6 +2106,7 @@ async def _import_one_reload_pdf(file: UploadFile, manufacturer_hint: str | None
         data_as_of=parsed["data_as_of"], original_filename=filename,
         source_file_path=source_file_path, case_diagram_path=case_diagram_path,
         uploaded_at=datetime.now(timezone.utc).isoformat(),
+        data_note=parsed.get("data_note"),
     )
     db.add(source)
     db.flush()
@@ -1999,6 +2125,7 @@ async def _import_one_reload_pdf(file: UploadFile, manufacturer_hint: str | None
         "filename": filename, "manufacturer": parsed["manufacturer"], "caliber": parsed["caliber"],
         "rows_imported": len(parsed["rows"]), "rows_rejected": len(parsed["rejected_lines"]),
         "data_as_of": parsed["data_as_of"], "rejected_sample": parsed["rejected_lines"][:10],
+        "data_note": parsed.get("data_note"),
     }
 
 

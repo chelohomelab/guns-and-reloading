@@ -286,6 +286,7 @@ class ReloadDataLoad(Base):
     is_recommended = Column(Boolean, nullable=True)  # Nosler "*" / Lyman bold row = most accurate load tested
     is_max_load = Column(Boolean, nullable=True)  # Hornady's red highlight = maximum load, use with caution
     is_reduced_load = Column(Boolean, nullable=True)  # Lyman's "**" powder-name prefix = reduced load
+    is_case_full = Column(Boolean, nullable=True)  # Vihtavuori's "F" flag = compressed to the point the case is full
     start_charge_gr = Column(Float, nullable=True)
     start_velocity_fps = Column(Integer, nullable=True)
     start_pressure = Column(Integer, nullable=True)
@@ -705,6 +706,7 @@ def init_db():
         _add_col('reload_data_loads', 'is_recommended',  'is_recommended BOOLEAN')
         _add_col('reload_data_loads', 'is_max_load',     'is_max_load BOOLEAN')
         _add_col('reload_data_loads', 'is_reduced_load', 'is_reduced_load BOOLEAN')
+        _add_col('reload_data_loads', 'is_case_full',    'is_case_full BOOLEAN')
         _add_col('reload_data_loads', 'twist',           'twist VARCHAR')
         _add_col('reload_data_loads', 'barrel_length',   'barrel_length VARCHAR')
         _add_col('reload_data_loads', 'trim_length',     'trim_length VARCHAR')

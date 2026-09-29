@@ -47,7 +47,7 @@
         <a href="/?tab=reload-data-tab"
             class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer text-left">
             <span class="text-lg">📖</span>
-            <div><div class="text-sm font-bold text-white">Reloading Data Center</div><div class="text-[10px] text-rose-400/70">6 manufacturers</div></div>
+            <div><div class="text-sm font-bold text-white">Reloading Data Center</div><div class="text-[10px] text-rose-400/70">7 manufacturers</div></div>
         </a>
         <a href="/inventory?inv=ammo&ammofilter=handload"
             class="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/40 hover:border-emerald-500/40 transition cursor-pointer text-left">
@@ -121,7 +121,7 @@
         <a id="topnav-btn-reload-data" href="/?tab=reload-data-tab"
             class="flex flex-col px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/40 transition cursor-pointer">
             <span class="text-sm font-bold text-white">Reloading Data Center</span>
-            <span class="text-[10px] text-rose-400/70">6 manufacturers</span>
+            <span class="text-[10px] text-rose-400/70">7 manufacturers</span>
         </a>
         <a id="topnav-btn-handloads" href="/inventory?inv=ammo&ammofilter=handload"
             class="flex flex-col px-3 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/40 hover:border-emerald-500/40 transition cursor-pointer">
@@ -163,7 +163,7 @@
     <!-- Upload -->
     <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-3">
         <h2 class="text-sm font-bold uppercase tracking-wider text-rose-400">📤 Upload PDFs</h2>
-        <p class="text-[11px] text-gray-500">Select as many files as you like at once — each is parsed and imported independently. Manufacturer is auto-detected per file; only override it if a file fails to auto-detect (Barnes PDFs always need this — there's no reliable brand text in the file to detect from).</p>
+        <p class="text-[11px] text-gray-500">Select as many files as you like at once — each is parsed and imported independently. Manufacturer is auto-detected per file; only override it if a file fails to auto-detect (Barnes and Vihtavuori PDFs always need this — there's no reliable brand text in either file to detect from).</p>
         <div class="flex gap-3 items-center flex-wrap">
             <input type="file" id="reload-data-file-input" accept=".pdf" multiple class="flex-1 min-w-[200px] text-xs text-gray-300 bg-gray-900 border border-gray-600 rounded p-2">
             <select id="reload-data-manufacturer-select" class="bg-gray-900 border border-gray-600 rounded p-2 text-xs text-white focus:outline-none focus:border-rose-500">
@@ -173,6 +173,7 @@
                 <option value="Speer">Speer</option>
                 <option value="Sierra">Sierra</option>
                 <option value="Barnes">Barnes</option>
+                <option value="Vihtavuori">Vihtavuori</option>
             </select>
             <button onclick="uploadReloadDataPdf()" id="reload-data-upload-btn" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded transition cursor-pointer">Upload</button>
         </div>
@@ -235,7 +236,8 @@
                 }
                 return `<div class="text-[11px] px-2 py-1.5 rounded bg-emerald-950/40 border border-emerald-800/40 text-emerald-300">
                     <span class="font-bold">${escHtml(r.filename)}</span> — ${escHtml(r.manufacturer)} ${escHtml(r.caliber)}:
-                    ${r.rows_imported} loads imported${r.rows_rejected ? `, ${r.rows_rejected} skipped (see console)` : ''}</div>`;
+                    ${r.rows_imported} loads imported${r.rows_rejected ? `, ${r.rows_rejected} skipped (see console)` : ''}
+                    ${r.data_note ? `<div class="text-amber-300 mt-0.5">⚠ ${escHtml(r.data_note)}</div>` : ''}</div>`;
             }).join('');
             const okCount = results.filter(r => !r.error).length;
             showToast(`${okCount}/${results.length} file(s) imported`, okCount === results.length ? 'success' : 'error');

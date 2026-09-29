@@ -6304,7 +6304,7 @@ function bulletStockBadge(inStock, ownedModel) {
 }
 
 let _rdActiveManufacturer = 'Hodgdon';
-const _RD_MANUFACTURERS = ['Hodgdon', 'Nosler', 'Speer', 'Sierra', 'Barnes', 'Hornady', 'Lyman', 'Lee'];
+const _RD_MANUFACTURERS = ['Hodgdon', 'Nosler', 'Speer', 'Sierra', 'Barnes', 'Vihtavuori', 'Hornady', 'Lyman', 'Lee'];
 
 // Registry of per-manufacturer filter loaders — each tab with a real design (not yet a
 // placeholder) registers its own `loadXFilters()` here so openReloadDataTab()/
@@ -6369,9 +6369,9 @@ function openReloadDataDetail(id) {
         </div>
 
         <div class="grid grid-cols-2 gap-3 mt-5">
-            ${stat('Charge (gr)', (row.start_charge_gr !== null && row.start_charge_gr === row.max_charge_gr && row.start_is_compressed === row.max_is_compressed)
+            ${stat('Charge (gr)', (row.start_charge_gr !== null && row.start_charge_gr === row.max_charge_gr && row.start_is_compressed === row.max_is_compressed && !row.is_case_full)
                 ? rdVal(row.start_charge_gr, row.start_is_compressed ? 'C' : '')
-                : `${rdVal(row.start_charge_gr, row.start_is_compressed ? 'C' : '')} – ${rdVal(row.max_charge_gr, row.max_is_compressed ? 'C' : '')}`)}
+                : `${rdVal(row.start_charge_gr, row.start_is_compressed ? 'C' : '')} – ${rdVal(row.max_charge_gr, (row.max_is_compressed ? 'C' : '') + (row.is_case_full ? 'F' : ''))}`)}
             ${(row.start_velocity_fps !== null || row.max_velocity_fps !== null) ? stat('Velocity (fps)', rangeVal(row.start_velocity_fps, row.max_velocity_fps)) : ''}
             ${(row.start_pressure !== null || row.max_pressure !== null) ? stat('Pressure', `${rangeVal(row.start_pressure, row.max_pressure)} <span class="text-xs text-gray-400">${escHtml(row.max_pressure_unit || '')}</span>`) : ''}
             ${(row.start_density_pct !== null || row.max_density_pct !== null) ? stat('Load Density', rangeVal(row.start_density_pct, row.max_density_pct, '%')) : ''}
@@ -6386,6 +6386,7 @@ function openReloadDataDetail(id) {
         </div>` : ''}
 
         ${(row.start_is_compressed || row.max_is_compressed) ? '<p class="text-xs text-amber-400 mt-4">⚠ "C" marks a compressed charge.</p>' : ''}
+        ${row.is_case_full ? '<p class="text-xs text-amber-400 mt-1">⚠ "F" marks a charge that fills the case.</p>' : ''}
         <p class="text-[10px] text-gray-600 mt-4">${row.data_as_of ? `Data current as of ${escHtml(row.data_as_of)}` : ''} — always start at the starting charge and work up; never exceed the maximum shown.</p>`;
 
     const rightCol = row.case_diagram_path ? `
@@ -6497,6 +6498,76 @@ async function onReloadDataPowderBrandChange() {
 function searchReloadData() {
     clearTimeout(_reloadDataDebounce);
     _reloadDataDebounce = setTimeout(_runSearchReloadData, 200);
+}
+
+// ── Vihtavuori tab ───────────────────────────────────────────────────────────
+// Same row shape as Hodgdon (flat row per bullet+powder combo, real start/max range +
+// velocity) — no candidate-bullet fan-out, so this reuses Hodgdon's own shared
+// renderReloadDataResults() rather than a bespoke render function. No Powder Brand filter
+// (every row is Vihtavuori's own powder, filtering by it would be pointless — same reasoning
+// as why Nosler/Speer/Sierra/Barnes drop the Bullet Brand filter when it's always their own
+// brand instead).
+
+async function loadVihtavuoriFilters() {
+    try {
+        const res = await fetch(`/reload-data/filters?manufacturer=Vihtavuori`);
+        const data = await res.json();
+        fillReloadDataSelect('rd-viht-filter-bullet-brand', data.bullet_brands);
+        fillReloadDataSelect('rd-viht-filter-powder-name', data.powder_names);
+        fillReloadDataCalibers(data.calibers, 'rd-viht-caliber-options');
+    } catch (e) {
+        showToast('Failed to load Vihtavuori filters', 'error');
+    }
+}
+registerReloadDataFilterLoader('Vihtavuori', loadVihtavuoriFilters);
+
+async function onVihtavuoriCaliberInput() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(async () => {
+        const caliber = document.getElementById('rd-viht-filter-caliber')?.value || '';
+        if (caliber) {
+            try {
+                const res = await fetch(`/reload-data/filters?manufacturer=Vihtavuori&caliber=${encodeURIComponent(caliber)}`);
+                const data = await res.json();
+                fillReloadDataSelect('rd-viht-filter-weight', data.bullet_weights);
+            } catch (e) { /* keep existing options on failure */ }
+        } else {
+            fillReloadDataSelect('rd-viht-filter-weight', []);
+        }
+        _runSearchVihtavuoriData();
+    }, 200);
+}
+
+function searchVihtavuoriData() {
+    clearTimeout(_reloadDataDebounce);
+    _reloadDataDebounce = setTimeout(_runSearchVihtavuoriData, 200);
+}
+
+async function _runSearchVihtavuoriData() {
+    const results = document.getElementById('rd-viht-results');
+    const caliber = document.getElementById('rd-viht-filter-caliber')?.value || '';
+    if (!caliber) {
+        results.innerHTML = '<p class="text-xs text-gray-500 italic">Pick a caliber to search.</p>';
+        return;
+    }
+    const params = new URLSearchParams({ caliber, manufacturer: 'Vihtavuori' });
+    const weight = document.getElementById('rd-viht-filter-weight')?.value;
+    if (weight) params.set('bullet_weight_gr', weight);
+    const bulletBrand = document.getElementById('rd-viht-filter-bullet-brand')?.value;
+    if (bulletBrand) params.set('bullet_brand', bulletBrand);
+    const powderName = document.getElementById('rd-viht-filter-powder-name')?.value;
+    if (powderName) params.set('powder_name', powderName);
+    if (document.getElementById('rd-viht-filter-in-stock')?.checked) params.set('in_stock_only', 'true');
+
+    results.innerHTML = '<p class="text-xs text-gray-500 italic">Searching…</p>';
+    try {
+        const res = await fetch(`/reload-data/loads?${params.toString()}`);
+        const rows = res.ok ? await res.json() : [];
+        _reloadDataRows = rows;
+        renderReloadDataResults(rows, 'rd-viht-results');
+    } catch (e) {
+        results.innerHTML = '<p class="text-xs text-red-400">Search failed — check connection.</p>';
+    }
 }
 
 async function _runSearchReloadData() {
@@ -7821,6 +7892,10 @@ function renderReloadDataResults(rows, resultsElId = 'reload-data-results') {
             ${first.trim_length ? `<div><span class="font-semibold text-gray-300">Trim Length:</span> ${escHtml(first.trim_length)}"</div>` : ''}
         </div>` : ''}
     </div>`;
+    const dataNoteBox = first.data_note ? `<div class="mb-4 bg-amber-950/40 border border-amber-700/60 rounded-lg p-3 flex gap-2 text-xs text-amber-200">
+        <span class="text-base leading-none">⚠</span>
+        <div><span class="font-bold uppercase tracking-wide text-amber-300">Possible data issue</span> — ${escHtml(first.data_note)}</div>
+    </div>` : '';
 
     const groupBlocks = [...groups.values()].map(groupRows => {
         const g = groupRows[0];
@@ -7860,7 +7935,7 @@ function renderReloadDataResults(rows, resultsElId = 'reload-data-results') {
                     ${showVelocity ? `<td class="py-2 px-2">${fmtInt(r.start_velocity_fps)}</td>` : ''}
                     ${showPressure ? `<td class="py-2 px-2">${fmtInt(r.start_pressure)} ${escHtml(r.start_pressure_unit || '')}</td>` : ''}
                     ${showDensity ? `<td class="py-2 px-2">${rdVal(r.start_density_pct, '%')}</td>` : ''}
-                    <td class="py-2 px-2 border-l border-gray-800">${rdVal(r.max_charge_gr, r.max_is_compressed ? 'C' : '')}</td>
+                    <td class="py-2 px-2 border-l border-gray-800">${rdVal(r.max_charge_gr, (r.max_is_compressed ? 'C' : '') + (r.is_case_full ? 'F' : ''))}</td>
                     ${showVelocity ? `<td class="py-2 px-2">${fmtInt(r.max_velocity_fps)}</td>` : ''}
                     ${showPressure ? `<td class="py-2 px-2">${fmtInt(r.max_pressure)} ${escHtml(r.max_pressure_unit || '')}</td>` : ''}
                     ${showDensity ? `<td class="py-2 px-2">${rdVal(r.max_density_pct, '%')}</td>` : ''}
@@ -7870,7 +7945,7 @@ function renderReloadDataResults(rows, resultsElId = 'reload-data-results') {
         </div>`;
     }).join('');
 
-    results.innerHTML = summary + groupBlocks;
+    results.innerHTML = summary + dataNoteBox + groupBlocks;
 }
 
 // Upload/manage moved to the standalone /admin/reload-data page

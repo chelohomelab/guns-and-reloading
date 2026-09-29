@@ -1068,17 +1068,24 @@ def _sierra_line_rows(page) -> list[tuple[float, str]]:
 # Cartridge/Test barrel/Primers/Cases spec block on page 0, then a flat table (one row per
 # bullet+powder combination, no candidate-bullet fan-out like Nosler/Speer/Sierra/Barnes —
 # closer to Hodgdon's shape) that spills across several pages, each repeating the same column
-# header. Confirmed against 3 real files (6.5 Creedmoor/270 Win/6.5 PRC): every powder name is
-# Vihtavuori's own "N" + digits, occasionally with a leading multiplier digit ("20N29"/"24N41")
-# — used as the anchor to split the Mfg+Type text (1-3 words: "V-Max", "Solid Shank", "HPBT
-# MatchKing") from the fixed numeric columns around it, rather than guessing a token count.
+# header. Every powder name is Vihtavuori's own "N" + digits, occasionally with a leading
+# multiplier digit ("20N29"/"24N41") — used as the anchor to split the Mfg+Type text (1-3 words:
+# "V-Max", "Solid Shank", "HPBT MatchKing") from the fixed numeric columns around it, rather than
+# guessing a token count. Bullet weight is usually an integer but not always ("155.5", "200.2" —
+# confirmed real on .308 Winchester's Berger entries), so the weight/row regexes accept an
+# optional decimal rather than assuming \d+ — an early version didn't, which silently dropped
+# those rows before they even reached the reject list (they never matched the `^\d+\s`
+# pre-filter), inflating the apparent gap between Vihtavuori's own claimed row count and what
+# actually got imported. Most Mfg values are one word, but not all — see
+# _VIHTAVUORI_MULTIWORD_BRANDS for the ones confirmed to be two words ("Fox Bullets", "Cutting
+# Edge", etc.), checked before falling back to the naive first-word-is-brand split.
 # No case diagram exists in the source (the only embedded image is the Vihtavuori logo, confirmed
 # identical position/size across every file) and no brand-anchor text exists either ("Vihtavuori"
 # never appears in the extracted text layer, only baked into that logo image) — like Barnes, this
 # manufacturer can't be auto-detected and always needs the upload dropdown's explicit override.
 
 _VIHTAVUORI_ROW_RE = re.compile(r'''
-    ^(?P<weight>\d+)\s+
+    ^(?P<weight>\d+(?:\.\d+)?)\s+
     (?P<mfg_type>.+?)\s+
     (?P<coal>\d+\.\d+)\s+
     (?P<powder>\d*N\d+)\s+
@@ -1087,6 +1094,23 @@ _VIHTAVUORI_ROW_RE = re.compile(r'''
     (?P<st_vel>\d+)\s+
     (?P<mx_vel>\d+)\s*$
 ''', re.VERBOSE)
+
+# Grown as new files surface new multi-word brands (same "hand-maintained, extend as needed"
+# pattern as _BULLET_BRAND_ABBR above) — the default split (first word = brand, rest = model)
+# is wrong for these, so they're checked first. Longest-first so "Fox Bullets" matches before
+# a hypothetical shorter "Fox" prefix would.
+_VIHTAVUORI_MULTIWORD_BRANDS = sorted(
+    ["Fox Bullets", "Cutting Edge", "Lehigh Defense", "Red Moose"], key=len, reverse=True,
+)
+
+
+def _split_vihtavuori_bullet(mfg_type: str) -> tuple[str | None, str | None]:
+    for brand in _VIHTAVUORI_MULTIWORD_BRANDS:
+        if mfg_type == brand or mfg_type.startswith(brand + " "):
+            model = mfg_type[len(brand):].strip()
+            return brand, (model or None)
+    parts = mfg_type.split(None, 1)
+    return (parts[0] if parts else None), (parts[1] if len(parts) > 1 else None)
 
 _VIHTAVUORI_CARTRIDGE_RE = re.compile(r'^Cartridge\s+(.+)$')
 _VIHTAVUORI_BARREL_RE = re.compile(r'^Test barrel\s+\S+\s+mm\s+\(([^)]+)\),\s*(.+?)\s+twist$')
@@ -1134,19 +1158,19 @@ def parse_vihtavuori_pdf(pdf_bytes: bytes) -> dict:
         if m:
             claimed_count = int(m.group(1))
             continue
-        if not re.match(r'^\d+\s', line):
+        if not re.match(r'^\d+(?:\.\d+)?\s', line):
             continue
         rm = _VIHTAVUORI_ROW_RE.match(line)
         if rm is None:
             rejected.append(line)
             continue
         d = rm.groupdict()
-        mfg_type = d["mfg_type"].split(None, 1)
+        bullet_brand, bullet_model = _split_vihtavuori_bullet(d["mfg_type"])
         flag = d["mx_flag"]
         rows.append({
             "bullet_weight_gr": float(d["weight"]),
-            "bullet_brand": mfg_type[0] if mfg_type else None,
-            "bullet_model": mfg_type[1] if len(mfg_type) > 1 else None,
+            "bullet_brand": bullet_brand,
+            "bullet_model": bullet_model,
             "coal": d["coal"],
             "case_brand": case_brand,
             "primer_display": primer_display,

@@ -2,37 +2,27 @@
 
 ## In Progress
 
-### Multi-Platform Rollout (`version-1.23` branch)
-Desktop packaging, PWA offline read/write caching, and LAN-only HTTPS. Core functionality is
-implemented and committed on `version-1.23` — this branch is now in the testing/polish phase
-before merge.
+_Last updated 2026-09-30 — the previous "Multi-Platform Rollout (`version-1.23` branch)" section
+here was stale: that branch merged long ago (PR #32) and everything it listed (Windows/macOS/Linux
+desktop installers, PWA install prompts, LAN-only HTTPS, offline-write queue) has since shipped —
+see `CLAUDE.md`'s Decisions section and `gh release list` for what's actually live. Keep this
+section honest going forward: when a branch/item here ships, remove it instead of leaving it to
+rot — check `VERSION` and recent releases against this file before trusting either blindly._
 
-**Testing needed:**
-- [ ] Windows desktop installer — trigger the GitHub Actions build
-      (`.github/workflows/build-desktop.yml`), download the artifact, run the raw `.exe` directly
-      (no installer wrapper yet — see dev item below)
-- [ ] macOS desktop installer — needs the `BUNDLE()` spec fix below done first, then build + test
-      on the Mac desktop/laptop
-- [ ] Docker deployment path (general) — never tested at all, no Docker available in dev sandbox
-- [ ] Docker + LAN-only HTTPS (the `caddy` sidecar in `docker-compose.yml`) — never tested
-- [ ] PWA install prompt ("Add to Home Screen") on Android/iOS — just implemented, not yet tried
-- [ ] iPad — HTTPS trust flow + offline read/write features; iPadOS Safari can differ slightly
-      from iPhone Safari in exact menu paths
-- [ ] Step 3 offline-write queue remaining checklist: multiple queued items flushing in order, the
-      logout-warning dialog when something's still pending, a permanently-failed item getting
-      marked "stuck" instead of retrying forever
-- [ ] `scripts/dev-phone-test.ps1` (WSL2 dev helper) — written but never actually run
+### Reloading Data Center caliber dropdown
+Branch `reload-data-caliber-dropdown` — committed locally, **not yet pushed/PR'd/merged/released**.
+Converts the Caliber field on every manufacturer tab (Hodgdon/Nosler/Speer/Sierra/Barnes/
+Vihtavuori/Hornady/Lyman) from a free-text input + `<datalist>` autocomplete into a real `<select>`
+restricted to calibers that actually have data uploaded. Already verified live against the running
+dev server. Next step: push/PR/merge/release when the user gives the go-ahead (see `CLAUDE.md`'s
+git workflow section — this repo gates push/PR/merge on an explicit ask each time).
 
-**Small dev work remaining:**
-- [ ] Add a `BUNDLE()` block to `desktop/inventory.spec` so macOS produces a real `.app` (currently
-      just a raw executable folder, not double-clickable in Finder)
-- [ ] Write `desktop/windows/installer.iss` (Inno Setup) — currently a TODO placeholder in the CI
-      workflow
-- [ ] Write the macOS `.dmg` packaging step (create-dmg or hdiutil) — currently a TODO placeholder
-- [ ] Write the Linux AppImage packaging step (appimagetool) — currently a TODO placeholder
-- [ ] Rebase `version-1.23` onto current `main` before merging — it's 16 commits ahead, 6 behind as
-      of this writing (main picked up the range-day fixes, gitignore fix, and tab-persistence fix
-      while this branch was in progress)
+### Production sync check
+As of v1.26.0 (Vihtavuori added to Reloading Data Center), production has **not yet** received
+this release. Once it's updated (`git pull` or `/admin/upgrade`), the 8 real Vihtavuori PDFs the
+user already has (6.5 Creedmoor, 6.5 PRC, 270 Win, 7mm-08 Remington, 7mm Rem Mag, 30-06, 30-30, 308
+Win) still need to be re-uploaded through `/admin/reload-data` there — that data only exists in the
+dev DB, the parser code shipping via git doesn't bring the data with it.
 
 ## Future
 
